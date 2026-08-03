@@ -183,6 +183,8 @@ public sealed class ArchitectureBoundaryTests
                 continue;
             }
 
+            // Follow-up before M1 target-framework divergence: replace this with metadata-only PE inspection.
+            // M0 intentionally avoids adding a dependency solely for that future refactor.
             var references = Assembly.LoadFrom(assemblyPath).GetReferencedAssemblies();
             foreach (var reference in references)
             {
@@ -196,6 +198,19 @@ public sealed class ArchitectureBoundaryTests
 
         Assert.True(missing.Count == 0, $"Missing built core assemblies: {string.Join(", ", missing)}");
         Assert.True(violations.Count == 0, string.Join(Environment.NewLine, violations));
+    }
+
+    [Fact]
+    public void RepositoryDependencyDeclarationsDoNotReferenceForbiddenRuntimeDependencies()
+    {
+        var findings = DependencyDeclarationScanner.Scan(
+            DependencyDeclarationScanner.LoadRepositoryDeclarations(RepositoryRoot));
+
+        Assert.True(
+            findings.Count == 0,
+            string.Join(
+                Environment.NewLine,
+                findings.Select(finding => $"{finding.RelativePath}: {finding.DependencyName}")));
     }
 
     private static string RepositoryRoot => FindRepositoryRoot();

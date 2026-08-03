@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M0 - Repository bootstrap and architecture skeleton (complete).
+M0 - Hardening and hosted-CI verification.
 
 ## Milestones
 
@@ -59,6 +59,19 @@ Evaluate signed metadata, update channels, package sources, richer content, loca
 - [x] Add CI for locked restore, formatting, Release build, tests, and architecture tests on Windows and Linux.
 - [x] Run every required validation command and repair failures before closing M0.
 - [x] Update `STATUS.md` with exact results, risks, and the first M1 task.
+
+## M0 hardening review checklist
+
+This is a bounded follow-up to M0 review; it does not start M1 or inspect the local game installation.
+
+- [x] Pin `global.json` to the exact SDK feature band and make CI install from that file.
+- [x] Add `workflow_dispatch`, concurrency cancellation, immutable action references, and OS-specific TRX artifact uploads to CI.
+- [x] Keep CI checks ordered as `dotnet --info`, locked restore, format, Release build, and tests without running architecture tests twice.
+- [x] Add repository-wide dependency declaration scanning for forbidden game/runtime packages, with synthetic parser tests for forbidden project, central, allowed-test, and harmless-text cases.
+- [x] Keep the compiled assembly scan and document the future metadata-only PE inspection follow-up.
+- [x] Add minimal `README.md` and contribution/security/license-selection documentation without choosing a license.
+- [x] Update `STATUS.md` to distinguish local validation from hosted Windows/Linux CI verification.
+- [ ] Run the exact local validation and hygiene commands, then commit and push this branch. Open a draft PR only if `main` exists remotely.
 
 ## First executable task for M1
 
