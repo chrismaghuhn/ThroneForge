@@ -6,7 +6,7 @@ M0 - Hardening and hosted-CI verification
 
 ## State
 
-M0 implementation complete locally. Hosted Windows/Linux CI verification pending.
+M0 hardening implementation complete locally. Hosted Windows/Linux CI verification passed for the pushed hardening commit.
 
 ## Completed
 
@@ -42,7 +42,12 @@ All commands below were run with the pinned .NET SDK 10.0.100 provisioned outsid
 
 The red-green architecture-test check was also performed: the initial test run failed on the intentionally absent M0 skeleton, and the post-bootstrap Release run passed all five architecture tests.
 
-Hosted Windows/Linux CI verification is pending for the hardening branch and must not be inferred from the local results above. The workflow is configured but has not yet produced a run identifier or hosted SDK output.
+Hosted verification passed in GitHub Actions run [30834651514](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30834651514) for commit `11c4e11443e90ce13a487f42903bf301462d889d`:
+
+- `windows-latest`: PASS; job `91756759449`; SDK `10.0.100`; test-results artifact `throneforge-test-results-windows-latest-30834651514`.
+- `ubuntu-latest`: PASS; job `91756759508`; SDK `10.0.100`; test-results artifact `throneforge-test-results-ubuntu-latest-30834651514`.
+
+Both jobs completed locked restore, format verification, Release build, full tests, and test-result upload. The run used no local game installation.
 
 ## Unverified assumptions
 
@@ -55,9 +60,9 @@ Hosted Windows/Linux CI verification is pending for the hardening branch and mus
 - The host's default PATH still does not contain `dotnet`; CI and maintainers need a .NET 10 SDK matching `global.json`.
 - The local game directory contains proprietary files and must remain ignored and outside Git history.
 - The M0 baseline is committed; future changes must continue to exclude the local game directory.
-- The hosted Windows/Linux CI workflow has not yet completed; its result, run identifier, tested SHA, and per-runner SDK output must be recorded after GitHub executes it.
+- The hosted run above validates the hardening commit, but the remote repository still has no protected `main` branch and no draft PR can be opened against it yet.
 - The remote repository currently has no `main` branch; the repository owner must create or promote `main`, set it as default, and protect it before a normal M0 hardening PR can target it.
 
 ## Next task
 
-Finish M0 hardening by pushing this branch, wait for a real hosted Windows/Linux CI run, and establish protected `main`. Only then begin M1, task 1: create a local-only discovery tool that accepts an explicit Thronefall installation path, detects the managed Mono versus IL2CPP layout and executable architecture, computes a sanitized fingerprint from local metadata, and writes `docs/discovery/<fingerprint>.md` without copying or committing game binaries or assets.
+Establish protected `main` from the reviewed hardening commit. Only then begin M1, task 1: create a local-only discovery tool that accepts an explicit Thronefall installation path, detects the managed Mono versus IL2CPP layout and executable architecture, computes a sanitized fingerprint from local metadata, and writes `docs/discovery/<fingerprint>.md` without copying or committing game binaries or assets.

@@ -71,7 +71,7 @@ This is a bounded follow-up to M0 review; it does not start M1 or inspect the lo
 - [x] Keep the compiled assembly scan and document the future metadata-only PE inspection follow-up.
 - [x] Add minimal `README.md` and contribution/security/license-selection documentation without choosing a license.
 - [x] Update `STATUS.md` to distinguish local validation from hosted Windows/Linux CI verification.
-- [ ] Run the exact local validation and hygiene commands, then commit and push this branch. Open a draft PR only if `main` exists remotely.
+- [x] Run the exact local validation and hygiene commands, commit and push this branch, and record the successful hosted Windows/Linux CI run. Open a draft PR only if `main` exists remotely.
 
 ## First executable task for M1
 
