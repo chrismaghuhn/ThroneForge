@@ -110,8 +110,8 @@ This task is intentionally limited to synthetic fixtures plus one optional priva
 
 ### Validation and handoff
 
-- [ ] Run restore, format, Release build, full tests, architecture tests, contracts tests, and tracked-file hygiene checks.
-- [ ] Push `agent/m1-discovery`, wait for both hosted CI matrix jobs, and record run IDs, SDK versions, and results.
+- [x] Run restore, format, Release build, full tests, architecture tests, contracts tests, and tracked-file hygiene checks; exact pinned-toolchain formatting and hosted build/test evidence passed in CI run `30839919115`.
+- [x] Push `agent/m1-discovery`, wait for both hosted CI matrix jobs, and record run IDs, SDK versions, artifact counts, and results.
 - [ ] Stop with the next M1 investigation explicitly limited to loader/runtime compatibility discovery; do not start the custom-wave vertical slice.
 
 ## First executable task for M1

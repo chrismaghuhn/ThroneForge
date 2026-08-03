@@ -77,7 +77,7 @@
 - [x] Support `inspect`, mandatory `--game-path`, optional `--output-root` defaulting to `docs/discovery`, and `--overwrite`; keep exit codes limited to success, invalid arguments, and I/O/discovery failure.
 - [x] Print only relative report information and sanitized diagnostics; never echo the absolute game path.
 - [x] Document what the tool reads and never modifies, backend classification rules, PE/Unity evidence limits, fingerprint v1, report collision behavior, privacy guarantees, and the difference between synthetic and private verification.
-- [x] Update status with actual local/hosted validation only; the private report records `Mono`, `X64`, and `Unity version: Unknown` as local evidence, while hosted validation remains pending.
+- [x] Update status with actual local/hosted validation only; the private report records `Mono`, `X64`, and `Unity version: Unknown` as local evidence, and hosted run `30839919115` passed on both runners.
 
 ### Task 6: Validate, optionally inspect the explicitly supplied private installation, and hand off
 
@@ -86,7 +86,7 @@
 - Modify: `docs/adr/ADR-0002-target-framework-split-pending-m1-discovery.md` only if the local evidence justifies a decision
 - Create: `docs/discovery/<fingerprint>.md` only after manual sanitization
 
-- [ ] Run `dotnet restore --locked-mode`, `dotnet format --verify-no-changes --no-restore`, `dotnet build -c Release --no-restore`, `dotnet test -c Release --no-build`, the architecture and contracts test projects, and tracked binary/game-directory hygiene checks.
+- [x] Run the required restore, format, Release build, full test, architecture, contracts, and tracked-file hygiene checks; local compile/tests passed with SDK `10.0.110`, while exact pinned-toolchain formatting/build/test evidence passed in hosted CI run `30839919115`.
 - [x] Run the discovery command against the explicit local game path after synthetic tests passed, inspect the report, and retain only sanitized Markdown.
-- [ ] Push `agent/m1-discovery`, verify both hosted matrix jobs, and record exact run IDs, SDK, and test results.
+- [x] Push `agent/m1-discovery`, verify both hosted matrix jobs and artifacts, and record exact run IDs, SDK, and test results.
 - [ ] Stop before BepInEx/Harmony selection, loader smoke tests, lifecycle discovery, catalog export, wave bridge, or custom-wave implementation.
