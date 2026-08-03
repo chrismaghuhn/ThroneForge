@@ -4,14 +4,14 @@ ThroneForge is intended to become a maintainable, Forge-like mod SDK and no-code
 
 ## Current status
 
-This repository currently contains the M0 architecture skeleton and its hardening work. It is not a functioning Thronefall mod, and no game-facing runtime, discovery tooling, catalog exporter, or custom-wave implementation exists yet. M1 discovery must complete before any game integration is added.
+This repository contains the completed M0 architecture skeleton and the first M1 local-only discovery tool. It is not a functioning Thronefall mod: no loader, game-facing runtime, catalog exporter, lifecycle binding, or custom-wave implementation exists.
 
 ThroneForge does not distribute Thronefall binaries, copied game assets, decompiled source, or modified game executables.
 
 ## Prerequisites
 
 - .NET SDK `10.0.100`, selected by [`global.json`](global.json).
-- A clean checkout; a Thronefall installation is not required for M0 builds and tests.
+- A clean checkout; a Thronefall installation is not required for synthetic builds and tests. Private discovery requires an explicit path to a legally obtained local installation.
 
 ## Local validation
 
@@ -23,7 +23,7 @@ dotnet build -c Release --no-restore
 dotnet test -c Release --no-build
 ```
 
-The local game directory, build output, logs, and private game reference paths are ignored by Git. Do not stage them.
+The local game directory, build output, logs, and private game reference paths are ignored by Git. Do not stage them. To run the local-only discovery tool, see [`docs/discovery/README.md`](docs/discovery/README.md).
 
 ## Roadmap and specification
 
@@ -33,7 +33,7 @@ The local game directory, build output, logs, and private game reference paths a
 
 ## Development status disclaimer
 
-M0 architecture, hardening, and the final TRX artifact-preservation fix passed hosted Windows/Linux CI in run [30836315556](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30836315556). M1 has not started, and repository-owner setup of a protected `main` branch is still required. ThroneForge remains an architecture skeleton, not a functioning Thronefall mod; M1 must remain a local-only discovery phase and document evidence without guessing game internals.
+M0 architecture, hardening, and the final TRX artifact-preservation fix passed hosted Windows/Linux CI in run [30836315556](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30836315556). M1 discovery task 1 and its output/executable-selection hardening are complete on `agent/m1-discovery-hardening`; final hosted hardening verification passed in run [30844364366](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30844364366). Synthetic validation and one sanitized local evidence report exist. `main` is the protected default branch. ThroneForge remains an architecture skeleton, not a functioning Thronefall mod; discovery must document evidence without guessing game internals.
 
 ## License
 

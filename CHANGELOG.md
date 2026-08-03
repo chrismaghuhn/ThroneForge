@@ -5,6 +5,7 @@ All notable ThroneForge changes are documented here.
 ## Unreleased
 
 - Fixed CI test-result preservation so every test project gets its own TRX artifact and the workflow verifies aggregate completeness before upload.
+- Completed and hardened M1 discovery task 1 with a local-only, metadata-based Thronefall installation inspector, protected output boundaries, deterministic executable selection, and a sanitized fingerprint report; hosted verification passed on Windows and Ubuntu.
 
 ### Added
 
@@ -14,4 +15,5 @@ All notable ThroneForge changes are documented here.
 
 ### Not yet implemented
 
-- Thronefall discovery and game-facing runtime integration remain planned for M1 and later.
+- Further private runtime-compatibility evidence and all game-facing runtime integration remain incomplete.
+- Runtime integration, loaders, game API bindings, and custom-wave support remain unimplemented.

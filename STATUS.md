@@ -2,11 +2,11 @@
 
 ## Current milestone
 
-M0 - Hardening and hosted-CI verification
+M1 - Thronefall discovery spike, task 1 hardening on `agent/m1-discovery-hardening`
 
 ## State
 
-M0 hardening and final CI artifact verification complete. Hosted Windows/Linux CI passed for the pushed TRX-fix head.
+M0 is complete and the repository governance setup is complete in GitHub. M1 discovery task 1 is complete on `agent/m1-discovery`; this branch hardens its output protection, executable selection, bounded hashing, tests, and documentation before merge. M1 overall remains incomplete.
 
 ## Completed
 
@@ -27,6 +27,16 @@ M0 hardening and final CI artifact verification complete. Hosted Windows/Linux C
 - Fixed solution-level TRX filename collisions and added a pre-upload completeness check for one result file per test project.
 - Added repository-wide dependency declaration scanning for central props, source projects, and source lock files, with synthetic forbidden/allowed/harmless-input tests.
 - Added `README.md`, `SECURITY.md`, and `CONTRIBUTING.md` without selecting a license.
+- Verified in GitHub that `main` is the default branch and that the active `Protect main` ruleset targets `main`, requires pull requests and `Validate (windows-latest)`/`Validate (ubuntu-latest)`, blocks branch deletion, and blocks force pushes. No second approval is required.
+- Created `agent/m1-discovery` from clean `main@37c50febfe0ab32231000c194d7f2f853463148c`.
+- Replaced architecture-test `Assembly.LoadFrom` inspection with metadata-only `PEReader`/`MetadataReader` inspection before any target-framework divergence.
+- Added the portable `ThroneForge.Discovery` external tool and its solution/test project, with no project references or game-facing packages.
+- Added synthetic discovery fixtures for Mono, IL2CPP, conflicting/unknown layouts, PE architecture, path safety, reparse-point handling, deterministic fingerprints, sanitization, atomic writes, and report collisions.
+- Implemented conservative backend evidence collection, x86/x64/Arm64 PE header parsing, bounded Unity-version evidence, selected-file SHA-256 hashing, fingerprint v1, atomic Markdown reports, and the `inspect` command.
+- Added `docs/discovery/README.md` and generated the sanitized private report `docs/discovery/1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d.md`.
+- Verified discovery evidence for this fingerprint: backend `Mono`, executable architecture `X64`, Unity version `Unknown`, fingerprint algorithm `throneforge-game-fingerprint-v1`, fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`.
+- Confirmed final current-head CI run `30840490906` on Windows and Ubuntu: 10 TRX files, 35 tests, 0 failures/errors per runner, SDK `10.0.100`.
+- Created `agent/m1-discovery-hardening` from `f87ad9bb7f483f3128cef87f53525a4cb60c48c5` to close review findings before merge; no loader or runtime integration has started.
 
 ## Validation
 
@@ -43,27 +53,56 @@ All commands below were run with the pinned .NET SDK 10.0.100 provisioned outsid
 
 The red-green architecture-test check was also performed: the initial test run failed on the intentionally absent M0 skeleton, and the post-bootstrap Release run passed all five architecture tests.
 
-Final hosted verification passed in GitHub Actions run [30836315556](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30836315556) for commit `0eb597304a1f188c428585e05e014517532fd11c`:
+M1 local validation used the installed x86 .NET SDK `10.0.110` from the parent directory so the repository `global.json` was not selected. This is compile/test feedback only; canonical repository commands still require exact SDK `10.0.100`.
 
-- `windows-latest`: PASS; job `91762246279`; SDK `10.0.100`; 9 TRX files representing 19 tests and 0 failed/errors; artifact `throneforge-test-results-windows-latest-30836315556` (artifact `8865001699`).
-- `ubuntu-latest`: PASS; job `91762246181`; SDK `10.0.100`; 9 TRX files representing 19 tests and 0 failed/errors; artifact `throneforge-test-results-ubuntu-latest-30836315556` (artifact `8864985942`).
+- `dotnet restore --force-evaluate` from the parent directory: PASS with SDK `10.0.110`; regenerated the new test project's lockfile for its project reference.
+- `dotnet build SDK\ThroneForge.slnx -c Release --no-restore`: PASS; 0 warnings, 0 errors.
+- Focused `ThroneForge.Discovery.Tests`: PASS; 16 passed, 0 failed, 0 skipped.
+- Full `dotnet test SDK\ThroneForge.slnx -c Release --no-build`: PASS; 35 passed, 0 failed, 0 skipped, including 11 architecture tests.
+- `dotnet format SDK\ThroneForge.slnx --verify-no-changes --no-restore`: BLOCKED because the formatter's build host resolves repository `global.json` and exact SDK `10.0.100` is not installed locally.
+- Private command, with the absolute game path redacted here: `dotnet run --project src/ThroneForge.Discovery --no-restore -- inspect --game-path <redacted> --output-root docs/discovery`: PASS.
+- Private report review: PASS; backend `Mono`, executable architecture `X64`, Unity version `Unknown`, fingerprint algorithm `throneforge-game-fingerprint-v1`, fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`.
+- Private report sanitization: PASS; no absolute path, username, machine name, parent traversal, arbitrary listing, or temporary report file was present.
+- Final hosted CI passed in GitHub Actions run [30840265844](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30840265844) for branch head commit `233ee8e8e5ac9ddc2f2828a2228447a198601c63`:
+  - `ubuntu-latest`: PASS; job `91775313489`; SDK `10.0.100`; 10 TRX files representing 35 tests and 0 failed/errors; artifact `throneforge-test-results-ubuntu-latest-30840265844` (artifact `8866496498`).
+  - `windows-latest`: PASS; job `91775313585`; SDK `10.0.100`; 10 TRX files representing 35 tests and 0 failed/errors; artifact `throneforge-test-results-windows-latest-30840265844` (artifact `8866517471`).
+- Hosted logs and both downloaded artifact directories were independently checked; no `Overwriting results file` warning occurred.
 
-Both jobs completed locked restore, format verification, Release build, full tests, the completeness check, and test-result upload. The two artifacts were downloaded and independently parsed. No `Overwriting results file` warning occurred in either test log. The run used no local game installation.
+### M1 discovery hardening validation
+
+The hardening implementation is complete and hosted-verified on `agent/m1-discovery-hardening`; M1 task 1 is merge-ready, while M1 task 2 has not started.
+
+- Output roots are validated before any output directory is created: the game root, descendants, existing reparse points, and reparse-point parents are rejected. Filesystem failures are converted to sanitized `DiscoveryException` messages.
+- Main-executable selection is deterministic: unique top-level `*_Data` base-name match, then installation-directory-name match, then exactly one valid top-level PE executable; multiple candidates remain ambiguous and produce architecture `Unknown`.
+- Selected compatibility files and Unity-version evidence use bounded single-open reads where applicable; fingerprints remain deterministic.
+- New regression coverage passes locally: output protection, sibling-path handling, reparse points, renamed installations, crash-handler ordering, ambiguous/unique executables, CLI redaction, deterministic fingerprints, and report non-creation.
+- Local full solution validation with installed SDK `10.0.110` from the parent directory: restore PASS, Release build PASS (0 warnings/0 errors), full tests PASS (46 passed, 0 failed, 0 skipped), architecture tests PASS (11), and Contracts tests PASS (1).
+- Local `dotnet format --verify-no-changes --no-restore` could not run because the formatter's build host resolves the repository's exact SDK requirement `10.0.100`, which is not installed on this machine. The exact pinned format/build/test path remains subject to hosted CI.
+- Private report re-run passed with the sanitized evidence unchanged: `Mono`, `X64`, Unity `Unknown`, fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`, and no absolute path, username, machine name, or temporary file.
+
+Hosted verification passed in GitHub Actions run [30844364366](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30844364366) for final hardening commit `d1ddc2bcec991fa1f12016c4ad5712557a1f8fa4`:
+
+- `windows-latest`: PASS; job `91788915294`; SDK `10.0.100`; 10 TRX files representing 46 tests, 0 failed, 0 errors; artifact `throneforge-test-results-windows-latest-30844364366` (artifact `8868100813`).
+- `ubuntu-latest`: PASS; job `91788915163`; SDK `10.0.100`; 10 TRX files representing 46 tests, 0 failed, 0 errors; artifact `throneforge-test-results-ubuntu-latest-30844364366` (artifact `8868078879`).
+
+Both jobs completed locked restore, exact-SDK information, format verification, Release build, full tests, TRX completeness verification, and upload. Both downloaded artifacts were independently parsed. No `Overwriting results file` warning occurred in either log, and each artifact contains one TRX per test project. No local game installation was available to CI.
 
 ## Unverified assumptions
 
-- Thronefall executable architecture, Unity version, scripting backend, loader, Harmony compatibility, target framework, build fingerprint, private members, lifecycle hooks, and wave representation have not been discovered.
+- Backend `Mono`, executable architecture `X64`, and fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d` are verified only for the documented local installation fingerprint.
+- Unity version remains `Unknown`; loader, Harmony compatibility, target framework, private members, lifecycle hooks, game APIs, and wave representation remain unknown.
 - The M0 external-tool target is planned as `net10.0` because the specification names .NET 10 as the active LTS at its research checkpoint; the game-facing target remains provisional until M1 evidence.
 - No game-facing behavior is implemented or claimed.
 
 ## Risks and blockers
 
-- The host's default PATH still does not contain `dotnet`; CI and maintainers need a .NET 10 SDK matching `global.json`.
+- The host's default PATH still does not contain `dotnet`; the only directly available SDK is x86 `10.0.110`, while CI and maintainers need exact `10.0.100` for canonical validation.
 - The local game directory contains proprietary files and must remain ignored and outside Git history.
 - The M0 baseline is committed; future changes must continue to exclude the local game directory.
-- The final hosted run validates the TRX fix, but the remote repository still has no protected `main` branch and no draft PR can be opened against it yet.
-- The remote repository currently has no `main` branch; the repository owner must create or promote `main`, set it as default, and protect it before a normal M0 hardening PR can target it.
+- Exact SDK `10.0.100` local formatting/validation remains unverified; hosted CI is required for that pinned-toolchain result.
+- The private report records only local layout evidence: Mono indicators were found under `MonoBleedingEdge` and `thronefall_Data/Managed`, plus `Assembly-CSharp.dll`; Unity version evidence was unavailable. No loader, target framework, lifecycle hook, catalog source, or runtime compatibility conclusion is claimed.
+- The hardening branch is merge-ready; merge into protected `main` remains a repository-owner action. The next M1 task must wait until that merge and must remain limited to loader/managed-runtime compatibility discovery.
 
 ## Next task
 
-Establish protected `main` from the final verified commit `0eb597304a1f188c428585e05e014517532fd11c`. Only then begin M1, task 1: create a local-only discovery tool that accepts an explicit Thronefall installation path, detects the managed Mono versus IL2CPP layout and executable architecture, computes a sanitized fingerprint from local metadata, and writes `docs/discovery/<fingerprint>.md` without copying or committing game binaries or assets.
+Merge and protect the reviewed `agent/m1-discovery-hardening` result, then limit the next M1 investigation to loader and managed-runtime compatibility discovery. Do not install or execute a loader, inspect game methods, or implement lifecycle/custom-wave behavior.
