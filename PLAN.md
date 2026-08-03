@@ -73,6 +73,15 @@ This is a bounded follow-up to M0 review; it does not start M1 or inspect the lo
 - [x] Update `STATUS.md` to distinguish local validation from hosted Windows/Linux CI verification.
 - [x] Run the exact local validation and hygiene commands, commit and push this branch, and record the successful hosted Windows/Linux CI run. Open a draft PR only if `main` exists remotely.
 
+## Final M0 TRX artifact fix
+
+This bounded follow-up corrects the solution-level TRX filename collision. It does not start M1 or inspect the local game installation.
+
+- [x] Reproduce the fixed-name TRX overwrite behavior locally.
+- [x] Use automatic TRX filenames while keeping one solution-level test execution per runner.
+- [x] Verify one TRX file per test project, non-empty counters, zero failures/errors, and aggregate test count before upload.
+- [ ] Run the corrected workflow on Windows and Linux, inspect both uploaded artifacts, and record the exact run evidence in `STATUS.md`.
+
 ## First executable task for M1
 
 Create a local-only discovery tool that accepts an explicit Thronefall installation path, detects the managed Mono versus IL2CPP layout and executable architecture, computes a sanitized fingerprint from local metadata, and writes `docs/discovery/<fingerprint>.md` without copying or committing game binaries or assets. Stop after documenting the evidence and blockers; do not guess a lifecycle hook or implement the wave bridge.

@@ -4,6 +4,8 @@ All notable ThroneForge changes are documented here.
 
 ## Unreleased
 
+- Fixed CI test-result preservation so every test project gets its own TRX artifact and the workflow verifies aggregate completeness before upload.
+
 ### Added
 
 - M0 repository bootstrap and architecture skeleton.

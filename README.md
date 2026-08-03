@@ -33,9 +33,8 @@ The local game directory, build output, logs, and private game reference paths a
 
 ## Development status disclaimer
 
-M0 establishes boundaries and verification infrastructure only. Hosted Windows/Linux CI verification and repository-owner setup of a protected `main` branch are required before M0 hardening is finally accepted. M1 must remain a local-only discovery phase and must document evidence without guessing game internals.
+M0 architecture and hardening have passed hosted Windows/Linux CI. The latest TRX artifact-preservation fix is being verified on its dedicated branch before final M0 closure. M1 has not started, and repository-owner setup of a protected `main` branch is still required. ThroneForge remains an architecture skeleton, not a functioning Thronefall mod; M1 must remain a local-only discovery phase and document evidence without guessing game internals.
 
 ## License
 
 TODO: The repository owner must select and approve a software license before accepting external contributions. No license is granted by this repository yet.
-

@@ -45,7 +45,57 @@ jobs:
         run: dotnet build -c Release --no-restore
 
       - name: Run tests
-        run: dotnet test -c Release --no-build --logger "trx;LogFileName=throneforge-${{ matrix.runner_os }}.trx" --results-directory "artifacts/test-results/${{ matrix.runner_os }}"
+        run: dotnet test -c Release --no-build --logger trx --results-directory "artifacts/test-results/${{ matrix.runner_os }}"
+
+      - name: Verify test result completeness
+        shell: pwsh
+        run: |
+          $resultDirectory = "artifacts/test-results/${{ matrix.runner_os }}"
+          $expectedProjects = @(
+              Get-ChildItem "tests" -Recurse -Filter "*.csproj" -File
+          )
+          $trxFiles = @(
+              Get-ChildItem $resultDirectory -Recurse -Filter "*.trx" -File
+          )
+
+          if ($trxFiles.Count -ne $expectedProjects.Count) {
+              throw "Expected $($expectedProjects.Count) TRX files, but found $($trxFiles.Count)."
+          }
+
+          $totalTests = 0
+          $failedTests = 0
+
+          foreach ($trxFile in $trxFiles) {
+              [xml]$document = Get-Content -LiteralPath $trxFile.FullName -Raw
+              $namespace = New-Object System.Xml.XmlNamespaceManager($document.NameTable)
+              $namespace.AddNamespace("trx", $document.DocumentElement.NamespaceURI)
+
+              $counters = $document.SelectSingleNode(
+                  "/trx:TestRun/trx:ResultSummary/trx:Counters",
+                  $namespace
+              )
+
+              if ($null -eq $counters) {
+                  throw "TRX file '$($trxFile.Name)' does not contain result counters."
+              }
+
+              $fileTotal = [int]$counters.GetAttribute("total")
+              $fileFailed = [int]$counters.GetAttribute("failed")
+              $fileErrors = [int]$counters.GetAttribute("error")
+
+              if ($fileTotal -lt 1) {
+                  throw "TRX file '$($trxFile.Name)' contains no discovered tests."
+              }
+
+              $totalTests += $fileTotal
+              $failedTests += $fileFailed + $fileErrors
+          }
+
+          if ($failedTests -ne 0) {
+              throw "TRX verification found $failedTests failed or errored tests."
+          }
+
+          Write-Host "Verified $($trxFiles.Count) TRX files containing $totalTests tests."
 
       - name: Upload test results
         if: always()
