@@ -1,5 +1,5 @@
-using ThroneForge.LoaderSmokeTest;
 using System.IO.Compression;
+using ThroneForge.LoaderSmokeTest;
 using Xunit;
 
 namespace ThroneForge.LoaderSmokeTest.Tests;
