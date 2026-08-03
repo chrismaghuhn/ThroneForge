@@ -60,9 +60,9 @@ M1 local validation used the installed x86 .NET SDK `10.0.110` from the parent d
 - Private command, with the absolute game path redacted here: `dotnet run --project src/ThroneForge.Discovery --no-restore -- inspect --game-path <redacted> --output-root docs/discovery`: PASS.
 - Private report review: PASS; backend `Mono`, executable architecture `X64`, Unity version `Unknown`, fingerprint algorithm `throneforge-game-fingerprint-v1`, fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`.
 - Private report sanitization: PASS; no absolute path, username, machine name, parent traversal, arbitrary listing, or temporary report file was present.
-- Hosted CI passed in GitHub Actions run [30839919115](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30839919115) for commit `912be5c7274014ecde0c3fa1deac2ae68e48a1a4`:
-  - `ubuntu-latest`: PASS; job `91774176463`; SDK `10.0.100`; 10 TRX files representing 35 tests and 0 failed/errors; artifact `throneforge-test-results-ubuntu-latest-30839919115` (artifact `8866359385`).
-  - `windows-latest`: PASS; job `91774176512`; SDK `10.0.100`; 10 TRX files representing 35 tests and 0 failed/errors; artifact `throneforge-test-results-windows-latest-30839919115` (artifact `8866383818`).
+- Final hosted CI passed in GitHub Actions run [30840265844](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30840265844) for branch head commit `233ee8e8e5ac9ddc2f2828a2228447a198601c63`:
+  - `ubuntu-latest`: PASS; job `91775313489`; SDK `10.0.100`; 10 TRX files representing 35 tests and 0 failed/errors; artifact `throneforge-test-results-ubuntu-latest-30840265844` (artifact `8866496498`).
+  - `windows-latest`: PASS; job `91775313585`; SDK `10.0.100`; 10 TRX files representing 35 tests and 0 failed/errors; artifact `throneforge-test-results-windows-latest-30840265844` (artifact `8866517471`).
 - Hosted logs and both downloaded artifact directories were independently checked; no `Overwriting results file` warning occurred.
 
 Final hosted verification passed in GitHub Actions run [30836315556](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30836315556) for commit `0eb597304a1f188c428585e05e014517532fd11c`:
