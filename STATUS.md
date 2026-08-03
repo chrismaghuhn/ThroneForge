@@ -2,11 +2,11 @@
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 3 reversible loader bootstrap smoke test on `agent/m1-loader-smoke-test`
+M1 - Thronefall discovery spike, task 3 reversible loader bootstrap smoke test completed on `agent/m1-loader-smoke-test`
 
 ## State
 
-M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has a private `Passed` bootstrap result on `agent/m1-loader-smoke-test`; hosted synthetic CI verification is pending and M1 overall remains incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 is complete for the documented fingerprint: the private disposable-copy smoke test passed and hosted synthetic CI verification passed in run `30857539959`. M1 overall remains incomplete.
 
 ## Completed
 
@@ -141,8 +141,13 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Main validation run `30853440786` passed on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 10 TRX files representing 99 tests, with 0 failures and 0 skips.
 - The active branch is `agent/m1-loader-smoke-test`, created from that merged baseline.
 - The provisional candidate was official BepInEx 5 Unity Mono x64 `5.4.23.5` for the documented fingerprint only. The experiment used an external disposable copy and left the original installation untouched.
-- Private outcome is `Passed`; hosted synthetic CI and artifact inspection for this branch remain pending.
+- Private outcome is `Passed`; the original installation fingerprint was unchanged before and after the experiment, and the disposable copy fingerprint was restored after rollback.
+- Final hosted validation passed in run [30857539959](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30857539959) for commit `634d3e97552d4f9ea619a2b7d9359ffc8bb1cb68`:
+  - `windows-latest`: PASS; SDK `10.0.100`; 11 TRX files, 130 tests, 0 failures, 0 errors, 0 skipped.
+  - `ubuntu-latest`: PASS; SDK `10.0.100`; 11 TRX files, 130 tests, 0 failures, 0 errors, 0 skipped.
+  - Both artifacts were downloaded and independently parsed. No `Overwriting results file` warning appeared in either hosted log.
+- The focused Loader-Smoke-Test suite represented 31 tests in the final hosted total. No hosted job ran the real game or loader experiment.
 
 ## Next task
 
-Run the exact-SDK hosted matrix, inspect every TRX artifact, then stop after handoff. The next M1 task may address the plugin/runtime compatibility boundary only after review; do not add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves in this branch.
+Task 3 handoff is complete. The next M1 task may address the plugin/runtime compatibility boundary only after review; do not add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves in this branch.

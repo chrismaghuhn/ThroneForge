@@ -141,8 +141,9 @@ Task 2 is complete and merged by PR #2 into protected `main` at `d3f1bb4fde9f77e
 - [x] Launch the copied loader profile, parse sanitized bootstrap evidence, and load no plugin.
 - [x] Roll back the disposable copy and verify both original and copied fingerprints/readiness.
 - [x] Commit only a sanitized outcome report; do not claim plugin, Harmony, lifecycle, or game API compatibility.
+- [x] Run the final hosted Windows/Linux matrix and independently inspect every TRX artifact.
 
-Private Task-3 outcome: `Passed` for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`; BepInEx `5.4.23.5` reported preloader and chainloader initialization with zero plugins and no warnings/errors. Hosted synthetic CI verification is still required before closing this task.
+Task-3 outcome: `Passed` for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`; BepInEx `5.4.23.5` reported preloader and chainloader initialization with zero plugins and no warnings/errors. Final hosted run `30857539959` on commit `634d3e97552d4f9ea619a2b7d9359ffc8bb1cb68` passed on both runners with 11 TRX files and 130 tests per runner using SDK `10.0.100`. M1 remains incomplete.
 
 ## M1 discovery task 2 hardening (completed and merged)
 
