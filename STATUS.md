@@ -6,7 +6,7 @@ M0 - Hardening and hosted-CI verification
 
 ## State
 
-M0 hardening implementation complete locally. Hosted Windows/Linux CI verification passed for the pushed hardening commit.
+M0 hardening and final CI artifact verification complete. Hosted Windows/Linux CI passed for the pushed TRX-fix head.
 
 ## Completed
 
@@ -24,6 +24,7 @@ M0 hardening implementation complete locally. Hosted Windows/Linux CI verificati
 - Pinned SDK selection to .NET `10.0.100` with `rollForward: disable`; CI reads the repository `global.json`.
 - Pinned current GitHub-maintained actions to immutable commits: checkout `v7.0.1` (`3d3c42e5aac5ba805825da76410c181273ba90b1`), setup-dotnet `v6.0.0` (`a98b56852c35b8e3190ac28c8c2271da59106c68`), and upload-artifact `v7.0.1` (`043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`).
 - Added CI manual dispatch, branch/PR concurrency cancellation, OS-specific TRX output, and always-run test-result artifact uploads.
+- Fixed solution-level TRX filename collisions and added a pre-upload completeness check for one result file per test project.
 - Added repository-wide dependency declaration scanning for central props, source projects, and source lock files, with synthetic forbidden/allowed/harmless-input tests.
 - Added `README.md`, `SECURITY.md`, and `CONTRIBUTING.md` without selecting a license.
 
@@ -42,12 +43,12 @@ All commands below were run with the pinned .NET SDK 10.0.100 provisioned outsid
 
 The red-green architecture-test check was also performed: the initial test run failed on the intentionally absent M0 skeleton, and the post-bootstrap Release run passed all five architecture tests.
 
-Hosted verification passed in GitHub Actions run [30834651514](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30834651514) for commit `11c4e11443e90ce13a487f42903bf301462d889d`:
+Final hosted verification passed in GitHub Actions run [30836315556](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30836315556) for commit `0eb597304a1f188c428585e05e014517532fd11c`:
 
-- `windows-latest`: PASS; job `91756759449`; SDK `10.0.100`; test-results artifact `throneforge-test-results-windows-latest-30834651514`.
-- `ubuntu-latest`: PASS; job `91756759508`; SDK `10.0.100`; test-results artifact `throneforge-test-results-ubuntu-latest-30834651514`.
+- `windows-latest`: PASS; job `91762246279`; SDK `10.0.100`; 9 TRX files representing 19 tests and 0 failed/errors; artifact `throneforge-test-results-windows-latest-30836315556` (artifact `8865001699`).
+- `ubuntu-latest`: PASS; job `91762246181`; SDK `10.0.100`; 9 TRX files representing 19 tests and 0 failed/errors; artifact `throneforge-test-results-ubuntu-latest-30836315556` (artifact `8864985942`).
 
-Both jobs completed locked restore, format verification, Release build, full tests, and test-result upload. The run used no local game installation.
+Both jobs completed locked restore, format verification, Release build, full tests, the completeness check, and test-result upload. The two artifacts were downloaded and independently parsed. No `Overwriting results file` warning occurred in either test log. The run used no local game installation.
 
 ## Unverified assumptions
 
@@ -60,9 +61,9 @@ Both jobs completed locked restore, format verification, Release build, full tes
 - The host's default PATH still does not contain `dotnet`; CI and maintainers need a .NET 10 SDK matching `global.json`.
 - The local game directory contains proprietary files and must remain ignored and outside Git history.
 - The M0 baseline is committed; future changes must continue to exclude the local game directory.
-- The hosted run above validates the hardening commit, but the remote repository still has no protected `main` branch and no draft PR can be opened against it yet.
+- The final hosted run validates the TRX fix, but the remote repository still has no protected `main` branch and no draft PR can be opened against it yet.
 - The remote repository currently has no `main` branch; the repository owner must create or promote `main`, set it as default, and protect it before a normal M0 hardening PR can target it.
 
 ## Next task
 
-Establish protected `main` from the reviewed hardening commit. Only then begin M1, task 1: create a local-only discovery tool that accepts an explicit Thronefall installation path, detects the managed Mono versus IL2CPP layout and executable architecture, computes a sanitized fingerprint from local metadata, and writes `docs/discovery/<fingerprint>.md` without copying or committing game binaries or assets.
+Establish protected `main` from the final verified commit `0eb597304a1f188c428585e05e014517532fd11c`. Only then begin M1, task 1: create a local-only discovery tool that accepts an explicit Thronefall installation path, detects the managed Mono versus IL2CPP layout and executable architecture, computes a sanitized fingerprint from local metadata, and writes `docs/discovery/<fingerprint>.md` without copying or committing game binaries or assets.

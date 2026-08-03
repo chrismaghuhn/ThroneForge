@@ -80,7 +80,7 @@ This bounded follow-up corrects the solution-level TRX filename collision. It do
 - [x] Reproduce the fixed-name TRX overwrite behavior locally.
 - [x] Use automatic TRX filenames while keeping one solution-level test execution per runner.
 - [x] Verify one TRX file per test project, non-empty counters, zero failures/errors, and aggregate test count before upload.
-- [ ] Run the corrected workflow on Windows and Linux, inspect both uploaded artifacts, and record the exact run evidence in `STATUS.md`.
+- [x] Run the corrected workflow on Windows and Linux, inspect both uploaded artifacts, and record the exact run evidence in `STATUS.md` (run `30836315556`, head `0eb597304a1f188c428585e05e014517532fd11c`).
 
 ## First executable task for M1
 
