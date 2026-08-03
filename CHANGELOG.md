@@ -11,6 +11,7 @@ All notable ThroneForge changes are documented here.
 - M1 task 2 was merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`; main run `30853440786` passed with 10 TRX files and 99 tests per runner. Started M1 task 3 as a local-only reversible BepInEx bootstrap smoke test; no loader result or plugin is claimed yet.
 - Completed the historical M1 task 3 bootstrap experiment for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`: official BepInEx `5.4.23.5` initialized its preloader and chainloader with zero custom plugins, and the disposable copy's compatibility fingerprint was restored. Complete historical manifests were not retained, so the report does not claim complete-manifest equality. Pre-hardening hosted run `30857962381` passed on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, and 130 tests per runner. Plugin, Harmony, lifecycle, and game API compatibility are not claimed.
 - Started M1 task 3 hardening: complete original/disposable manifest verification, fresh-profile and manifest-backed resume gates, post-apply rollback guarding, recovery-state handling, and repository-derived report-path validation. The historical private result remains explicitly limited because complete manifests were not retained; no private experiment was rerun.
+- Hosted hardening validation run `30860012681` passed on Windows and Ubuntu for implementation commit `1643cdb4e26f3e5d0890b7b203df8904ec77795c`: SDK `10.0.100`, 11 TRX files, 146 tests per runner, 0 failures/errors/skips, and no overwrite warnings.
 
 ### Added
 

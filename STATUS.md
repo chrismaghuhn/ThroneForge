@@ -157,7 +157,7 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Harness hardening now requires complete original and disposable manifest equality, fresh-copy or manifest-backed resume validation, real post-runtime/readiness checks, guarded post-apply rollback, manual-closure recovery state, and a repository-derived committed report path.
 - Local hardening validation with the installed parent-directory SDK `10.0.110`: locked restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 146 tests (including 47 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and Contracts tests PASS with 1 test. The repository-pinned `dotnet format` command remains locally blocked because SDK `10.0.100` is not installed; hosted CI is required for exact-toolchain format verification.
 - The private experiment was not rerun. No loader, game binary, archive, raw log, recovery marker, or private path was committed.
-- Hosted validation for this hardening branch is pending; no final branch-head run is claimed yet. After the hosted run, record its run ID, tested SHA, Windows/Linux TRX totals, and SDK `10.0.100` here.
+- Hosted hardening validation passed in run [30860012681](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30860012681) for implementation commit `1643cdb4e26f3e5d0890b7b203df8904ec77795c`: Windows PASS with SDK `10.0.100`, 11 TRX files, 146 tests, 0 failures/errors/skips; Ubuntu PASS with SDK `10.0.100`, 11 TRX files, 146 tests, 0 failures/errors/skips. Both artifacts were downloaded and parsed independently; no `Overwriting results file` warning occurred.
 
 ## Next task
 

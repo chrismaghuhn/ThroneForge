@@ -155,7 +155,9 @@ Task-3 historical outcome: BepInEx `5.4.23.5` reported preloader and chainloader
 - [x] Derive and validate the committed report path below `docs/discovery`; remove arbitrary direct CLI report destinations.
 - [x] Add regression tests for manifest verification, resume safety, post-apply rollback, recovery markers, and report-path containment.
 - [x] Update the Task 3 report and project documentation without fabricating complete historical manifest evidence.
-- [ ] Run local and hosted validation; do not begin M1 Task 4 until this branch is reviewed and merged.
+- [x] Run local and hosted validation; do not begin M1 Task 4 until this branch is reviewed and merged.
+
+Task-3 hardening validation: implementation commit `1643cdb4e26f3e5d0890b7b203df8904ec77795c` passed hosted run `30860012681` on Windows and Ubuntu. Each runner used SDK `10.0.100`, uploaded 11 TRX files representing 146 tests, and reported 0 failures, errors, or skips; no TRX overwrite warning occurred. The private experiment was not rerun.
 
 ## M1 discovery task 2 hardening (completed and merged)
 
