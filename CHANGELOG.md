@@ -8,6 +8,7 @@ All notable ThroneForge changes are documented here.
 - Completed and hardened M1 discovery task 1 with a local-only, metadata-based Thronefall installation inspector, protected output boundaries, deterministic executable selection, and a sanitized fingerprint report; hosted verification passed on Windows and Ubuntu.
 - Added M1 task 2's bounded runtime-compatibility inspection: metadata-only managed-runtime profiling, conservative target-framework recommendations, bounded Unity-version evidence, loader-indicator inventory, and a provisional official BepInEx candidate matrix.
 - Completed M1 task 2 hardening: shared fingerprint-v1 verification, separate candidate/readiness assessment, evidence-specific TFM confidence, and distinct conflict/missing/limitation/warning reporting. Hosted Windows/Linux verification passed in run `30852340193` with 10 TRX files and 99 tests per runner.
+- M1 task 2 was merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`; main run `30853440786` passed with 10 TRX files and 99 tests per runner. Started M1 task 3 as a local-only reversible BepInEx bootstrap smoke test; no loader result or plugin is claimed yet.
 
 ### Added
 
@@ -17,5 +18,5 @@ All notable ThroneForge changes are documented here.
 
 ### Not yet implemented
 
-- Further private runtime-compatibility evidence and all game-facing runtime integration remain incomplete.
+- The M1 task 3 disposable-profile loader bootstrap experiment, private evidence review, and hosted synthetic validation remain incomplete.
 - Runtime integration, loaders, game API bindings, and custom-wave support remain unimplemented.

@@ -4,7 +4,7 @@ ThroneForge is intended to become a maintainable, Forge-like mod SDK and no-code
 
 ## Current status
 
-This repository contains the completed M0 architecture skeleton, M1 discovery task 1, and M1 task 2 runtime-compatibility hardening. M1 task 3 has not started. It is not a functioning Thronefall mod: no loader, game-facing runtime, catalog exporter, lifecycle binding, or custom-wave implementation exists.
+This repository contains the completed M0 architecture skeleton, M1 discovery task 1, and M1 task 2 runtime-compatibility hardening. M1 task 3 has started on a separate branch and is limited to a reversible loader-bootstrap smoke test in an external disposable copy. It is not a functioning Thronefall mod: no plugin, game-facing runtime, catalog exporter, lifecycle binding, or custom-wave implementation exists.
 
 ThroneForge does not distribute Thronefall binaries, copied game assets, decompiled source, or modified game executables.
 
@@ -33,7 +33,7 @@ The local game directory, build output, logs, and private game reference paths a
 
 ## Development status disclaimer
 
-M0 architecture, hardening, and the final TRX artifact-preservation fix passed hosted Windows/Linux CI in run [30836315556](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30836315556). M1 discovery task 1 and its output/executable-selection hardening are complete on protected `main`; final hosted hardening verification passed in run [30844364366](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30844364366). M1 task 2 hardening commit `09850c9` passed hosted Windows/Linux CI in run [30852340193](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30852340193), with 10 TRX files and 99 tests per runner. `main` remains the protected default branch. ThroneForge remains an architecture skeleton, not a functioning Thronefall mod; discovery must document evidence without guessing game internals.
+M0 architecture, hardening, and the final TRX artifact-preservation fix passed hosted Windows/Linux CI. M1 discovery task 1 and task 2 are complete on protected `main`; PR #2 merged at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. Main run [30853440786](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30853440786) passed with 10 TRX files and 99 tests per runner using SDK `10.0.100`. M1 task 3 is now a separate, local-only reversible loader-bootstrap investigation; it has not yet produced a result. `main` remains the protected default branch. ThroneForge remains an architecture skeleton, not a functioning Thronefall mod; discovery must document evidence without guessing game internals.
 
 ## License
 

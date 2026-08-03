@@ -2,11 +2,11 @@
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 2 hardening on `agent/m1-runtime-compatibility-hardening`
+M1 - Thronefall discovery spike, task 3 reversible loader bootstrap smoke test on `agent/m1-loader-smoke-test`
 
 ## State
 
-M0 and M1 discovery task 1 are complete and merged into protected `main` at `e0c46a16fde527dd3a0f99cd5e30f8d5baba571a`. M1 task 2 hardening is complete on `agent/m1-runtime-compatibility-hardening`; the implementation/documentation head `456360480c265e29817aa6c818274341cdbced54` passed the final hosted Windows/Linux verification recorded below. M1 task 3 and M1 overall remain incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has started on `agent/m1-loader-smoke-test`; no loader has been installed or executed yet, and M1 overall remains incomplete.
 
 ## Completed
 
@@ -130,9 +130,17 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
   - `windows-latest`: PASS; job `91816522849`; SDK `10.0.100`; 10 TRX files, 99 tests, 0 failures, 0 errors, 0 skipped; artifact `throneforge-test-results-windows-latest-30852764951`.
   - `ubuntu-latest`: PASS; job `91816522702`; SDK `10.0.100`; 10 TRX files, 99 tests, 0 failures, 0 errors, 0 skipped; artifact `throneforge-test-results-ubuntu-latest-30852764951`.
   - Both artifacts were downloaded and independently parsed. No `Overwriting results file` warning appeared in either hosted log.
-- Task 3 remains unstarted; no loader has been installed or executed.
+- Task 3 had not started on the merged Task-2 head; the separate `agent/m1-loader-smoke-test` branch now contains only the scoped Task-3 start documentation and plan. No loader has been installed or executed.
 - The fingerprint-specific report now records `netstandard2.1 candidate`, confidence `Medium`, basis `netstandard compatibility surface plus Unity 2022.3 evidence`, `ReadyForReversibleTest`, and the bounded `globalgamemanagers` note under `Inspection limitations`.
+
+## M1 task 3 start status
+
+- PR #2 is merged into protected `main` at `d3f1bb4fde9f77efbb84349f440385cc89002c86`.
+- Main validation run `30853440786` passed on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 10 TRX files representing 99 tests, with 0 failures and 0 skips.
+- The active branch is `agent/m1-loader-smoke-test`, created from that merged baseline.
+- The provisional candidate is official BepInEx 5 Unity Mono x64 `5.4.23.5` for the documented fingerprint only. The task will use an external disposable copy and must leave the original installation untouched.
+- No baseline launch, archive download, extraction, loader installation, or loader execution has occurred in this branch yet.
 
 ## Next task
 
-Open/merge the reviewed hardening PR into protected `main`. Only after that merge, begin M1 task 3 on a new branch for the reversible clean-profile loader smoke test of the provisional BepInEx 5 candidate; do not start it in this branch.
+Complete the bounded private smoke-test gates and record only the sanitized bootstrap outcome. Do not create a plugin, add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves.

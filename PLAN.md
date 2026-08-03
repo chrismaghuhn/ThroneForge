@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 2 hardening on `agent/m1-runtime-compatibility-hardening`.
+M1 - Thronefall discovery spike, task 3 reversible loader bootstrap smoke test on `agent/m1-loader-smoke-test`.
 
 ## Milestones
 
@@ -127,15 +127,24 @@ This task starts from merged `main@e0c46a16fde527dd3a0f99cd5e30f8d5baba571a` on 
 - [x] Run synthetic tests before private inspection; generate and manually sanitize the fingerprint-specific runtime report only after tests pass.
 - [x] Update discovery documentation, ADR-0002 with a provisional evidence-based recommendation, `STATUS.md`, and `CHANGELOG.md`; keep M1 incomplete.
 - [x] Run baseline exact-SDK hosted Windows/Linux CI and inspect both TRX artifacts. Reviewed head `9511e99` passed in run `30849281168`: Windows and Ubuntu each produced 10 TRX files representing 70 tests, including 51 focused Discovery tests, with 0 failures/errors and no overwrite warnings.
-- [ ] Run the new hardening branch-head Windows/Linux matrix and inspect every TRX artifact before closing Task 2.
+- [x] Run the hardening branch-head Windows/Linux matrix and inspect every TRX artifact before closing Task 2; merged result is recorded in main run `30853440786`.
 
-## Next executable task after M1 discovery task 2
+## M1 Task 3: reversible clean-profile loader bootstrap smoke test
 
-M1 Task 3 is a reversible clean-profile loader smoke test for the selected official candidate. It must be planned only after Task 2 evidence is complete, and it must not be started in the Task-2 branch.
+Task 2 is complete and merged by PR #2 into protected `main` at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. This task is deliberately separate from the Task-2 branch and evaluates only BepInEx bootstrap initialization for the fingerprint-bound disposable copy. The complete execution plan is [`docs/superpowers/plans/2026-08-03-m1-loader-smoke-test.md`](docs/superpowers/plans/2026-08-03-m1-loader-smoke-test.md).
 
-## M1 discovery task 2 hardening
+- [ ] Recompute the original installation fingerprint and runtime readiness before preparation.
+- [ ] Copy the installation without following reparse points and verify the copied fingerprint.
+- [ ] Run the bounded copied baseline launch before any loader installation.
+- [ ] Verify and securely extract only the official `BepInEx_win_x64_5.4.23.5.zip` asset.
+- [ ] Apply the loader transaction only to the disposable copy and retain rollback metadata.
+- [ ] Launch the copied loader profile, parse sanitized bootstrap evidence, and load no plugin.
+- [ ] Roll back the disposable copy and verify both original and copied fingerprints/readiness.
+- [ ] Commit only a sanitized outcome report; do not claim plugin, Harmony, lifecycle, or game API compatibility.
 
-This follow-up closes review findings without installing or executing a loader. It keeps Task 3 out of scope and preserves the existing fingerprint-v1 inputs.
+## M1 discovery task 2 hardening (completed and merged)
+
+This completed follow-up closed review findings without installing or executing a loader. It preserved the existing fingerprint-v1 inputs.
 
 - [x] Refactor Task 1 and Task 2 to consume one non-writing installation snapshot and fingerprint service.
 - [x] Recompute fingerprint v1 before runtime report generation and reject mismatched supplied fingerprints without creating output.
@@ -148,6 +157,8 @@ This follow-up closes review findings without installing or executing a loader. 
 - [x] Inspect every hosted TRX artifact and record the exact current-head evidence; leave M1 Task 3 unstarted.
 
 Final hardening validation: run `30852340193` tested commit `09850c955eff216264ad23a84b035c1057e8bcca`. Windows and Ubuntu each passed with SDK `10.0.100`, 10 TRX files, 99 represented tests, 0 failures/errors, and 0 skipped tests. No overwrite warning occurred.
+
+Task-2 merge evidence: PR #2 merged into `main` at `d3f1bb4fde9f77efbb84349f440385cc89002c86`; main run `30853440786` passed on Windows and Ubuntu with 10 TRX files and 99 tests per runner.
 
 ## M1 discovery task 1 hardening checklist
 
