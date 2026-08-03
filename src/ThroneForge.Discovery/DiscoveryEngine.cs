@@ -26,6 +26,39 @@ public sealed class DiscoveryEngine
 
         var gameRoot = DiscoveryPathValidator.ValidateGameRoot(request.GamePath);
         var outputRoot = DiscoveryPathValidator.ValidateOutputRoot(gameRoot, request.OutputRoot);
+        var snapshot = InstallationFingerprintService.Capture(gameRoot);
+
+        var reportMarkdown = BuildReport(
+            snapshot.Fingerprint,
+            request.DiscoveryTimestampUtc ?? DateTimeOffset.UtcNow,
+            snapshot.Backend,
+            snapshot.ExecutableArchitecture,
+            snapshot.UnityVersion,
+            snapshot.DetectedEvidence,
+            snapshot.MissingOrConflictingEvidence,
+            snapshot.SelectedFiles);
+        var reportPath = DiscoveryReportWriter.Write(
+            outputRoot,
+            snapshot.Fingerprint,
+            reportMarkdown,
+            request.OverwriteExisting);
+
+        return new DiscoveryResult(
+            snapshot.Fingerprint,
+            DiscoveryToolVersion,
+            FingerprintAlgorithmVersion,
+            snapshot.Backend,
+            snapshot.ExecutableArchitecture,
+            snapshot.UnityVersion,
+            snapshot.DetectedEvidence,
+            snapshot.MissingOrConflictingEvidence,
+            snapshot.SelectedFiles,
+            reportPath,
+            reportMarkdown);
+    }
+
+    internal static InstallationDiscoverySnapshot CaptureSnapshot(DirectoryInfo gameRoot)
+    {
         var files = EnumerateFiles(gameRoot);
         var directories = EnumerateDirectories(gameRoot);
         var fileMap = files.ToDictionary(item => item.RelativePath, StringComparer.OrdinalIgnoreCase);
@@ -57,33 +90,15 @@ public sealed class DiscoveryEngine
         var selectedFiles = SelectCompatibilityFiles(fileMap, executable, detectedEvidence, missingOrConflictingEvidence);
         var fingerprint = CreateFingerprint(backend, executableArchitecture, unityVersion, selectedFiles);
 
-        var reportMarkdown = BuildReport(
-            fingerprint,
-            request.DiscoveryTimestampUtc ?? DateTimeOffset.UtcNow,
+        return new InstallationDiscoverySnapshot(
             backend,
             executableArchitecture,
             unityVersion,
-            detectedEvidence,
-            missingOrConflictingEvidence,
-            selectedFiles);
-        var reportPath = DiscoveryReportWriter.Write(
-            outputRoot,
-            fingerprint,
-            reportMarkdown,
-            request.OverwriteExisting);
-
-        return new DiscoveryResult(
-            fingerprint,
-            DiscoveryToolVersion,
-            FingerprintAlgorithmVersion,
-            backend,
-            executableArchitecture,
-            unityVersion,
+            executable?.RelativePath,
             detectedEvidence,
             missingOrConflictingEvidence,
             selectedFiles,
-            reportPath,
-            reportMarkdown);
+            fingerprint);
     }
 
     private static List<FileEntry> EnumerateFiles(DirectoryInfo root)

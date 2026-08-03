@@ -4,7 +4,7 @@ ThroneForge is intended to become a maintainable, Forge-like mod SDK and no-code
 
 ## Current status
 
-This repository contains the completed M0 architecture skeleton, M1 discovery task 1, and the locally validated M1 task 2 runtime-compatibility report. M1 task 2 remains subject to hosted CI verification. It is not a functioning Thronefall mod: no loader, game-facing runtime, catalog exporter, lifecycle binding, or custom-wave implementation exists.
+This repository contains the completed M0 architecture skeleton, M1 discovery task 1, and the reviewed M1 task 2 runtime-compatibility implementation. Task-2 hardening is in progress on `agent/m1-runtime-compatibility-hardening`; its new branch-head hosted verification is pending. It is not a functioning Thronefall mod: no loader, game-facing runtime, catalog exporter, lifecycle binding, or custom-wave implementation exists.
 
 ThroneForge does not distribute Thronefall binaries, copied game assets, decompiled source, or modified game executables.
 
@@ -33,7 +33,7 @@ The local game directory, build output, logs, and private game reference paths a
 
 ## Development status disclaimer
 
-M0 architecture, hardening, and the final TRX artifact-preservation fix passed hosted Windows/Linux CI in run [30836315556](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30836315556). M1 discovery task 1 and its output/executable-selection hardening are complete on `main`; final hosted hardening verification passed in run [30844364366](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30844364366). M1 task 2 implementation commit `51d30d6` passed hosted Windows/Linux CI in run [30848993321](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30848993321), with 10 TRX files and 70 tests per runner. `main` is the protected default branch. ThroneForge remains an architecture skeleton, not a functioning Thronefall mod; discovery must document evidence without guessing game internals.
+M0 architecture, hardening, and the final TRX artifact-preservation fix passed hosted Windows/Linux CI in run [30836315556](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30836315556). M1 discovery task 1 and its output/executable-selection hardening are complete on protected `main`; final hosted hardening verification passed in run [30844364366](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30844364366). Task-2 baseline implementation head `9511e99` passed hosted Windows/Linux CI in run [30849281168](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30849281168), with 10 TRX files and 70 tests per runner; the new hardening branch-head run is still pending. ThroneForge remains an architecture skeleton, not a functioning Thronefall mod; discovery must document evidence without guessing game internals.
 
 ## License
 

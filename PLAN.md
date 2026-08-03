@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 2 loader and managed-runtime compatibility discovery on `agent/m1-runtime-compatibility`.
+M1 - Thronefall discovery spike, task 2 hardening on `agent/m1-runtime-compatibility-hardening`.
 
 ## Milestones
 
@@ -126,11 +126,26 @@ This task starts from merged `main@e0c46a16fde527dd3a0f99cd5e30f8d5baba571a` on 
 - [x] Verify official BepInEx candidate metadata, document the provisional stable BepInEx 5 Unity Mono x64 recommendation, and record uncertainty until a clean-profile smoke test.
 - [x] Run synthetic tests before private inspection; generate and manually sanitize the fingerprint-specific runtime report only after tests pass.
 - [x] Update discovery documentation, ADR-0002 with a provisional evidence-based recommendation, `STATUS.md`, and `CHANGELOG.md`; keep M1 incomplete.
-- [x] Run exact-SDK hosted Windows/Linux CI, inspect both TRX artifacts, and close this task only after the branch-head run is green. Run `30848993321` validated implementation commit `51d30d611af85f41205da5d0f1d7f68514081a58`: Windows and Ubuntu each produced 10 TRX files representing 70 tests with 0 failures/errors and no overwrite warnings.
+- [x] Run baseline exact-SDK hosted Windows/Linux CI and inspect both TRX artifacts. Reviewed head `9511e99` passed in run `30849281168`: Windows and Ubuntu each produced 10 TRX files representing 70 tests, including 51 focused Discovery tests, with 0 failures/errors and no overwrite warnings.
+- [ ] Run the new hardening branch-head Windows/Linux matrix and inspect every TRX artifact before closing Task 2.
 
 ## Next executable task after M1 discovery task 2
 
 M1 Task 3 is a reversible clean-profile loader smoke test for the selected official candidate. It must be planned only after Task 2 evidence is complete, and it must not be started in the Task-2 branch.
+
+## M1 discovery task 2 hardening
+
+This follow-up closes review findings without installing or executing a loader. It keeps Task 3 out of scope and preserves the existing fingerprint-v1 inputs.
+
+- [ ] Refactor Task 1 and Task 2 to consume one non-writing installation snapshot and fingerprint service.
+- [ ] Recompute fingerprint v1 before runtime report generation and reject mismatched supplied fingerprints without creating output.
+- [ ] Add regression coverage for matching, mismatched, changed-file, changed-backend, uppercase, deterministic, and no-write fingerprint cases.
+- [ ] Separate provisional loader-candidate selection from structured clean-profile smoke-test readiness.
+- [ ] Block readiness for every non-absent loader/bootstrap indicator, conflicting evidence, unsupported backend, unknown architecture, or unusable framework evidence.
+- [ ] Replace generic TFM confidence prose with an evidence-specific assessment and confidence level.
+- [ ] Categorize conflict, missing evidence, bounded-inspection limitations, and warnings independently in the runtime report.
+- [ ] Correct the fingerprint-specific report and project documentation only after the new branch-head hosted CI run passes.
+- [ ] Inspect every hosted TRX artifact and record the exact current-head evidence; leave M1 Task 3 unstarted.
 
 ## M1 discovery task 1 hardening checklist
 

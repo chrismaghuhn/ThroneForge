@@ -25,7 +25,7 @@ dotnet run --project src/ThroneForge.Discovery -- runtime-compatibility `
   --output-root "docs/discovery"
 ```
 
-This command writes `<fingerprint>-runtime-compatibility.md`. It requires the base fingerprint so that a compatibility report cannot be mistaken for evidence from another installation. `--overwrite` is required for an existing report.
+This command writes `<fingerprint>-runtime-compatibility.md`. It recomputes fingerprint v1 from the current installation before inspecting runtime compatibility and fails without creating output when the supplied fingerprint does not match. `--overwrite` is required for an existing report. The shared snapshot is read-only and does not create or replace the Task 1 report.
 
 ## Evidence and safety boundaries
 
@@ -49,9 +49,9 @@ Target-framework output is a recommendation only:
 
 Unity-version evidence is bounded to `UnityVersion.txt`, the beginning of `globalgamemanagers`, and version-resource metadata from the selected executable and `UnityPlayer.dll`. Equivalent Unity version-resource build-number formats are normalized before conflict checking; raw relative evidence sources remain listed in the report.
 
-The loader inventory reports only exact-name indicators such as `BepInEx/`, `MelonLoader/`, Doorstop configuration files, `winhttp.dll`, `version.dll`, `Mods/`, and `Plugins/`. A DLL filename is never treated as proof of a loader. No indicator is executed, changed, deleted, or identified beyond its safe bounded classification.
+The loader inventory reports only exact-name indicators such as `BepInEx/`, `MelonLoader/`, Doorstop configuration files, `winhttp.dll`, `version.dll`, `Mods/`, and `Plugins/`. A DLL filename is never treated as proof of a loader. No indicator is executed, changed, deleted, or identified beyond its safe bounded classification. Reports keep `Conflict`, `Missing`, `Limitation`, and `Warning` evidence categories separate; a bounded prefix limitation is not treated as missing evidence when the version was found in that prefix.
 
-As of 2026-08-03, the official BepInEx release metadata records BepInEx 5.4.23.5 as the stable LTS line and BepInEx 6.0.0-pre.2 as a pre-release. For Mono Unity plus x64 evidence, BepInEx 5 is the provisional candidate for a later clean-profile smoke test. This is not a loader selection or compatibility claim; it remains provisional until the reversible smoke test succeeds. Sources: [BepInEx releases](https://github.com/BepInEx/BepInEx/releases), [BepInEx plugin target-framework guidance](https://docs.bepinex.dev/master/articles/dev_guide/plugin_tutorial/2_plugin_start.html).
+As of 2026-08-03, the official BepInEx release metadata records BepInEx 5.4.23.5 as the stable LTS line and BepInEx 6.0.0-pre.2 as a pre-release. For Mono Unity plus x64 evidence, BepInEx 5 is the provisional candidate for a later clean-profile smoke test. Candidate selection is separate from readiness: any non-absent loader/bootstrap indicator blocks `ReadyForReversibleTest`, and conflicts or insufficient evidence produce a blocked/unsupported readiness result. This is not a loader selection or compatibility claim; it remains provisional until the reversible smoke test succeeds. Sources: [BepInEx releases](https://github.com/BepInEx/BepInEx/releases), [BepInEx plugin target-framework guidance](https://docs.bepinex.dev/master/articles/dev_guide/plugin_tutorial/2_plugin_start.html).
 
 ## Backend classification
 

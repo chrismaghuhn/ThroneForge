@@ -67,60 +67,65 @@ public sealed class RuntimeCompatibilityEngine
 
         var gameRoot = DiscoveryPathValidator.ValidateGameRoot(request.GamePath);
         var outputRoot = DiscoveryPathValidator.ValidateOutputRoot(gameRoot, request.OutputRoot);
-        var missingOrConflictingEvidence = new List<string>();
-        var dataDirectories = FindDataDirectories(gameRoot, missingOrConflictingEvidence);
-        var executableSelection = SelectMainExecutable(gameRoot, dataDirectories, missingOrConflictingEvidence);
-        var executableArchitecture = executableSelection.RelativePath is null
-            ? ExecutableArchitecture.Unknown
-            : PeArchitectureReader.TryRead(executableSelection.FullPath!, out var selectedArchitecture)
-                ? selectedArchitecture
-                : ExecutableArchitecture.Unknown;
-
-        if (executableSelection.IsAmbiguous)
+        var snapshot = InstallationFingerprintService.Capture(gameRoot);
+        var expectedFingerprint = request.BaseFingerprint.ToLowerInvariant();
+        if (!string.Equals(snapshot.Fingerprint, expectedFingerprint, StringComparison.Ordinal))
         {
-            missingOrConflictingEvidence.Add("The main executable remains ambiguous among multiple valid top-level PE candidates.");
-        }
-        else if (executableSelection.RelativePath is null)
-        {
-            missingOrConflictingEvidence.Add("No deterministic top-level executable candidate was found.");
+            throw new DiscoveryException(
+                "The inspected installation does not match the supplied base fingerprint. "
+                + $"Expected: {expectedFingerprint} Actual: {snapshot.Fingerprint}");
         }
 
-        var runtimeLayoutEvidence = InspectRuntimeLayout(gameRoot, dataDirectories, missingOrConflictingEvidence);
+        var legacyExplanations = new List<string>();
+        var dataDirectories = FindDataDirectories(gameRoot, legacyExplanations);
+        var executableRelativePath = snapshot.SelectedExecutableRelativePath;
+        var executableArchitecture = snapshot.ExecutableArchitecture;
+
+        var runtimeLayoutEvidence = InspectRuntimeLayout(gameRoot, dataDirectories, legacyExplanations);
         var managedAssemblies = InspectManagedAssemblies(
             gameRoot,
             dataDirectories,
-            missingOrConflictingEvidence);
-        var managedRuntimeProfile = ClassifyManagedRuntimeProfile(runtimeLayoutEvidence, missingOrConflictingEvidence);
+            legacyExplanations);
+        var managedRuntimeProfile = ClassifyManagedRuntimeProfile(runtimeLayoutEvidence, legacyExplanations);
         var unityVersionEvidence = UnityVersionEvidenceReader.Read(
             gameRoot,
             dataDirectories,
-            executableSelection.RelativePath,
+            executableRelativePath,
             versionResourceReader);
-        missingOrConflictingEvidence.AddRange(unityVersionEvidence.Explanations);
+        var evidenceIssues = legacyExplanations
+            .Select(CategorizeIssue)
+            .Concat(unityVersionEvidence.Issues)
+            .DistinctBy(item => (item.Category, item.Message))
+            .ToArray();
 
-        var targetFrameworkRecommendation = RuntimeCompatibilityClassifier.Recommend(
+        var targetFrameworkAssessment = RuntimeCompatibilityClassifier.Assess(
             managedAssemblies.Where(item => item.HasManagedMetadata).ToArray(),
             unityVersionEvidence.Version);
-        var recommendedCandidate = managedRuntimeProfile == ManagedRuntimeProfile.Mono
-            && executableArchitecture == ExecutableArchitecture.X64
-            && targetFrameworkRecommendation != TargetFrameworkRecommendation.Conflicting
-            && targetFrameworkRecommendation != TargetFrameworkRecommendation.Unknown
-            ? "BepInEx 5 Unity Mono x64 5.4.23.5"
-            : "No loader candidate recommended";
-
         var loaderIndicators = LoaderIndicatorInspector.Inspect(gameRoot);
+        var recommendedCandidate = RuntimeCompatibilityClassifier.RecommendedCandidate(
+            managedRuntimeProfile,
+            executableArchitecture,
+            targetFrameworkAssessment);
+        var readiness = RuntimeCompatibilityReadiness.Assess(
+            managedRuntimeProfile,
+            executableArchitecture,
+            targetFrameworkAssessment,
+            unityVersionEvidence.Version,
+            loaderIndicators);
+        var missingOrConflictingEvidence = evidenceIssues.Select(item => item.Message).ToArray();
         var reportMarkdown = BuildReport(
             request,
             managedRuntimeProfile,
             executableArchitecture,
-            executableSelection.RelativePath,
+            executableRelativePath,
             runtimeLayoutEvidence,
             managedAssemblies,
-            targetFrameworkRecommendation,
+            targetFrameworkAssessment,
             unityVersionEvidence,
             loaderIndicators,
             recommendedCandidate,
-            missingOrConflictingEvidence);
+            readiness,
+            evidenceIssues);
         var reportPath = DiscoveryReportWriter.WriteFile(
             outputRoot,
             $"{request.BaseFingerprint}-runtime-compatibility.md",
@@ -132,17 +137,19 @@ public sealed class RuntimeCompatibilityEngine
             DiscoveryEngine.DiscoveryToolVersion,
             $"Base game fingerprint {request.BaseFingerprint}; backend and architecture evidence are installation-specific.",
             executableArchitecture,
-            executableSelection.RelativePath,
+            executableRelativePath,
             managedRuntimeProfile,
             runtimeLayoutEvidence,
             managedAssemblies,
-            targetFrameworkRecommendation,
-            RuntimeCompatibilityClassifier.Confidence(targetFrameworkRecommendation),
+            targetFrameworkAssessment.Recommendation,
+            targetFrameworkAssessment,
             unityVersionEvidence.Version,
             unityVersionEvidence.Evidence,
             loaderIndicators,
             OfficialCandidates,
             recommendedCandidate,
+            readiness,
+            evidenceIssues,
             missingOrConflictingEvidence,
             reportPath,
             reportMarkdown);
@@ -197,84 +204,6 @@ public sealed class RuntimeCompatibilityEngine
         {
             throw new DiscoveryException("The installation could not be enumerated safely.", exception);
         }
-    }
-
-    private static ExecutableSelection SelectMainExecutable(
-        DirectoryInfo gameRoot,
-        string[] dataDirectories,
-        List<string> explanations)
-    {
-        FileInfo[] executables;
-        try
-        {
-            executables = gameRoot.EnumerateFiles("*.exe", SearchOption.TopDirectoryOnly)
-                .Where(file =>
-                {
-                    try
-                    {
-                        return (file.Attributes & FileAttributes.ReparsePoint) == 0;
-                    }
-                    catch (IOException)
-                    {
-                        return false;
-                    }
-                    catch (UnauthorizedAccessException)
-                    {
-                        return false;
-                    }
-                })
-                .OrderBy(file => file.Name, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            throw new DiscoveryException("Top-level executable candidates could not be enumerated safely.", exception);
-        }
-
-        if (executables.Length == 0)
-        {
-            return new ExecutableSelection(null, null, false);
-        }
-
-        if (dataDirectories.Length == 1)
-        {
-            var dataBaseName = dataDirectories[0][..^"_Data".Length];
-            var dataBaseExecutable = executables.FirstOrDefault(file =>
-                file.Name.Equals(dataBaseName + ".exe", StringComparison.OrdinalIgnoreCase));
-            if (dataBaseExecutable is not null)
-            {
-                return ToExecutableSelection(gameRoot, dataBaseExecutable);
-            }
-        }
-
-        var rootNameExecutable = executables.FirstOrDefault(file =>
-            file.Name.Equals(gameRoot.Name + ".exe", StringComparison.OrdinalIgnoreCase));
-        if (rootNameExecutable is not null)
-        {
-            return ToExecutableSelection(gameRoot, rootNameExecutable);
-        }
-
-        var validPeExecutables = executables
-            .Where(file => PeArchitectureReader.TryRead(file.FullName, out _))
-            .ToArray();
-        return validPeExecutables.Length switch
-        {
-            1 => ToExecutableSelection(gameRoot, validPeExecutables[0]),
-            > 1 => new ExecutableSelection(null, null, true),
-            _ => new ExecutableSelection(null, null, executables.Length > 1)
-        };
-    }
-
-    private static ExecutableSelection ToExecutableSelection(DirectoryInfo gameRoot, FileInfo file)
-    {
-        var relativePath = Path.GetRelativePath(gameRoot.FullName, file.FullName)
-            .Replace(Path.DirectorySeparatorChar, '/');
-        if (!DiscoveryPathValidator.TryResolveReadFile(gameRoot, relativePath, out var fullPath))
-        {
-            return new ExecutableSelection(null, null, false);
-        }
-
-        return new ExecutableSelection(relativePath, fullPath, false);
     }
 
     private static ManagedAssemblyEvidence[] InspectManagedAssemblies(
@@ -413,11 +342,12 @@ public sealed class RuntimeCompatibilityEngine
         string? selectedExecutableRelativePath,
         RuntimeLayoutEvidence[] runtimeLayoutEvidence,
         ManagedAssemblyEvidence[] managedAssemblies,
-        TargetFrameworkRecommendation targetFrameworkRecommendation,
+        TargetFrameworkAssessment targetFrameworkAssessment,
         UnityVersionScanResult unityVersionEvidence,
         IReadOnlyList<LoaderIndicatorEvidence> loaderIndicators,
         string recommendedCandidate,
-        IReadOnlyList<string> missingOrConflictingEvidence)
+        SmokeTestReadinessAssessment readiness,
+        IReadOnlyList<DiscoveryIssue> evidenceIssues)
     {
         var builder = new StringBuilder();
         builder.AppendLine("# Thronefall Runtime Compatibility Report");
@@ -465,8 +395,9 @@ public sealed class RuntimeCompatibilityEngine
         }
 
         builder.AppendLine();
-        AppendValue(builder, "Target-framework recommendation", targetFrameworkRecommendation.ToString());
-        AppendValue(builder, "Recommendation confidence", RuntimeCompatibilityClassifier.Confidence(targetFrameworkRecommendation));
+        AppendValue(builder, "Target-framework recommendation", targetFrameworkAssessment.Recommendation.ToString());
+        AppendValue(builder, "Target-framework confidence", targetFrameworkAssessment.Confidence.ToString());
+        AppendValue(builder, "Target-framework evidence basis", targetFrameworkAssessment.Basis);
         AppendValue(builder, "Unity-version evidence", unityVersionEvidence.Version);
         builder.AppendLine("## Unity-version evidence sources");
         builder.AppendLine();
@@ -518,13 +449,23 @@ public sealed class RuntimeCompatibilityEngine
 
         builder.AppendLine();
         AppendValue(builder, "Recommended candidate for a future smoke test", recommendedCandidate);
+        builder.AppendLine("## Current clean-profile smoke-test readiness");
+        builder.AppendLine();
+        builder.Append("- Status: ").AppendLine(readiness.Status.ToString());
+        builder.Append("- Blocking indicators: ").AppendLine(readiness.BlockingIndicators.Count == 0
+            ? "None"
+            : string.Join(", ", readiness.BlockingIndicators));
+        builder.Append("- Explanation: ").AppendLine(readiness.Explanation);
+        builder.Append("- Remediation required: ").AppendLine(readiness.Remediation);
+        builder.AppendLine("- No automatic cleanup was performed.");
+        builder.AppendLine();
         builder.AppendLine("## Reasons for the recommendation");
         builder.AppendLine();
         builder.AppendLine("- The recommendation is provisional and combines only the local backend, executable architecture, and bounded framework evidence.");
         builder.AppendLine("- The official BepInEx 5 Unity Mono x64 distribution is preferred over the pre-release BepInEx 6 candidate for a later clean-profile experiment.");
         builder.AppendLine("- No loader was downloaded, installed, executed, or selected as production-compatible by this report.");
         builder.AppendLine();
-        AppendEvidenceLists(builder, missingOrConflictingEvidence);
+        AppendEvidenceLists(builder, evidenceIssues);
         builder.AppendLine("## Security and privacy statement");
         builder.AppendLine();
         builder.AppendLine("- Only selected compatibility metadata below the explicit game root was inspected; no assembly was loaded and no method or private type was examined.");
@@ -545,11 +486,15 @@ public sealed class RuntimeCompatibilityEngine
         builder.AppendLine();
     }
 
-    private static void AppendEvidenceLists(StringBuilder builder, IReadOnlyList<string> evidence)
+    private static void AppendEvidenceLists(StringBuilder builder, IReadOnlyList<DiscoveryIssue> evidence)
     {
         builder.AppendLine("## Conflicting evidence");
         builder.AppendLine();
-        var conflicts = evidence.Where(item => item.Contains("conflict", StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.Ordinal).ToArray();
+        var conflicts = evidence
+            .Where(item => item.Category == DiscoveryIssueCategory.Conflict)
+            .Select(item => item.Message)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
         foreach (var item in conflicts)
         {
             builder.Append("- ").AppendLine(item);
@@ -563,7 +508,11 @@ public sealed class RuntimeCompatibilityEngine
         builder.AppendLine();
         builder.AppendLine("## Missing evidence");
         builder.AppendLine();
-        var missing = evidence.Where(item => !item.Contains("conflict", StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.Ordinal).ToArray();
+        var missing = evidence
+            .Where(item => item.Category == DiscoveryIssueCategory.Missing)
+            .Select(item => item.Message)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
         foreach (var item in missing)
         {
             builder.Append("- ").AppendLine(item);
@@ -575,7 +524,61 @@ public sealed class RuntimeCompatibilityEngine
         }
 
         builder.AppendLine();
+
+        builder.AppendLine("## Inspection limitations");
+        builder.AppendLine();
+        var limitations = evidence
+            .Where(item => item.Category == DiscoveryIssueCategory.Limitation)
+            .Select(item => item.Message)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        foreach (var item in limitations)
+        {
+            builder.Append("- ").AppendLine(item);
+        }
+
+        if (limitations.Length == 0)
+        {
+            builder.AppendLine("- None");
+        }
+
+        builder.AppendLine();
+
+        builder.AppendLine("## Warnings");
+        builder.AppendLine();
+        var warnings = evidence
+            .Where(item => item.Category == DiscoveryIssueCategory.Warning)
+            .Select(item => item.Message)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        foreach (var item in warnings)
+        {
+            builder.Append("- ").AppendLine(item);
+        }
+
+        if (warnings.Length == 0)
+        {
+            builder.AppendLine("- None");
+        }
+
+        builder.AppendLine();
     }
 
-    private sealed record ExecutableSelection(string? RelativePath, string? FullPath, bool IsAmbiguous);
+    private static DiscoveryIssue CategorizeIssue(string message)
+    {
+        var category = message.Contains("conflict", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("multiple", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("ambiguous", StringComparison.OrdinalIgnoreCase)
+                ? DiscoveryIssueCategory.Conflict
+                : message.Contains("insufficient", StringComparison.OrdinalIgnoreCase)
+                    || message.Contains("no ", StringComparison.OrdinalIgnoreCase)
+                    || message.Contains("unknown", StringComparison.OrdinalIgnoreCase)
+                        ? DiscoveryIssueCategory.Missing
+                        : message.Contains("limit", StringComparison.OrdinalIgnoreCase)
+                            || message.Contains("omitted", StringComparison.OrdinalIgnoreCase)
+                                ? DiscoveryIssueCategory.Limitation
+                                : DiscoveryIssueCategory.Warning;
+        return new DiscoveryIssue(category, message);
+    }
+
 }

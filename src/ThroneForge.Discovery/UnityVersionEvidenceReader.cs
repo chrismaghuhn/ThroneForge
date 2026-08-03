@@ -7,7 +7,7 @@ namespace ThroneForge.Discovery;
 internal sealed record UnityVersionScanResult(
     string Version,
     IReadOnlyList<UnityVersionEvidence> Evidence,
-    IReadOnlyList<string> Explanations);
+    IReadOnlyList<DiscoveryIssue> Issues);
 
 internal static class UnityVersionEvidenceReader
 {
@@ -28,7 +28,7 @@ internal static class UnityVersionEvidenceReader
         ArgumentNullException.ThrowIfNull(versionResourceReader);
 
         var evidence = new List<UnityVersionEvidence>();
-        var explanations = new List<string>();
+        var issues = new List<DiscoveryIssue>();
         foreach (var dataDirectory in dataDirectories.Order(StringComparer.OrdinalIgnoreCase))
         {
             ReadBoundedTextCandidate(
@@ -37,14 +37,14 @@ internal static class UnityVersionEvidenceReader
                 "UnityVersion.txt",
                 MaximumTextFileBytes,
                 evidence,
-                explanations);
+                issues);
             ReadBoundedTextCandidate(
                 gameRoot,
                 CombineRelative(dataDirectory, "globalgamemanagers"),
                 "globalgamemanagers",
                 MaximumGlobalManagersPrefixBytes,
                 evidence,
-                explanations);
+                issues);
         }
 
         ReadVersionResourceCandidate(
@@ -53,14 +53,14 @@ internal static class UnityVersionEvidenceReader
             "executable version resource",
             versionResourceReader,
             evidence,
-            explanations);
+            issues);
         ReadVersionResourceCandidate(
             gameRoot,
             "UnityPlayer.dll",
             "UnityPlayer.dll version resource",
             versionResourceReader,
             evidence,
-            explanations);
+            issues);
 
         var versionIdentities = evidence
             .Select(item => NormalizeVersionIdentity(item.Version))
@@ -75,14 +75,14 @@ internal static class UnityVersionEvidenceReader
         };
         if (versionIdentities.Length == 0)
         {
-            explanations.Add("Unity version: Unknown; no bounded local version evidence was found.");
+            issues.Add(new(DiscoveryIssueCategory.Missing, "Unity version: Unknown; no bounded local version evidence was found."));
         }
         else if (versionIdentities.Length > 1)
         {
-            explanations.Add("Conflicting Unity version evidence was found across bounded local sources.");
+            issues.Add(new(DiscoveryIssueCategory.Conflict, "Conflicting Unity version evidence was found across bounded local sources."));
         }
 
-        return new UnityVersionScanResult(version, evidence, explanations);
+        return new UnityVersionScanResult(version, evidence, issues);
     }
 
     private static void ReadBoundedTextCandidate(
@@ -91,7 +91,7 @@ internal static class UnityVersionEvidenceReader
         string source,
         int maximumBytes,
         List<UnityVersionEvidence> evidence,
-        List<string> explanations)
+        List<DiscoveryIssue> issues)
     {
         if (!DiscoveryPathValidator.TryResolveReadFile(gameRoot, relativePath, out var fullPath))
         {
@@ -123,7 +123,9 @@ internal static class UnityVersionEvidenceReader
 
             if (stream.Length > maximumBytes)
             {
-                explanations.Add($"Unity version evidence '{relativePath}' exceeded the bounded read limit; only the prefix was inspected.");
+                issues.Add(new(
+                    DiscoveryIssueCategory.Limitation,
+                    $"Unity version evidence '{relativePath}' exceeded the bounded read limit; only the prefix was inspected."));
             }
 
             var content = Encoding.UTF8.GetString(bytes, 0, read);
@@ -131,7 +133,9 @@ internal static class UnityVersionEvidenceReader
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
-            explanations.Add($"Unity version evidence '{relativePath}' could not be read.");
+            issues.Add(new(
+                DiscoveryIssueCategory.Warning,
+                $"Unity version evidence '{relativePath}' could not be read."));
         }
     }
 
@@ -141,7 +145,7 @@ internal static class UnityVersionEvidenceReader
         string source,
         Func<string, string?> versionResourceReader,
         List<UnityVersionEvidence> evidence,
-        List<string> explanations)
+        List<DiscoveryIssue> issues)
     {
         if (string.IsNullOrWhiteSpace(relativePath)
             || !DiscoveryPathValidator.TryResolveReadFile(gameRoot, relativePath, out var fullPath))
@@ -159,7 +163,9 @@ internal static class UnityVersionEvidenceReader
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
-            explanations.Add($"Version-resource evidence '{relativePath}' could not be read.");
+            issues.Add(new(
+                DiscoveryIssueCategory.Warning,
+                $"Version-resource evidence '{relativePath}' could not be read."));
         }
     }
 

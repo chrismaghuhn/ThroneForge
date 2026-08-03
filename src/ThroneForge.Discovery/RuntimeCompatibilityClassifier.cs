@@ -12,6 +12,11 @@ public static class RuntimeCompatibilityClassifier
     public static TargetFrameworkRecommendation Recommend(
         IReadOnlyList<ManagedAssemblyEvidence> managedAssemblies,
         string unityVersion)
+        => Assess(managedAssemblies, unityVersion).Recommendation;
+
+    public static TargetFrameworkAssessment Assess(
+        IReadOnlyList<ManagedAssemblyEvidence> managedAssemblies,
+        string unityVersion)
     {
         ArgumentNullException.ThrowIfNull(managedAssemblies);
         ArgumentNullException.ThrowIfNull(unityVersion);
@@ -27,7 +32,10 @@ public static class RuntimeCompatibilityClassifier
         {
             if (mscorlibAssemblies.Any(item => item.AssemblyVersion is not null && item.AssemblyVersion < new Version(4, 0)))
             {
-                return TargetFrameworkRecommendation.Conflicting;
+                return Assessment(
+                    TargetFrameworkRecommendation.Conflicting,
+                    TargetFrameworkConfidence.None,
+                    "netstandard and legacy mscorlib evidence conflict.");
             }
 
             var directRecommendations = netstandardAssemblies
@@ -38,20 +46,39 @@ public static class RuntimeCompatibilityClassifier
                 .ToArray();
             if (directRecommendations.Length > 1)
             {
-                return TargetFrameworkRecommendation.Conflicting;
+                return Assessment(
+                    TargetFrameworkRecommendation.Conflicting,
+                    TargetFrameworkConfidence.None,
+                    "TargetFrameworkAttribute values disagree across netstandard assemblies.");
             }
 
             if (directRecommendations.Length == 1)
             {
-                return directRecommendations[0];
+                return Assessment(
+                    directRecommendations[0],
+                    TargetFrameworkConfidence.High,
+                    "A readable TargetFrameworkAttribute supports the exact recommendation.");
             }
 
-            return RecommendNetstandardFromUnityVersion(unityVersion);
+            var inferredRecommendation = RecommendNetstandardFromUnityVersion(unityVersion);
+            return inferredRecommendation is TargetFrameworkRecommendation.Netstandard20Candidate
+                or TargetFrameworkRecommendation.Netstandard21Candidate
+                ? Assessment(
+                    inferredRecommendation,
+                    TargetFrameworkConfidence.Medium,
+                    $"netstandard compatibility surface plus Unity {UnityIdentity(unityVersion)} evidence")
+                : Assessment(
+                    inferredRecommendation,
+                    TargetFrameworkConfidence.None,
+                    "netstandard compatibility surface is present, but the Unity version does not resolve the exact TFM.");
         }
 
         if (mscorlibAssemblies.Length == 0)
         {
-            return TargetFrameworkRecommendation.Unknown;
+            return Assessment(
+                TargetFrameworkRecommendation.Unknown,
+                TargetFrameworkConfidence.None,
+                "No netstandard.dll or mscorlib.dll compatibility evidence was found.");
         }
 
         var mscorlibVersions = mscorlibAssemblies
@@ -62,32 +89,52 @@ public static class RuntimeCompatibilityClassifier
             .ToArray();
         if (mscorlibVersions.Length == 0)
         {
-            return TargetFrameworkRecommendation.Unknown;
+            return Assessment(
+                TargetFrameworkRecommendation.Unknown,
+                TargetFrameworkConfidence.None,
+                "mscorlib metadata did not expose an assembly version.");
         }
 
         if (mscorlibVersions.Any(item => item >= new Version(4, 0))
             && mscorlibVersions.Any(item => item < new Version(4, 0)))
         {
-            return TargetFrameworkRecommendation.Conflicting;
+            return Assessment(
+                TargetFrameworkRecommendation.Conflicting,
+                TargetFrameworkConfidence.None,
+                "mscorlib versions contain both modern and legacy evidence.");
         }
 
         return mscorlibVersions[0] >= new Version(4, 0)
-            ? TargetFrameworkRecommendation.Net46Candidate
-            : TargetFrameworkRecommendation.Net35FallbackCandidate;
+            ? Assessment(
+                TargetFrameworkRecommendation.Net46Candidate,
+                TargetFrameworkConfidence.Medium,
+                "mscorlib version 4.0.0.0 or newer supports a net46 candidate.")
+            : Assessment(
+                TargetFrameworkRecommendation.Net35FallbackCandidate,
+                TargetFrameworkConfidence.Low,
+                "Only legacy mscorlib evidence was found; net35 is a conservative fallback candidate.");
     }
 
-    public static string Confidence(TargetFrameworkRecommendation recommendation)
-        => recommendation switch
-        {
-            TargetFrameworkRecommendation.Netstandard21Candidate
-                or TargetFrameworkRecommendation.Netstandard20Candidate => "High when direct metadata is present; medium when inferred from Unity version.",
-            TargetFrameworkRecommendation.Net46Candidate
-                or TargetFrameworkRecommendation.Net35FallbackCandidate => "Medium; based on mscorlib version without a loader smoke test.",
-            TargetFrameworkRecommendation.Net472FallbackCandidate => "Low; fallback only and not selected as the primary target.",
-            TargetFrameworkRecommendation.FrameworkCompatibleButExactTfmUnresolved => "Low; compatibility surface is present but exact TFM evidence is missing.",
-            TargetFrameworkRecommendation.Conflicting => "None; conflicting evidence must be resolved before target selection.",
-            _ => "None; insufficient evidence."
-        };
+    public static string RecommendedCandidate(
+        ManagedRuntimeProfile profile,
+        ExecutableArchitecture architecture,
+        TargetFrameworkAssessment assessment)
+    {
+        ArgumentNullException.ThrowIfNull(assessment);
+
+        return profile == ManagedRuntimeProfile.Mono
+            && architecture == ExecutableArchitecture.X64
+            && assessment.Recommendation is not TargetFrameworkRecommendation.Conflicting
+            and not TargetFrameworkRecommendation.Unknown
+            ? "BepInEx 5 Unity Mono x64 5.4.23.5"
+            : "No loader candidate recommended";
+    }
+
+    private static TargetFrameworkAssessment Assessment(
+        TargetFrameworkRecommendation recommendation,
+        TargetFrameworkConfidence confidence,
+        string basis)
+        => new(recommendation, confidence, basis);
 
     private static TargetFrameworkRecommendation? DirectNetstandardRecommendation(string? targetFramework)
     {
@@ -124,5 +171,14 @@ public static class RuntimeCompatibilityClassifier
         return major > 2021 || major == 2021 && minor >= 2
             ? TargetFrameworkRecommendation.Netstandard21Candidate
             : TargetFrameworkRecommendation.Netstandard20Candidate;
+    }
+
+    private static string UnityIdentity(string unityVersion)
+    {
+        var match = Regex.Match(
+            unityVersion,
+            @"^(?<major>\d{4})\.(?<minor>\d+)",
+            RegexOptions.CultureInvariant);
+        return match.Success ? match.Value : "unknown Unity version";
     }
 }

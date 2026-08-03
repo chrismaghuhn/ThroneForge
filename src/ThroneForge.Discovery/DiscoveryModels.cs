@@ -44,6 +44,30 @@ public enum LoaderIndicatorStatus
     PotentialConflict
 }
 
+public enum DiscoveryIssueCategory
+{
+    Conflict,
+    Missing,
+    Limitation,
+    Warning
+}
+
+public enum TargetFrameworkConfidence
+{
+    High,
+    Medium,
+    Low,
+    None
+}
+
+public enum SmokeTestReadiness
+{
+    ReadyForReversibleTest,
+    BlockedByExistingLoaderIndicators,
+    BlockedByConflictingCompatibilityEvidence,
+    Unsupported
+}
+
 public sealed record DiscoveryRequest(
     string GamePath,
     string OutputRoot,
@@ -51,6 +75,8 @@ public sealed record DiscoveryRequest(
     DateTimeOffset? DiscoveryTimestampUtc = null);
 
 public sealed record EvidenceItem(string Category, string RelativePath, string Description);
+
+public sealed record DiscoveryIssue(DiscoveryIssueCategory Category, string Message);
 
 public sealed record SelectedFileEvidence(string RelativePath, long Size, string Sha256);
 
@@ -90,6 +116,17 @@ public sealed record LoaderIndicatorEvidence(
     LoaderIndicatorStatus Status,
     string Explanation);
 
+public sealed record TargetFrameworkAssessment(
+    TargetFrameworkRecommendation Recommendation,
+    TargetFrameworkConfidence Confidence,
+    string Basis);
+
+public sealed record SmokeTestReadinessAssessment(
+    SmokeTestReadiness Status,
+    IReadOnlyList<string> BlockingIndicators,
+    string Remediation,
+    string Explanation);
+
 public sealed record BepInExCandidate(
     string Product,
     string Version,
@@ -114,12 +151,14 @@ public sealed record RuntimeCompatibilityResult(
     IReadOnlyList<RuntimeLayoutEvidence> RuntimeLayoutEvidence,
     IReadOnlyList<ManagedAssemblyEvidence> ManagedAssemblies,
     TargetFrameworkRecommendation TargetFrameworkRecommendation,
-    string RecommendationConfidence,
+    TargetFrameworkAssessment TargetFrameworkAssessment,
     string UnityVersion,
     IReadOnlyList<UnityVersionEvidence> UnityVersionEvidence,
     IReadOnlyList<LoaderIndicatorEvidence> LoaderIndicators,
     IReadOnlyList<BepInExCandidate> BepInExCandidates,
     string RecommendedCandidate,
+    SmokeTestReadinessAssessment SmokeTestReadiness,
+    IReadOnlyList<DiscoveryIssue> EvidenceIssues,
     IReadOnlyList<string> MissingOrConflictingEvidence,
     string ReportPath,
     string ReportMarkdown);

@@ -6,8 +6,6 @@ namespace ThroneForge.Discovery.Tests;
 
 public sealed class RuntimeCompatibilityEngineTests
 {
-    private const string BaseFingerprint = "1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d";
-
     [Fact]
     public void ClassifiesDirectNetstandard21Metadata()
     {
@@ -138,7 +136,7 @@ public sealed class RuntimeCompatibilityEngineTests
         fixture.CreateMonoLayout();
         fixture.WriteCandidate("Game_Data/globalgamemanagers", System.Text.Encoding.UTF8.GetBytes("Unity 2022.3.12f1\0"));
 
-        var result = fixture.Inspect(BaseFingerprint);
+        var result = fixture.Inspect();
 
         Assert.Equal("2022.3.12f1", result.UnityVersion);
         Assert.Contains(result.UnityVersionEvidence, item => item.Source == "globalgamemanagers");
@@ -155,10 +153,16 @@ public sealed class RuntimeCompatibilityEngineTests
                 .Select((value, index) => index == (256 * 1024) + 4 ? (byte)'2' : value)
                 .ToArray());
 
-        var result = fixture.Inspect(BaseFingerprint);
+        var result = fixture.Inspect();
 
         Assert.Equal("Unknown", result.UnityVersion);
         Assert.Contains(result.MissingOrConflictingEvidence, item => item.Contains("read limit", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.EvidenceIssues, item =>
+            item.Category == DiscoveryIssueCategory.Limitation
+            && item.Message.Contains("read limit", StringComparison.OrdinalIgnoreCase));
+        var missingSection = result.ReportMarkdown.Split("## Missing evidence", StringSplitOptions.None)[1]
+            .Split("## Inspection limitations", StringSplitOptions.None)[0];
+        Assert.DoesNotContain("read limit", missingSection, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -169,10 +173,13 @@ public sealed class RuntimeCompatibilityEngineTests
         fixture.WriteCandidate("Game_Data/UnityVersion.txt", "2022.3.12f1");
         fixture.WriteCandidate("Game_Data/globalgamemanagers", System.Text.Encoding.UTF8.GetBytes("Unity 2021.1.28f1\0"));
 
-        var result = fixture.Inspect(BaseFingerprint);
+        var result = fixture.Inspect();
 
         Assert.Equal("Conflicting", result.UnityVersion);
         Assert.Contains(result.MissingOrConflictingEvidence, item => item.Contains("conflicting Unity", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(result.EvidenceIssues, item =>
+            item.Category == DiscoveryIssueCategory.Conflict
+            && item.Message.Contains("conflicting Unity", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -183,7 +190,6 @@ public sealed class RuntimeCompatibilityEngineTests
         fixture.WriteCandidate("UnityPlayer.dll", [1, 2, 3]);
 
         var result = fixture.Inspect(
-            BaseFingerprint,
             versionResourceReader: path => path.EndsWith("Thronefall.exe", StringComparison.OrdinalIgnoreCase)
                 ? "2022.3.12f1"
                 : path.EndsWith("UnityPlayer.dll", StringComparison.OrdinalIgnoreCase)
@@ -203,7 +209,6 @@ public sealed class RuntimeCompatibilityEngineTests
         fixture.WriteCandidate("UnityPlayer.dll", [1, 2, 3]);
 
         var result = fixture.Inspect(
-            BaseFingerprint,
             versionResourceReader: path => path.EndsWith("Thronefall.exe", StringComparison.OrdinalIgnoreCase)
                 || path.EndsWith("UnityPlayer.dll", StringComparison.OrdinalIgnoreCase)
                 ? "2022.3.62.7762112"
@@ -220,9 +225,12 @@ public sealed class RuntimeCompatibilityEngineTests
         using var fixture = new RuntimeCompatibilityTestFixture();
         fixture.CreateMonoLayout();
 
-        var result = fixture.Inspect(BaseFingerprint);
+        var result = fixture.Inspect();
 
         Assert.All(result.LoaderIndicators, item => Assert.Equal(LoaderIndicatorStatus.Absent, item.Status));
+        Assert.Contains(result.EvidenceIssues, item =>
+            item.Category == DiscoveryIssueCategory.Missing
+            && item.Message.Contains("Unity version", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -231,7 +239,7 @@ public sealed class RuntimeCompatibilityEngineTests
         using var fixture = new RuntimeCompatibilityTestFixture();
         fixture.CreateMonoLayout();
 
-        var result = fixture.Inspect(BaseFingerprint);
+        var result = fixture.Inspect();
 
         Assert.Contains(result.RuntimeLayoutEvidence, item =>
             item.RelativePath == "Game_Data/Managed" && item.IsDirectory && item.Present);
@@ -252,12 +260,14 @@ public sealed class RuntimeCompatibilityEngineTests
         fixture.CreateDirectory("MelonLoader");
         fixture.WriteCandidate("winhttp.dll", [1, 2, 3]);
 
-        var result = fixture.Inspect(BaseFingerprint);
+        var result = fixture.Inspect();
 
         Assert.Equal(LoaderIndicatorStatus.PotentialConflict, result.LoaderIndicators.Single(item => item.Name == "BepInEx/").Status);
         Assert.Equal(LoaderIndicatorStatus.PotentialConflict, result.LoaderIndicators.Single(item => item.Name == "doorstop_config.ini").Status);
         Assert.Equal(LoaderIndicatorStatus.PotentialConflict, result.LoaderIndicators.Single(item => item.Name == "MelonLoader/").Status);
         Assert.Equal(LoaderIndicatorStatus.Ambiguous, result.LoaderIndicators.Single(item => item.Name == "winhttp.dll").Status);
+        Assert.Equal(SmokeTestReadiness.BlockedByExistingLoaderIndicators, result.SmokeTestReadiness.Status);
+        Assert.Contains("Current clean-profile smoke-test readiness", result.ReportMarkdown, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -268,7 +278,7 @@ public sealed class RuntimeCompatibilityEngineTests
 
         Assert.Throws<DiscoveryException>(() => new RuntimeCompatibilityEngine().Inspect(new RuntimeCompatibilityRequest(
             fixture.Root,
-            BaseFingerprint,
+            fixture.Fingerprint,
             Path.Combine(fixture.Root, "reports"))));
         Assert.False(Directory.Exists(Path.Combine(fixture.Root, "reports")));
     }
@@ -282,8 +292,8 @@ public sealed class RuntimeCompatibilityEngineTests
         second.CreateMonoLayout();
         var timestamp = new DateTimeOffset(2026, 8, 3, 12, 0, 0, TimeSpan.Zero);
 
-        var firstResult = first.Inspect(BaseFingerprint, timestamp);
-        var secondResult = second.Inspect(BaseFingerprint, timestamp);
+        var firstResult = first.Inspect(timestamp: timestamp);
+        var secondResult = second.Inspect(timestamp: timestamp);
 
         Assert.Equal(firstResult.ReportMarkdown, secondResult.ReportMarkdown);
         Assert.DoesNotContain(first.Root, firstResult.ReportMarkdown, StringComparison.OrdinalIgnoreCase);
@@ -297,9 +307,9 @@ public sealed class RuntimeCompatibilityEngineTests
     {
         using var fixture = new RuntimeCompatibilityTestFixture();
         fixture.CreateMonoLayout();
-        var first = fixture.Inspect(BaseFingerprint);
+        var first = fixture.Inspect();
 
-        var exception = Assert.Throws<DiscoveryException>(() => fixture.Inspect(BaseFingerprint));
+        var exception = Assert.Throws<DiscoveryException>(() => fixture.Inspect());
 
         Assert.Contains("already exists", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(first.ReportMarkdown, File.ReadAllText(first.ReportPath));
@@ -320,7 +330,7 @@ public sealed class RuntimeCompatibilityEngineTests
                 "--game-path",
                 fixture.Root,
                 "--fingerprint",
-                BaseFingerprint,
+                fixture.Fingerprint,
                 "--output-root",
                 "invalid\0output"
             ],
@@ -347,7 +357,7 @@ public sealed class RuntimeCompatibilityEngineTests
                 "--game-path",
                 fixture.Root,
                 "--fingerprint",
-                BaseFingerprint,
+                fixture.Fingerprint,
                 "--output-root",
                 fixture.OutputRoot
             ],
@@ -357,6 +367,6 @@ public sealed class RuntimeCompatibilityEngineTests
         Assert.Equal(0, exitCode);
         Assert.Empty(stderr.ToString());
         Assert.DoesNotContain(fixture.Root, stdout.ToString(), StringComparison.OrdinalIgnoreCase);
-        Assert.True(File.Exists(Path.Combine(fixture.OutputRoot, $"{BaseFingerprint}-runtime-compatibility.md")));
+        Assert.True(File.Exists(Path.Combine(fixture.OutputRoot, $"{fixture.Fingerprint}-runtime-compatibility.md")));
     }
 }

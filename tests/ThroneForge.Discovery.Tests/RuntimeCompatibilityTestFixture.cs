@@ -20,6 +20,8 @@ internal sealed class RuntimeCompatibilityTestFixture : IDisposable
 
     public string DataRoot => Path.Combine(Root, "Game_Data");
 
+    public string Fingerprint => InstallationFingerprintService.Capture(Root).Fingerprint;
+
     public string WriteCandidate(string relativePath, string content)
     {
         var path = PreparePath(relativePath);
@@ -46,12 +48,12 @@ internal sealed class RuntimeCompatibilityTestFixture : IDisposable
     }
 
     public RuntimeCompatibilityResult Inspect(
-        string fingerprint,
+        string? fingerprint = null,
         DateTimeOffset? timestamp = null,
         Func<string, string?>? versionResourceReader = null)
         => new RuntimeCompatibilityEngine(versionResourceReader).Inspect(new RuntimeCompatibilityRequest(
             Root,
-            fingerprint,
+            fingerprint ?? Fingerprint,
             OutputRoot,
             DiscoveryTimestampUtc: timestamp ?? new DateTimeOffset(2026, 8, 3, 12, 0, 0, TimeSpan.Zero)));
 

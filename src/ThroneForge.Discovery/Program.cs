@@ -152,6 +152,7 @@ public static class DiscoveryCli
             stdout.WriteLine($"Executable architecture: {result.ExecutableArchitecture}");
             stdout.WriteLine($"Target-framework recommendation: {result.TargetFrameworkRecommendation}");
             stdout.WriteLine($"Recommended candidate: {result.RecommendedCandidate}");
+            stdout.WriteLine($"Current clean-profile smoke-test readiness: {result.SmokeTestReadiness.Status}");
             return 0;
         }
         catch (DiscoveryException exception)
