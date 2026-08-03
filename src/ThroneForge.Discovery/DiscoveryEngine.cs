@@ -40,7 +40,7 @@ public sealed class DiscoveryEngine
         var executable = executableSelection.Candidate;
         if (executableSelection.IsAmbiguous)
         {
-            missingOrConflictingEvidence.Add("Multiple top-level PE executables were found and the main executable is ambiguous.");
+            missingOrConflictingEvidence.Add("Multiple top-level executable candidates were found and the main executable is ambiguous.");
         }
 
         var architectureProbe = executable
@@ -319,8 +319,7 @@ public sealed class DiscoveryEngine
         {
             1 => new ExecutableSelection(peExecutables[0], false),
             > 1 => new ExecutableSelection(null, true),
-            _ when executables.Count == 1 => new ExecutableSelection(executables[0], false),
-            _ => new ExecutableSelection(null, true)
+            _ => new ExecutableSelection(null, executables.Count > 1)
         };
     }
 

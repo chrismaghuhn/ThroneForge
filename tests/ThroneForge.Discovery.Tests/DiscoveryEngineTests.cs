@@ -227,6 +227,19 @@ public sealed class DiscoveryEngineTests
     }
 
     [Fact]
+    public void DoesNotSelectAMalformedOnlyExecutable()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        fixture.CreateMonoLayout(executableName: "broken.exe", dataDirectoryName: "Game_Data");
+        File.WriteAllText(Path.Combine(fixture.Root, "broken.exe"), "not a PE file");
+
+        var result = Inspect(fixture);
+
+        Assert.Equal(ExecutableArchitecture.Unknown, result.ExecutableArchitecture);
+        Assert.DoesNotContain(result.DetectedEvidence, item => item.Category == "Selected executable");
+    }
+
+    [Fact]
     public void CliFailureDoesNotPrintTheSuppliedAbsoluteGamePath()
     {
         using var fixture = new DiscoveryTestFixture();
