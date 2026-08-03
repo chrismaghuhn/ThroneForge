@@ -33,7 +33,7 @@ The local game directory, build output, logs, and private game reference paths a
 
 ## Development status disclaimer
 
-M0 architecture, hardening, and the final TRX artifact-preservation fix passed hosted Windows/Linux CI in run [30836315556](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30836315556). M1 discovery task 1 and its output/executable-selection hardening are complete on `agent/m1-discovery-hardening`; hosted hardening verification passed in run [30843657857](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30843657857). Synthetic validation and one sanitized local evidence report exist. `main` is the protected default branch. ThroneForge remains an architecture skeleton, not a functioning Thronefall mod; discovery must document evidence without guessing game internals.
+M0 architecture, hardening, and the final TRX artifact-preservation fix passed hosted Windows/Linux CI in run [30836315556](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30836315556). M1 discovery task 1 and its output/executable-selection hardening are complete on `agent/m1-discovery-hardening`; final hosted hardening verification passed in run [30844364366](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30844364366). Synthetic validation and one sanitized local evidence report exist. `main` is the protected default branch. ThroneForge remains an architecture skeleton, not a functioning Thronefall mod; discovery must document evidence without guessing game internals.
 
 ## License
 

@@ -76,14 +76,14 @@ The hardening implementation is complete and hosted-verified on `agent/m1-discov
 - Main-executable selection is deterministic: unique top-level `*_Data` base-name match, then installation-directory-name match, then exactly one valid top-level PE executable; multiple candidates remain ambiguous and produce architecture `Unknown`.
 - Selected compatibility files and Unity-version evidence use bounded single-open reads where applicable; fingerprints remain deterministic.
 - New regression coverage passes locally: output protection, sibling-path handling, reparse points, renamed installations, crash-handler ordering, ambiguous/unique executables, CLI redaction, deterministic fingerprints, and report non-creation.
-- Local full solution validation with installed SDK `10.0.110` from the parent directory: restore PASS, Release build PASS (0 warnings/0 errors), full tests PASS (45 passed, 0 failed, 0 skipped), architecture tests PASS (11), and Contracts tests PASS (1).
+- Local full solution validation with installed SDK `10.0.110` from the parent directory: restore PASS, Release build PASS (0 warnings/0 errors), full tests PASS (46 passed, 0 failed, 0 skipped), architecture tests PASS (11), and Contracts tests PASS (1).
 - Local `dotnet format --verify-no-changes --no-restore` could not run because the formatter's build host resolves the repository's exact SDK requirement `10.0.100`, which is not installed on this machine. The exact pinned format/build/test path remains subject to hosted CI.
 - Private report re-run passed with the sanitized evidence unchanged: `Mono`, `X64`, Unity `Unknown`, fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`, and no absolute path, username, machine name, or temporary file.
 
-Hosted verification passed in GitHub Actions run [30843657857](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30843657857) for hardening commit `7d206ac19ebb26147b5c96833e4029e02cdc0d64`:
+Hosted verification passed in GitHub Actions run [30844364366](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30844364366) for final hardening commit `d1ddc2bcec991fa1f12016c4ad5712557a1f8fa4`:
 
-- `windows-latest`: PASS; job `91786534020`; SDK `10.0.100`; 10 TRX files representing 45 tests, 0 failed, 0 errors; artifact `throneforge-test-results-windows-latest-30843657857` (artifact `8867871535`).
-- `ubuntu-latest`: PASS; job `91786534027`; SDK `10.0.100`; 10 TRX files representing 45 tests, 0 failed, 0 errors; artifact `throneforge-test-results-ubuntu-latest-30843657857` (artifact `8867814159`).
+- `windows-latest`: PASS; job `91788915294`; SDK `10.0.100`; 10 TRX files representing 46 tests, 0 failed, 0 errors; artifact `throneforge-test-results-windows-latest-30844364366` (artifact `8868100813`).
+- `ubuntu-latest`: PASS; job `91788915163`; SDK `10.0.100`; 10 TRX files representing 46 tests, 0 failed, 0 errors; artifact `throneforge-test-results-ubuntu-latest-30844364366` (artifact `8868078879`).
 
 Both jobs completed locked restore, exact-SDK information, format verification, Release build, full tests, TRX completeness verification, and upload. Both downloaded artifacts were independently parsed. No `Overwriting results file` warning occurred in either log, and each artifact contains one TRX per test project. No local game installation was available to CI.
 
