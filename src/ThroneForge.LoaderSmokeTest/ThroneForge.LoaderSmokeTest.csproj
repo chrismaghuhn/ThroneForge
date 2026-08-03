@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ThroneForge.LoaderSmokeTest</AssemblyName>
+    <RootNamespace>ThroneForge.LoaderSmokeTest</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ThroneForge.Discovery/ThroneForge.Discovery.csproj" />
+  </ItemGroup>
+</Project>

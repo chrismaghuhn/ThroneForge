@@ -15,6 +15,7 @@
   <Project Path="src/ThroneForge.InGameUI/ThroneForge.InGameUI.csproj" />
   <Project Path="src/ThroneForge.TestKit/ThroneForge.TestKit.csproj" />
   <Project Path="src/ThroneForge.Discovery/ThroneForge.Discovery.csproj" />
+  <Project Path="src/ThroneForge.LoaderSmokeTest/ThroneForge.LoaderSmokeTest.csproj" />
   <Project Path="tests/ThroneForge.ArchitectureTests/ThroneForge.ArchitectureTests.csproj" />
   <Project Path="tests/ThroneForge.Contracts.Tests/ThroneForge.Contracts.Tests.csproj" />
   <Project Path="tests/ThroneForge.Schemas.Tests/ThroneForge.Schemas.Tests.csproj" />
@@ -25,4 +26,5 @@
   <Project Path="tests/ThroneForge.Cli.Tests/ThroneForge.Cli.Tests.csproj" />
   <Project Path="tests/ThroneForge.Studio.Tests/ThroneForge.Studio.Tests.csproj" />
   <Project Path="tests/ThroneForge.Discovery.Tests/ThroneForge.Discovery.Tests.csproj" />
+  <Project Path="tests/ThroneForge.LoaderSmokeTest.Tests/ThroneForge.LoaderSmokeTest.Tests.csproj" />
 </Solution>

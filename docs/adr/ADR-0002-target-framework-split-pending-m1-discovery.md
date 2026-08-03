@@ -1,6 +1,6 @@
 # ADR-0002: Target-framework split pending M1 discovery
 
-- Status: Provisional recommendation recorded during M1 task 2; hardening hosted verification passed in run `30852340193`
+- Status: Bootstrap smoke-test verified for the documented fingerprint; plugin/runtime integration remains provisional
 - Date: 2026-08-03
 
 ## Context
@@ -11,7 +11,7 @@ External tooling should use the pinned current .NET LTS, while the injected game
 
 M0 pins the external-tool SDK to .NET 10 (`global.json`) and uses `net10.0` as the target for external tooling. The Task 2 compatibility report provisionally recommends `netstandard2.1` for a future plugin target because the local evidence includes `netstandard.dll` and Unity 2022.3.62. It provisionally recommends the official BepInEx 5.4.23.5 Unity Mono x64 distribution for a later smoke test because the local backend and executable architecture match and the official release is the stable LTS line.
 
-These are discovery recommendations only. The target-framework assessment records evidence-specific confidence; the current installation's `netstandard2.1` recommendation is medium confidence because it combines a netstandard compatibility surface with Unity 2022.3 evidence. Candidate selection is independent from current clean-profile readiness: existing loader/bootstrap indicators block readiness even when BepInEx 5 remains the leading candidate. Production game-facing target frameworks, loader dependencies, Harmony selection, lifecycle bindings, and runtime APIs remain unselected. All recommendations are provisional until a clean-profile loader smoke test succeeds.
+These are discovery recommendations only. The target-framework assessment records evidence-specific confidence; the current installation's `netstandard2.1` recommendation is medium confidence because it combines a netstandard compatibility surface with Unity 2022.3 evidence. Candidate selection is independent from current clean-profile readiness: existing loader/bootstrap indicators block readiness even when BepInEx 5 remains the leading candidate. A reversible clean-profile experiment for this exact fingerprint verified BepInEx 5.4.23.5 bootstrap initialization with preloader and chainloader evidence and zero custom plugins. Plugin target-framework compatibility, Harmony selection, lifecycle bindings, runtime APIs, and game-facing behavior remain unverified.
 
 No BepInEx, Harmony/HarmonyX, Unity, or proprietary game package is selected or referenced in M0.
 
@@ -19,4 +19,4 @@ No BepInEx, Harmony/HarmonyX, Unity, or proprietary game package is selected or 
 
 - A clean clone can build the platform-neutral skeleton without the game installed once the pinned SDK is present.
 - The game-facing target may diverge from shared/external targets after the clean-profile smoke test.
-- The report does not claim a loadable plugin, loader compatibility, Harmony compatibility, lifecycle binding, or game API compatibility.
+- The report claims only BepInEx bootstrap compatibility for the documented fingerprint; it does not claim a loadable ThroneForge plugin, plugin TFM compatibility, Harmony compatibility, lifecycle binding, or game API compatibility.

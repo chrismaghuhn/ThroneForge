@@ -133,14 +133,16 @@ This task starts from merged `main@e0c46a16fde527dd3a0f99cd5e30f8d5baba571a` on 
 
 Task 2 is complete and merged by PR #2 into protected `main` at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. This task is deliberately separate from the Task-2 branch and evaluates only BepInEx bootstrap initialization for the fingerprint-bound disposable copy. The complete execution plan is [`docs/superpowers/plans/2026-08-03-m1-loader-smoke-test.md`](docs/superpowers/plans/2026-08-03-m1-loader-smoke-test.md).
 
-- [ ] Recompute the original installation fingerprint and runtime readiness before preparation.
-- [ ] Copy the installation without following reparse points and verify the copied fingerprint.
-- [ ] Run the bounded copied baseline launch before any loader installation.
-- [ ] Verify and securely extract only the official `BepInEx_win_x64_5.4.23.5.zip` asset.
-- [ ] Apply the loader transaction only to the disposable copy and retain rollback metadata.
-- [ ] Launch the copied loader profile, parse sanitized bootstrap evidence, and load no plugin.
-- [ ] Roll back the disposable copy and verify both original and copied fingerprints/readiness.
-- [ ] Commit only a sanitized outcome report; do not claim plugin, Harmony, lifecycle, or game API compatibility.
+- [x] Recompute the original installation fingerprint and runtime readiness before preparation.
+- [x] Copy the installation without following reparse points and verify the copied fingerprint.
+- [x] Run the bounded copied baseline launch before any loader installation.
+- [x] Verify and securely extract only the official `BepInEx_win_x64_5.4.23.5.zip` asset.
+- [x] Apply the loader transaction only to the disposable copy and retain rollback metadata.
+- [x] Launch the copied loader profile, parse sanitized bootstrap evidence, and load no plugin.
+- [x] Roll back the disposable copy and verify both original and copied fingerprints/readiness.
+- [x] Commit only a sanitized outcome report; do not claim plugin, Harmony, lifecycle, or game API compatibility.
+
+Private Task-3 outcome: `Passed` for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`; BepInEx `5.4.23.5` reported preloader and chainloader initialization with zero plugins and no warnings/errors. Hosted synthetic CI verification is still required before closing this task.
 
 ## M1 discovery task 2 hardening (completed and merged)
 
