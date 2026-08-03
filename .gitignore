@@ -1,0 +1,20 @@
+# Build and IDE output
+artifacts/
+bin/
+obj/
+.vs/
+.idea/
+TestResults/
+*.user
+*.suo
+
+# Local game installation and private discovery inputs
+Thronefall/
+lib/game/
+
+# Local tooling and generated reports
+.dotnet/
+coverage/
+*.trx
+*.log
+

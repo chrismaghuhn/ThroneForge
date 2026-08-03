@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ThroneForge.API</AssemblyName>
+    <RootNamespace>ThroneForge.API</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ThroneForge.Contracts/ThroneForge.Contracts.csproj" />
+  </ItemGroup>
+</Project>
+

@@ -1,0 +1,27 @@
+<Solution>
+  <Project Path="src/ThroneForge.Contracts/ThroneForge.Contracts.csproj" />
+  <Project Path="src/ThroneForge.Schemas/ThroneForge.Schemas.csproj" />
+  <Project Path="src/ThroneForge.API/ThroneForge.API.csproj" />
+  <Project Path="src/ThroneForge.Packaging/ThroneForge.Packaging.csproj" />
+  <Project Path="src/ThroneForge.Diagnostics/ThroneForge.Diagnostics.csproj" />
+  <Project Path="src/ThroneForge.Content/ThroneForge.Content.csproj" />
+  <Project Path="src/ThroneForge.Logic/ThroneForge.Logic.csproj" />
+  <Project Path="src/ThroneForge.Runtime/ThroneForge.Runtime.csproj" />
+  <Project Path="src/ThroneForge.GameAdapter.Abstractions/ThroneForge.GameAdapter.Abstractions.csproj" />
+  <Project Path="src/ThroneForge.GameAdapter.Thronefall/ThroneForge.GameAdapter.Thronefall.csproj" />
+  <Project Path="src/ThroneForge.Bootstrap.Thronefall/ThroneForge.Bootstrap.Thronefall.csproj" />
+  <Project Path="src/ThroneForge.Cli/ThroneForge.Cli.csproj" />
+  <Project Path="src/ThroneForge.Studio/ThroneForge.Studio.csproj" />
+  <Project Path="src/ThroneForge.InGameUI/ThroneForge.InGameUI.csproj" />
+  <Project Path="src/ThroneForge.TestKit/ThroneForge.TestKit.csproj" />
+  <Project Path="tests/ThroneForge.ArchitectureTests/ThroneForge.ArchitectureTests.csproj" />
+  <Project Path="tests/ThroneForge.Contracts.Tests/ThroneForge.Contracts.Tests.csproj" />
+  <Project Path="tests/ThroneForge.Schemas.Tests/ThroneForge.Schemas.Tests.csproj" />
+  <Project Path="tests/ThroneForge.Packaging.Tests/ThroneForge.Packaging.Tests.csproj" />
+  <Project Path="tests/ThroneForge.Runtime.Tests/ThroneForge.Runtime.Tests.csproj" />
+  <Project Path="tests/ThroneForge.Logic.Tests/ThroneForge.Logic.Tests.csproj" />
+  <Project Path="tests/ThroneForge.GameAdapter.Tests/ThroneForge.GameAdapter.Tests.csproj" />
+  <Project Path="tests/ThroneForge.Cli.Tests/ThroneForge.Cli.Tests.csproj" />
+  <Project Path="tests/ThroneForge.Studio.Tests/ThroneForge.Studio.Tests.csproj" />
+</Solution>
+

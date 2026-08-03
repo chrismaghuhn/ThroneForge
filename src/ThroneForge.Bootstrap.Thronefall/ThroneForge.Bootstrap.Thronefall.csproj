@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ThroneForge.Bootstrap.Thronefall</AssemblyName>
+    <RootNamespace>ThroneForge.Bootstrap.Thronefall</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ThroneForge.Runtime/ThroneForge.Runtime.csproj" />
+    <ProjectReference Include="../ThroneForge.GameAdapter.Thronefall/ThroneForge.GameAdapter.Thronefall.csproj" />
+    <ProjectReference Include="../ThroneForge.Diagnostics/ThroneForge.Diagnostics.csproj" />
+  </ItemGroup>
+</Project>
+

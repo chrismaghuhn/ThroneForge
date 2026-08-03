@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ThroneForge.Logic</AssemblyName>
+    <RootNamespace>ThroneForge.Logic</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ThroneForge.Contracts/ThroneForge.Contracts.csproj" />
+    <ProjectReference Include="../ThroneForge.Schemas/ThroneForge.Schemas.csproj" />
+  </ItemGroup>
+</Project>
+

@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net10.0": {
+      "throneforge.content": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )",
+          "ThroneForge.Schemas": "[1.0.0, )"
+        }
+      },
+      "throneforge.contracts": {
+        "type": "Project"
+      },
+      "throneforge.diagnostics": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )"
+        }
+      },
+      "throneforge.logic": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )",
+          "ThroneForge.Schemas": "[1.0.0, )"
+        }
+      },
+      "throneforge.packaging": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )",
+          "ThroneForge.Schemas": "[1.0.0, )"
+        }
+      },
+      "throneforge.schemas": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )"
+        }
+      }
+    }
+  }
+}

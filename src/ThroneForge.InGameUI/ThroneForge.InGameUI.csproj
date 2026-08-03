@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ThroneForge.InGameUI</AssemblyName>
+    <RootNamespace>ThroneForge.InGameUI</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ThroneForge.Runtime/ThroneForge.Runtime.csproj" />
+    <ProjectReference Include="../ThroneForge.Diagnostics/ThroneForge.Diagnostics.csproj" />
+  </ItemGroup>
+</Project>
+

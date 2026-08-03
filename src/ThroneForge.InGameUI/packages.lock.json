@@ -1,0 +1,61 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net10.0": {
+      "throneforge.content": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )",
+          "ThroneForge.Schemas": "[1.0.0, )"
+        }
+      },
+      "throneforge.contracts": {
+        "type": "Project"
+      },
+      "throneforge.diagnostics": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )"
+        }
+      },
+      "throneforge.gameadapter.abstractions": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )"
+        }
+      },
+      "throneforge.logic": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )",
+          "ThroneForge.Schemas": "[1.0.0, )"
+        }
+      },
+      "throneforge.packaging": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )",
+          "ThroneForge.Schemas": "[1.0.0, )"
+        }
+      },
+      "throneforge.runtime": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Content": "[1.0.0, )",
+          "ThroneForge.Contracts": "[1.0.0, )",
+          "ThroneForge.Diagnostics": "[1.0.0, )",
+          "ThroneForge.GameAdapter.Abstractions": "[1.0.0, )",
+          "ThroneForge.Logic": "[1.0.0, )",
+          "ThroneForge.Packaging": "[1.0.0, )",
+          "ThroneForge.Schemas": "[1.0.0, )"
+        }
+      },
+      "throneforge.schemas": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )"
+        }
+      }
+    }
+  }
+}

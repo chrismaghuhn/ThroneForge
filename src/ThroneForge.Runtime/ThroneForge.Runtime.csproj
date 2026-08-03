@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ThroneForge.Runtime</AssemblyName>
+    <RootNamespace>ThroneForge.Runtime</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ThroneForge.Contracts/ThroneForge.Contracts.csproj" />
+    <ProjectReference Include="../ThroneForge.Schemas/ThroneForge.Schemas.csproj" />
+    <ProjectReference Include="../ThroneForge.Packaging/ThroneForge.Packaging.csproj" />
+    <ProjectReference Include="../ThroneForge.Diagnostics/ThroneForge.Diagnostics.csproj" />
+    <ProjectReference Include="../ThroneForge.Content/ThroneForge.Content.csproj" />
+    <ProjectReference Include="../ThroneForge.Logic/ThroneForge.Logic.csproj" />
+    <ProjectReference Include="../ThroneForge.GameAdapter.Abstractions/ThroneForge.GameAdapter.Abstractions.csproj" />
+  </ItemGroup>
+</Project>
+
