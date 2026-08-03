@@ -16,6 +16,58 @@ public enum ExecutableArchitecture
     Unknown
 }
 
+public enum ManagedRuntimeProfile
+{
+    Mono,
+    IL2CPP,
+    Conflicting,
+    Unknown
+}
+
+public enum TargetFrameworkRecommendation
+{
+    Netstandard21Candidate,
+    Netstandard20Candidate,
+    Net472FallbackCandidate,
+    Net46Candidate,
+    Net35FallbackCandidate,
+    FrameworkCompatibleButExactTfmUnresolved,
+    Conflicting,
+    Unknown
+}
+
+public enum LoaderIndicatorStatus
+{
+    Absent,
+    Present,
+    Ambiguous,
+    PotentialConflict
+}
+
+public enum DiscoveryIssueCategory
+{
+    Conflict,
+    Missing,
+    Limitation,
+    Warning
+}
+
+public enum TargetFrameworkConfidence
+{
+    High,
+    Medium,
+    Low,
+    None
+}
+
+public enum SmokeTestReadiness
+{
+    ReadyForReversibleTest,
+    BlockedByExistingLoaderIndicators,
+    BlockedByConflictingCompatibilityEvidence,
+    Unsupported
+}
+
 public sealed record DiscoveryRequest(
     string GamePath,
     string OutputRoot,
@@ -24,7 +76,92 @@ public sealed record DiscoveryRequest(
 
 public sealed record EvidenceItem(string Category, string RelativePath, string Description);
 
+public sealed record DiscoveryIssue(DiscoveryIssueCategory Category, string Message);
+
 public sealed record SelectedFileEvidence(string RelativePath, long Size, string Sha256);
+
+public sealed record RuntimeCompatibilityRequest(
+    string GamePath,
+    string BaseFingerprint,
+    string OutputRoot,
+    bool OverwriteExisting = false,
+    DateTimeOffset? DiscoveryTimestampUtc = null);
+
+public sealed record FrameworkAssemblyReference(string Name, Version? Version);
+
+public sealed record ManagedAssemblyEvidence(
+    string RelativePath,
+    bool HasManagedMetadata,
+    string? AssemblyName,
+    Version? AssemblyVersion,
+    string? TargetFramework,
+    IReadOnlyList<FrameworkAssemblyReference> SelectedFrameworkReferences,
+    string? FailureReason);
+
+public sealed record RuntimeLayoutEvidence(
+    string RelativePath,
+    bool IsDirectory,
+    bool Present,
+    string Description);
+
+public sealed record UnityVersionEvidence(
+    string Source,
+    string RelativePath,
+    string Version,
+    string Description);
+
+public sealed record LoaderIndicatorEvidence(
+    string Name,
+    string RelativePath,
+    LoaderIndicatorStatus Status,
+    string Explanation);
+
+public sealed record TargetFrameworkAssessment(
+    TargetFrameworkRecommendation Recommendation,
+    TargetFrameworkConfidence Confidence,
+    string Basis);
+
+public sealed record SmokeTestReadinessAssessment(
+    SmokeTestReadiness Status,
+    IReadOnlyList<string> BlockingIndicators,
+    string Remediation,
+    string Explanation);
+
+public sealed record BepInExCandidate(
+    string Product,
+    string Version,
+    string OfficialStatus,
+    string BackendMatch,
+    string ArchitectureMatch,
+    string LikelyTargetFramework,
+    string Stability,
+    string KnownUncertainty,
+    string Suitability,
+    string SourceTitle,
+    string SourceUrl,
+    string RetrievedDateUtc);
+
+public sealed record RuntimeCompatibilityResult(
+    string BaseFingerprint,
+    string InspectionToolVersion,
+    string BackendEvidenceReference,
+    ExecutableArchitecture ExecutableArchitecture,
+    string? SelectedExecutableRelativePath,
+    ManagedRuntimeProfile ManagedRuntimeProfile,
+    IReadOnlyList<RuntimeLayoutEvidence> RuntimeLayoutEvidence,
+    IReadOnlyList<ManagedAssemblyEvidence> ManagedAssemblies,
+    TargetFrameworkRecommendation TargetFrameworkRecommendation,
+    TargetFrameworkAssessment TargetFrameworkAssessment,
+    string UnityVersion,
+    IReadOnlyList<UnityVersionEvidence> UnityVersionEvidence,
+    IReadOnlyList<LoaderIndicatorEvidence> LoaderIndicators,
+    IReadOnlyList<BepInExCandidate> BepInExCandidates,
+    string RecommendedCandidate,
+    SmokeTestReadinessAssessment SmokeTestReadiness,
+    IReadOnlyList<DiscoveryIssue> EvidenceIssues,
+    IReadOnlyList<string> MissingOrConflictingEvidence,
+    string ReportPath,
+    string ReportMarkdown);
 
 public sealed record DiscoveryResult(
     string Fingerprint,

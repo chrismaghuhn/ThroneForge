@@ -16,11 +16,42 @@ dotnet run --project src/ThroneForge.Discovery -- inspect `
 
 The output root is validated before any directory is created. It must be outside the inspected game root, must not be the game root or a descendant, and must not be an existing symbolic link/reparse point or pass through one of its parents. Similarly prefixed sibling paths are allowed.
 
+For the second bounded investigation, run:
+
+```powershell
+dotnet run --project src/ThroneForge.Discovery -- runtime-compatibility `
+  --game-path "C:\Path\To\Thronefall" `
+  --fingerprint "<fingerprint-from-the-discovery-report>" `
+  --output-root "docs/discovery"
+```
+
+This command writes `<fingerprint>-runtime-compatibility.md`. It recomputes fingerprint v1 from the current installation before inspecting runtime compatibility and fails without creating output when the supplied fingerprint does not match. `--overwrite` is required for an existing report. The shared snapshot is read-only and does not create or replace the Task 1 report.
+
 ## Evidence and safety boundaries
 
 The tool reads directory and file metadata below the supplied root, selected PE headers, selected small compatibility files, and selected file contents for SHA-256 hashing. It never launches the game, modifies the installation, loads an assembly, executes code, follows symbolic links or reparse points, scans the computer or Steam library, copies binaries, decompiles source, or writes outside the requested output directory.
 
 Reports contain relative paths only. They do not contain the absolute installation path, usernames, machine names, filesystem timestamps, environment variables, arbitrary directory listings, or copied binary contents.
+
+## Runtime-compatibility evidence
+
+The `runtime-compatibility` command reads only selected framework assemblies and layout indicators beneath the explicit game root. Managed assemblies are inspected with `PEReader` and `MetadataReader`; they are never loaded, executed, decompiled, or searched for game methods or private types. The report records assembly identity, assembly version, the `TargetFrameworkAttribute` when safely decodable, and a small allowlist of framework references.
+
+The managed-runtime classification requires multiple compatible layout signals. `Mono` and `IL2CPP` are evidence classifications, not proof of loader compatibility. `Conflicting` means signals for both backends are present, and `Unknown` means the bounded evidence is insufficient.
+
+Target-framework output is a recommendation only:
+
+- `netstandard2.0 candidate` is supported by direct metadata or by `netstandard.dll` plus Unity 2021.1 or older evidence.
+- `netstandard2.1 candidate` is supported by direct metadata or by `netstandard.dll` plus Unity 2021.2 or newer evidence.
+- `Framework-compatible but exact TFM unresolved` is used when `netstandard.dll` exists but Unity-version evidence cannot distinguish 2.0 from 2.1.
+- `net46 candidate` and `net35 fallback candidate` are conservative `mscorlib`-based recommendations.
+- `Conflicting` and `Unknown` prevent a confident target selection.
+
+Unity-version evidence is bounded to `UnityVersion.txt`, the beginning of `globalgamemanagers`, and version-resource metadata from the selected executable and `UnityPlayer.dll`. Equivalent Unity version-resource build-number formats are normalized before conflict checking; raw relative evidence sources remain listed in the report.
+
+The loader inventory reports only exact-name indicators such as `BepInEx/`, `MelonLoader/`, Doorstop configuration files, `winhttp.dll`, `version.dll`, `Mods/`, and `Plugins/`. A DLL filename is never treated as proof of a loader. No indicator is executed, changed, deleted, or identified beyond its safe bounded classification. Reports keep `Conflict`, `Missing`, `Limitation`, and `Warning` evidence categories separate; a bounded prefix limitation is not treated as missing evidence when the version was found in that prefix.
+
+As of 2026-08-03, the official BepInEx release metadata records BepInEx 5.4.23.5 as the stable LTS line and BepInEx 6.0.0-pre.2 as a pre-release. For Mono Unity plus x64 evidence, BepInEx 5 is the provisional candidate for a later clean-profile smoke test. Candidate selection is separate from readiness: any non-absent loader/bootstrap indicator blocks `ReadyForReversibleTest`, and conflicts or insufficient evidence produce a blocked/unsupported readiness result. This is not a loader selection or compatibility claim; it remains provisional until the reversible smoke test succeeds. Sources: [BepInEx releases](https://github.com/BepInEx/BepInEx/releases), [BepInEx plugin target-framework guidance](https://docs.bepinex.dev/master/articles/dev_guide/plugin_tutorial/2_plugin_start.html).
 
 ## Backend classification
 
