@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 1 hardening on `agent/m1-discovery-hardening`.
+M1 - Thronefall discovery spike, task 2 loader and managed-runtime compatibility discovery on `agent/m1-runtime-compatibility`.
 
 ## Milestones
 
@@ -114,9 +114,23 @@ This task is intentionally limited to synthetic fixtures plus one optional priva
 - [x] Push `agent/m1-discovery`, wait for both hosted CI matrix jobs, and record run IDs, SDK versions, artifact counts, and results.
 - [x] Stop with the next M1 investigation explicitly limited to loader/runtime compatibility discovery; do not start the custom-wave vertical slice.
 
-## Next executable task for M1
+## M1 discovery task 2: loader and managed-runtime compatibility discovery
 
-After this hardening branch is merged, investigate loader and managed-runtime compatibility from bounded local metadata only. Determine the probable plugin target framework, additional Unity-version evidence, existing bootstrap conflicts, and the leading official BepInEx candidate. Do not install or execute a loader, add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves.
+This task starts from merged `main@e0c46a16fde527dd3a0f99cd5e30f8d5baba571a` on `agent/m1-runtime-compatibility`. It extends the existing external discovery tool and remains limited to bounded local metadata. It must not install or execute a loader, add BepInEx/Harmony/Unity/game references, load assemblies, inspect methods or private game types, implement lifecycle bindings, or start custom waves.
+
+- [x] Add synthetic metadata fixtures and failing tests for netstandard profiles, modern/legacy `mscorlib`, conflicting framework evidence, malformed/oversized candidates, bounded Unity evidence, version-resource evidence, loader indicators, output isolation, deterministic reports, redaction, and architecture boundaries.
+- [x] Implement metadata-only managed assembly inspection with `PEReader`/`MetadataReader`, selected framework references, `TargetFrameworkAttribute` decoding, and conservative target-framework classification.
+- [x] Implement bounded Unity-version evidence from `UnityVersion.txt`, the beginning of `globalgamemanagers`, and executable/`UnityPlayer.dll` version resources with explicit conflict reporting.
+- [x] Implement the fixed-name loader/bootstrap indicator inventory without executing or identifying arbitrary DLLs by filename alone.
+- [x] Add `runtime-compatibility --game-path <absolute-path> --fingerprint <sha256> --output-root <path>` and write only `<fingerprint>-runtime-compatibility.md` through the existing safe atomic writer.
+- [x] Verify official BepInEx candidate metadata, document the provisional stable BepInEx 5 Unity Mono x64 recommendation, and record uncertainty until a clean-profile smoke test.
+- [x] Run synthetic tests before private inspection; generate and manually sanitize the fingerprint-specific runtime report only after tests pass.
+- [x] Update discovery documentation, ADR-0002 with a provisional evidence-based recommendation, `STATUS.md`, and `CHANGELOG.md`; keep M1 incomplete.
+- [ ] Run exact-SDK hosted Windows/Linux CI, inspect both TRX artifacts, and close this task only after the branch-head run is green.
+
+## Next executable task after M1 discovery task 2
+
+M1 Task 3 is a reversible clean-profile loader smoke test for the selected official candidate. It must be planned only after Task 2 evidence is complete, and it must not be started in the Task-2 branch.
 
 ## M1 discovery task 1 hardening checklist
 

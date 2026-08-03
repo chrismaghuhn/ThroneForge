@@ -46,6 +46,80 @@ internal static class DiscoveryPathValidator
         return outputRoot;
     }
 
+    internal static bool TryResolveReadFile(
+        DirectoryInfo gameRoot,
+        string relativePath,
+        out string fullPath)
+    {
+        fullPath = string.Empty;
+        if (string.IsNullOrWhiteSpace(relativePath)
+            || Path.IsPathRooted(relativePath)
+            || relativePath.Contains("..", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        try
+        {
+            fullPath = Path.GetFullPath(Path.Combine(gameRoot.FullName, relativePath));
+            if (!IsSameOrDescendant(gameRoot.FullName, fullPath)
+                || !File.Exists(fullPath))
+            {
+                return false;
+            }
+
+            EnsureNoReparsePointOnExistingPath(
+                fullPath,
+                "A compatibility candidate uses a symbolic link or reparse point and was not inspected.");
+            return true;
+        }
+        catch (DiscoveryException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            throw new DiscoveryException("A compatibility candidate could not be accessed safely.", exception);
+        }
+    }
+
+    internal static bool TryResolveReadDirectory(
+        DirectoryInfo gameRoot,
+        string relativePath,
+        out string fullPath)
+    {
+        fullPath = string.Empty;
+        if (string.IsNullOrWhiteSpace(relativePath)
+            || Path.IsPathRooted(relativePath)
+            || relativePath.Contains("..", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        try
+        {
+            fullPath = Path.GetFullPath(Path.Combine(gameRoot.FullName, relativePath));
+            if (!IsSameOrDescendant(gameRoot.FullName, fullPath)
+                || !Directory.Exists(fullPath))
+            {
+                return false;
+            }
+
+            EnsureNoReparsePointOnExistingPath(
+                fullPath,
+                "A compatibility directory uses a symbolic link or reparse point and was not inspected.");
+            return true;
+        }
+        catch (DiscoveryException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            throw new DiscoveryException("A compatibility directory could not be accessed safely.", exception);
+        }
+    }
+
     private static string GetFullPath(string suppliedPath, string optionName)
     {
         try
@@ -115,6 +189,46 @@ internal static class DiscoveryPathValidator
             }
 
             current = current.Parent;
+        }
+    }
+
+    private static void EnsureNoReparsePointOnExistingPath(string path, string message)
+    {
+        FileSystemInfo? current = File.Exists(path)
+            ? new FileInfo(path)
+            : new DirectoryInfo(path);
+        while (current is not null)
+        {
+            try
+            {
+                if ((File.GetAttributes(current.FullName) & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new DiscoveryException(message);
+                }
+            }
+            catch (DiscoveryException)
+            {
+                throw;
+            }
+            catch (FileNotFoundException)
+            {
+                // The candidate disappeared between existence and attribute checks.
+            }
+            catch (DirectoryNotFoundException)
+            {
+                // The candidate disappeared between existence and attribute checks.
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                throw new DiscoveryException("A compatibility candidate is not accessible.", exception);
+            }
+
+            current = current switch
+            {
+                DirectoryInfo directory => directory.Parent,
+                FileInfo file => file.Directory,
+                _ => null
+            };
         }
     }
 

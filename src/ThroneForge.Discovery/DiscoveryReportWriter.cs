@@ -5,20 +5,30 @@ namespace ThroneForge.Discovery;
 internal static class DiscoveryReportWriter
 {
     public static string Write(string outputRoot, string fingerprint, string markdown, bool overwriteExisting)
+        => WriteFile(outputRoot, $"{fingerprint}.md", markdown, overwriteExisting);
+
+    public static string WriteFile(string outputRoot, string fileName, string markdown, bool overwriteExisting)
     {
         string? temporaryPath = null;
         try
         {
             Directory.CreateDirectory(outputRoot);
-            var reportPath = Path.Combine(outputRoot, $"{fingerprint}.md");
+            if (string.IsNullOrWhiteSpace(fileName)
+                || fileName.Contains(Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                || fileName.Contains(Path.AltDirectorySeparatorChar, StringComparison.Ordinal))
+            {
+                throw new DiscoveryException("The discovery report file name is invalid.");
+            }
+
+            var reportPath = Path.Combine(outputRoot, fileName);
             if (File.Exists(reportPath) && !overwriteExisting)
             {
                 throw new DiscoveryException(
-                    $"A discovery report for fingerprint '{fingerprint}' already exists. "
+                    $"A discovery report named '{fileName}' already exists. "
                     + "Pass --overwrite to replace it explicitly.");
             }
 
-            temporaryPath = Path.Combine(outputRoot, $".{fingerprint}.{Guid.NewGuid():N}.tmp");
+            temporaryPath = Path.Combine(outputRoot, $".{Path.GetFileNameWithoutExtension(fileName)}.{Guid.NewGuid():N}.tmp");
             using (var stream = new FileStream(
                 temporaryPath,
                 FileMode.CreateNew,
@@ -42,7 +52,7 @@ internal static class DiscoveryReportWriter
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
-            throw new DiscoveryException($"Could not write discovery report '{fingerprint}.md'.", exception);
+            throw new DiscoveryException("Could not write discovery report.", exception);
         }
         finally
         {

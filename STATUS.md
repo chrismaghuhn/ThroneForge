@@ -2,11 +2,11 @@
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 1 hardening on `agent/m1-discovery-hardening`
+M1 - Thronefall discovery spike, task 2 loader and managed-runtime compatibility discovery on `agent/m1-runtime-compatibility`
 
 ## State
 
-M0 is complete and the repository governance setup is complete in GitHub. M1 discovery task 1 is complete on `agent/m1-discovery`; this branch hardens its output protection, executable selection, bounded hashing, tests, and documentation before merge. M1 overall remains incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main` at `e0c46a16fde527dd3a0f99cd5e30f8d5baba571a`. M1 task 2 implementation and private evidence generation are complete locally on `agent/m1-runtime-compatibility`; hosted branch-head verification is pending. M1 overall remains incomplete.
 
 ## Completed
 
@@ -36,7 +36,13 @@ M0 is complete and the repository governance setup is complete in GitHub. M1 dis
 - Added `docs/discovery/README.md` and generated the sanitized private report `docs/discovery/1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d.md`.
 - Verified discovery evidence for this fingerprint: backend `Mono`, executable architecture `X64`, Unity version `Unknown`, fingerprint algorithm `throneforge-game-fingerprint-v1`, fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`.
 - Confirmed final current-head CI run `30840490906` on Windows and Ubuntu: 10 TRX files, 35 tests, 0 failures/errors per runner, SDK `10.0.100`.
-- Created `agent/m1-discovery-hardening` from `f87ad9bb7f483f3128cef87f53525a4cb60c48c5` to close review findings before merge; no loader or runtime integration has started.
+- Merged PR #1 (`agent/m1-discovery-hardening` into `main`) after required Windows/Linux checks passed; merge commit `e0c46a16fde527dd3a0f99cd5e30f8d5baba571a`.
+- Created and pushed `agent/m1-runtime-compatibility` from the merged `main` baseline.
+- Added the Task 2 `runtime-compatibility` command, metadata-only managed assembly inspection, bounded Unity-version evidence, runtime-layout evidence, loader/bootstrap indicator inventory, conservative target-framework classification, and atomic sanitized report generation.
+- Added synthetic Task 2 coverage for netstandard and `mscorlib` profiles, conflicting and malformed evidence, bounded Unity metadata, version-resource normalization, loader indicators, output isolation, deterministic reports, collision behavior, CLI redaction, and runtime-layout evidence.
+- Verified official BepInEx release metadata and documentation on 2026-08-03. The report compares BepInEx 5.4.23.5 stable/LTS with BepInEx 6.0.0-pre.2 pre-release and keeps the BepInEx 5 Unity Mono x64 choice provisional.
+- Ran the private Task 2 command against the explicitly supplied local installation without modifying it. The sanitized report is committed at `docs/discovery/1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-runtime-compatibility.md`.
+- Private Task 2 evidence for this fingerprint: managed runtime `Mono`; executable `X64`; Unity `2022.3.62f2` from bounded `globalgamemanagers` evidence, with matching version-resource build-number evidence; `netstandard.dll` plus Unity 2022.3 evidence supports a provisional `netstandard2.1` candidate; no BepInEx, Doorstop, MelonLoader, Mods, Plugins, `winhttp.dll`, or `version.dll` indicators were present.
 
 ## Validation
 
@@ -70,7 +76,7 @@ M1 local validation used the installed x86 .NET SDK `10.0.110` from the parent d
 
 ### M1 discovery hardening validation
 
-The hardening implementation is complete and hosted-verified on `agent/m1-discovery-hardening`; M1 task 1 is merge-ready, while M1 task 2 has not started.
+The hardening implementation is complete and hosted-verified on `agent/m1-discovery-hardening`; M1 task 1 is merged, and M1 task 2 is being developed separately on `agent/m1-runtime-compatibility`.
 
 - Output roots are validated before any output directory is created: the game root, descendants, existing reparse points, and reparse-point parents are rejected. Filesystem failures are converted to sanitized `DiscoveryException` messages.
 - Main-executable selection is deterministic: unique top-level `*_Data` base-name match, then installation-directory-name match, then exactly one valid top-level PE executable; multiple candidates remain ambiguous and produce architecture `Unknown`.
@@ -87,10 +93,19 @@ Hosted verification passed in GitHub Actions run [30844364366](https://github.co
 
 Both jobs completed locked restore, exact-SDK information, format verification, Release build, full tests, TRX completeness verification, and upload. Both downloaded artifacts were independently parsed. No `Overwriting results file` warning occurred in either log, and each artifact contains one TRX per test project. No local game installation was available to CI.
 
+### M1 discovery task 2 local validation
+
+- Focused `ThroneForge.Discovery` build: PASS with installed SDK `10.0.110` from the parent directory; 0 warnings and 0 errors.
+- Focused `ThroneForge.Discovery.Tests`: PASS; 49 tests passed, 0 failed, 0 skipped.
+- Private command, with the absolute game path redacted here: `dotnet run --project src/ThroneForge.Discovery --no-restore -- runtime-compatibility --game-path <redacted> --fingerprint 1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d --output-root docs/discovery --overwrite`: PASS.
+- Private report review: PASS; no absolute path, username, machine name, arbitrary listing, binary content, decompiled source, or temporary report remained. The report contains only relative paths and selected compatibility metadata.
+- Hosted branch-head CI: pending. No hosted Task 2 result is claimed until both required matrix jobs and TRX artifacts complete successfully.
+
 ## Unverified assumptions
 
 - Backend `Mono`, executable architecture `X64`, and fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d` are verified only for the documented local installation fingerprint.
-- Unity version remains `Unknown`; loader, Harmony compatibility, target framework, private members, lifecycle hooks, game APIs, and wave representation remain unknown.
+- The Task 1 Unity `Unknown` result was superseded for this same fingerprint by Task 2's additional bounded `globalgamemanagers` and version-resource evidence: Unity `2022.3.62f2` is locally evidenced, but not generalized to other installations.
+- The Task 2 target-framework recommendation is provisional `netstandard2.1 candidate`; exact plugin compatibility remains unverified. Loader, Harmony compatibility, private members, lifecycle hooks, game APIs, and wave representation remain unknown.
 - The M0 external-tool target is planned as `net10.0` because the specification names .NET 10 as the active LTS at its research checkpoint; the game-facing target remains provisional until M1 evidence.
 - No game-facing behavior is implemented or claimed.
 
@@ -100,9 +115,10 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - The local game directory contains proprietary files and must remain ignored and outside Git history.
 - The M0 baseline is committed; future changes must continue to exclude the local game directory.
 - Exact SDK `10.0.100` local formatting/validation remains unverified; hosted CI is required for that pinned-toolchain result.
-- The private report records only local layout evidence: Mono indicators were found under `MonoBleedingEdge` and `thronefall_Data/Managed`, plus `Assembly-CSharp.dll`; Unity version evidence was unavailable. No loader, target framework, lifecycle hook, catalog source, or runtime compatibility conclusion is claimed.
-- The hardening branch is merge-ready; merge into protected `main` remains a repository-owner action. The next M1 task must wait until that merge and must remain limited to loader/managed-runtime compatibility discovery.
+- The private reports record local layout evidence: Mono indicators were found under `MonoBleedingEdge` and `thronefall_Data/Managed`, plus `Assembly-CSharp.dll`; Task 2 adds bounded Unity, managed-framework, and loader-indicator evidence. All conclusions remain installation-specific.
+- Task 2 remains metadata-only and bounded. The BepInEx 5.4.23.5 Unity Mono x64 candidate is a provisional recommendation only; no loader was downloaded, installed, or executed. A clean-profile smoke test is still required.
+- Hosted Task 2 validation and artifact inspection are still outstanding for the current branch head.
 
 ## Next task
 
-Merge and protect the reviewed `agent/m1-discovery-hardening` result, then limit the next M1 investigation to loader and managed-runtime compatibility discovery. Do not install or execute a loader, inspect game methods, or implement lifecycle/custom-wave behavior.
+Push the reviewed Task 2 implementation, wait for the hosted Windows/Linux CI matrix, inspect both TRX artifacts, and then merge only after the branch-head checks pass. The next M1 task is a reversible clean-profile loader smoke test for the provisional BepInEx 5 candidate; do not start it in this branch.
