@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 1: local-only installation inspection.
+M1 - Thronefall discovery spike, task 1 hardening on `agent/m1-discovery-hardening`.
 
 ## Milestones
 
@@ -105,15 +105,24 @@ This task is intentionally limited to synthetic fixtures plus one optional priva
 
 - [x] Create `docs/discovery/README.md` documenting inputs, non-effects, backend rules, fingerprint v1, privacy guarantees, limitations, and report interpretation.
 - [x] Run synthetic tests before any private game inspection. The user-supplied local path was inspected once, the generated report was manually checked for paths/usernames/proprietary details, and only sanitized Markdown was retained.
-- [ ] If the private report cannot be safely committed, keep it ignored and document the redaction decision instead of copying game files or metadata.
-- [ ] Update `CHANGELOG.md`, `STATUS.md`, and ADR-0002 only with verified discovery evidence; do not mark M1 complete.
+- [x] The private report passed manual sanitization and is committed; no game binaries or assets were copied.
+- [x] `CHANGELOG.md`, `STATUS.md`, and ADR-0002 were reviewed; only verified discovery evidence is documented and M1 remains incomplete.
 
 ### Validation and handoff
 
-- [x] Run restore, format, Release build, full tests, architecture tests, contracts tests, and tracked-file hygiene checks; exact pinned-toolchain formatting and hosted build/test evidence passed in CI run `30839919115`.
+- [x] Run restore, format, Release build, full tests, architecture tests, contracts tests, and tracked-file hygiene checks; exact pinned-toolchain formatting and hosted build/test evidence passed in CI run `30840490906`.
 - [x] Push `agent/m1-discovery`, wait for both hosted CI matrix jobs, and record run IDs, SDK versions, artifact counts, and results.
-- [ ] Stop with the next M1 investigation explicitly limited to loader/runtime compatibility discovery; do not start the custom-wave vertical slice.
+- [x] Stop with the next M1 investigation explicitly limited to loader/runtime compatibility discovery; do not start the custom-wave vertical slice.
 
-## First executable task for M1
+## Next executable task for M1
 
-Create a local-only discovery tool that accepts an explicit Thronefall installation path, detects the managed Mono versus IL2CPP layout and executable architecture, computes a sanitized fingerprint from local metadata, and writes `docs/discovery/<fingerprint>.md` without copying or committing game binaries or assets. Stop after documenting the evidence and blockers; do not guess a lifecycle hook or implement the wave bridge.
+After this hardening branch is merged, investigate loader and managed-runtime compatibility from bounded local metadata only. Determine the probable plugin target framework, additional Unity-version evidence, existing bootstrap conflicts, and the leading official BepInEx candidate. Do not install or execute a loader, add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves.
+
+## M1 discovery task 1 hardening checklist
+
+- [x] Reject output roots that are the game root, descendants of it, existing reparse points, or reached through reparse-point parents before creating any directory.
+- [x] Normalize output-path and filesystem failures into sanitized `DiscoveryException` messages without absolute paths or stack traces in normal CLI output.
+- [x] Select the main executable from a unique `*_Data` base-name match, then root-name match, then exactly one remaining PE executable; report ambiguity as `Unknown`.
+- [x] Open selected files once for bounded length validation and hashing; keep deterministic fingerprints.
+- [x] Add regression coverage for output protection, renamed installations, crash-handler ordering, ambiguous executables, CLI redaction, and report non-creation after rejected output.
+- [x] Correct status, plan, README, and changelog wording; run local and hosted validation without starting loader/runtime work.

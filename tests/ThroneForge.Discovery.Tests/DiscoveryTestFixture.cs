@@ -4,11 +4,14 @@ namespace ThroneForge.Discovery.Tests;
 
 internal sealed class DiscoveryTestFixture : IDisposable
 {
+    private readonly List<string> externalDirectories = [];
+    private readonly List<string> externalLinks = [];
+
     public DiscoveryTestFixture()
     {
         Root = Path.Combine(Path.GetTempPath(), $"throneforge-discovery-{Guid.NewGuid():N}");
         Directory.CreateDirectory(Root);
-        OutputRoot = Path.Combine(Root, "reports");
+        OutputRoot = CreateExternalOutputRoot("reports");
     }
 
     public string Root { get; }
@@ -19,10 +22,44 @@ internal sealed class DiscoveryTestFixture : IDisposable
 
     public string MainExecutable => Path.Combine(Root, "Thronefall.exe");
 
-    public void CreateMonoLayout(bool includeAssembly = true)
+    public string CreateExternalOutputRoot(string name)
     {
-        var managed = Path.Combine(DataRoot, "Managed");
-        var monoRuntime = Path.Combine(DataRoot, "MonoBleedingEdge");
+        var outputRoot = Path.Combine(Path.GetTempPath(), $"throneforge-discovery-output-{name}-{Guid.NewGuid():N}");
+        externalDirectories.Add(outputRoot);
+        return outputRoot;
+    }
+
+    public bool TryCreateExternalDirectoryLink(out string linkPath)
+    {
+        var target = CreateExternalOutputRoot("symlink-target");
+        Directory.CreateDirectory(target);
+        linkPath = Path.Combine(Path.GetTempPath(), $"throneforge-discovery-output-link-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateSymbolicLink(linkPath, target);
+            externalLinks.Add(linkPath);
+            return true;
+        }
+        catch (IOException)
+        {
+            linkPath = string.Empty;
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            linkPath = string.Empty;
+            return false;
+        }
+    }
+
+    public void CreateMonoLayout(
+        bool includeAssembly = true,
+        string executableName = "Thronefall.exe",
+        string dataDirectoryName = "Thronefall_Data")
+    {
+        var dataRoot = Path.Combine(Root, dataDirectoryName);
+        var managed = Path.Combine(dataRoot, "Managed");
+        var monoRuntime = Path.Combine(dataRoot, "MonoBleedingEdge");
         Directory.CreateDirectory(managed);
         Directory.CreateDirectory(monoRuntime);
         if (includeAssembly)
@@ -30,7 +67,7 @@ internal sealed class DiscoveryTestFixture : IDisposable
             File.WriteAllText(Path.Combine(managed, "Assembly-CSharp.dll"), "synthetic mono assembly");
         }
 
-        WriteMinimalPe(MainExecutable, 0x8664);
+        WriteMinimalPe(Path.Combine(Root, executableName), 0x8664);
     }
 
     public void CreateIl2CppLayout()
@@ -77,6 +114,22 @@ internal sealed class DiscoveryTestFixture : IDisposable
 
     public void Dispose()
     {
+        foreach (var link in externalLinks)
+        {
+            if (Directory.Exists(link) || File.Exists(link))
+            {
+                Directory.Delete(link);
+            }
+        }
+
+        foreach (var directory in externalDirectories)
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
         if (Directory.Exists(Root))
         {
             Directory.Delete(Root, recursive: true);

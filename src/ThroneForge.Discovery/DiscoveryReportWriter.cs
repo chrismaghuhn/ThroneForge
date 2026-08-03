@@ -6,19 +6,19 @@ internal static class DiscoveryReportWriter
 {
     public static string Write(string outputRoot, string fingerprint, string markdown, bool overwriteExisting)
     {
-        Directory.CreateDirectory(outputRoot);
-
-        var reportPath = Path.Combine(outputRoot, $"{fingerprint}.md");
-        if (File.Exists(reportPath) && !overwriteExisting)
-        {
-            throw new DiscoveryException(
-                $"A discovery report for fingerprint '{fingerprint}' already exists. "
-                + "Pass --overwrite to replace it explicitly.");
-        }
-
-        var temporaryPath = Path.Combine(outputRoot, $".{fingerprint}.{Guid.NewGuid():N}.tmp");
+        string? temporaryPath = null;
         try
         {
+            Directory.CreateDirectory(outputRoot);
+            var reportPath = Path.Combine(outputRoot, $"{fingerprint}.md");
+            if (File.Exists(reportPath) && !overwriteExisting)
+            {
+                throw new DiscoveryException(
+                    $"A discovery report for fingerprint '{fingerprint}' already exists. "
+                    + "Pass --overwrite to replace it explicitly.");
+            }
+
+            temporaryPath = Path.Combine(outputRoot, $".{fingerprint}.{Guid.NewGuid():N}.tmp");
             using (var stream = new FileStream(
                 temporaryPath,
                 FileMode.CreateNew,
@@ -36,19 +36,19 @@ internal static class DiscoveryReportWriter
             File.Move(temporaryPath, reportPath, overwrite: overwriteExisting);
             return reportPath;
         }
-        catch (IOException exception)
+        catch (DiscoveryException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             throw new DiscoveryException($"Could not write discovery report '{fingerprint}.md'.", exception);
-        }
-        catch (UnauthorizedAccessException exception)
-        {
-            throw new DiscoveryException($"The discovery output directory is not writable: '{outputRoot}'.", exception);
         }
         finally
         {
             try
             {
-                if (File.Exists(temporaryPath))
+                if (temporaryPath is not null && File.Exists(temporaryPath))
                 {
                     File.Delete(temporaryPath);
                 }

@@ -24,7 +24,8 @@ public sealed class DiscoveryEngine
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var gameRoot = ValidateGameRoot(request.GamePath);
+        var gameRoot = DiscoveryPathValidator.ValidateGameRoot(request.GamePath);
+        var outputRoot = DiscoveryPathValidator.ValidateOutputRoot(gameRoot, request.OutputRoot);
         var files = EnumerateFiles(gameRoot);
         var directories = EnumerateDirectories(gameRoot);
         var fileMap = files.ToDictionary(item => item.RelativePath, StringComparer.OrdinalIgnoreCase);
@@ -35,18 +36,27 @@ public sealed class DiscoveryEngine
         var (backend, monoCount, il2CppCount) = DetectBackend(fileMap, directorySet, detectedEvidence);
         AddBackendExplanation(backend, monoCount, il2CppCount, missingOrConflictingEvidence);
 
-        var executable = SelectMainExecutable(fileMap, gameRoot);
+        var executableSelection = SelectMainExecutable(fileMap, directorySet, gameRoot);
+        var executable = executableSelection.Candidate;
+        if (executableSelection.IsAmbiguous)
+        {
+            missingOrConflictingEvidence.Add("Multiple top-level PE executables were found and the main executable is ambiguous.");
+        }
+
         var architectureProbe = executable
             ?? fileMap.GetValueOrDefault("GameAssembly.dll");
         var executableArchitecture = architectureProbe is null
             ? ExecutableArchitecture.Unknown
-            : ReadExecutableArchitecture(architectureProbe, detectedEvidence, missingOrConflictingEvidence);
+            : ReadExecutableArchitecture(
+                architectureProbe,
+                executable is not null,
+                detectedEvidence,
+                missingOrConflictingEvidence);
 
         var unityVersion = DetectUnityVersion(fileMap, detectedEvidence, missingOrConflictingEvidence);
         var selectedFiles = SelectCompatibilityFiles(fileMap, executable, detectedEvidence, missingOrConflictingEvidence);
         var fingerprint = CreateFingerprint(backend, executableArchitecture, unityVersion, selectedFiles);
 
-        var outputRoot = Path.GetFullPath(request.OutputRoot);
         var reportMarkdown = BuildReport(
             fingerprint,
             request.DiscoveryTimestampUtc ?? DateTimeOffset.UtcNow,
@@ -74,53 +84,6 @@ public sealed class DiscoveryEngine
             selectedFiles,
             reportPath,
             reportMarkdown);
-    }
-
-    private static DirectoryInfo ValidateGameRoot(string? suppliedPath)
-    {
-        if (string.IsNullOrWhiteSpace(suppliedPath) || !Path.IsPathRooted(suppliedPath))
-        {
-            throw new DiscoveryException("--game-path must be an explicit absolute path to an existing directory.");
-        }
-
-        string fullPath;
-        try
-        {
-            fullPath = Path.GetFullPath(suppliedPath);
-        }
-        catch (Exception exception) when (exception is ArgumentException or IOException or UnauthorizedAccessException)
-        {
-            throw new DiscoveryException("--game-path is not a valid accessible path.", exception);
-        }
-
-        if (!Directory.Exists(fullPath))
-        {
-            if (File.Exists(fullPath))
-            {
-                throw new DiscoveryException("--game-path must point to a directory, not a file.");
-            }
-
-            throw new DiscoveryException("The directory supplied by --game-path does not exist.");
-        }
-
-        try
-        {
-            var attributes = File.GetAttributes(fullPath);
-            if ((attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                throw new DiscoveryException("--game-path must not be a symbolic link or reparse point.");
-            }
-
-            return new DirectoryInfo(fullPath);
-        }
-        catch (DiscoveryException)
-        {
-            throw;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            throw new DiscoveryException("The directory supplied by --game-path is not accessible.", exception);
-        }
     }
 
     private static List<FileEntry> EnumerateFiles(DirectoryInfo root)
@@ -208,7 +171,17 @@ public sealed class DiscoveryEngine
                         throw new DiscoveryException("The installation could not be enumerated.", exception);
                     }
 
-                    if ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
+                    FileAttributes attributes;
+                    try
+                    {
+                        attributes = entry.Attributes;
+                    }
+                    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+                    {
+                        throw new DiscoveryException("The installation could not be enumerated.", exception);
+                    }
+
+                    if ((attributes & FileAttributes.ReparsePoint) != 0)
                     {
                         continue;
                     }
@@ -302,7 +275,10 @@ public sealed class DiscoveryEngine
         }
     }
 
-    private static FileEntry? SelectMainExecutable(IReadOnlyDictionary<string, FileEntry> files, DirectoryInfo root)
+    private static ExecutableSelection SelectMainExecutable(
+        IReadOnlyDictionary<string, FileEntry> files,
+        IReadOnlySet<string> directories,
+        DirectoryInfo root)
     {
         var executables = files.Values
             .Where(file => !file.RelativePath.Contains('/')
@@ -311,19 +287,54 @@ public sealed class DiscoveryEngine
             .ToList();
         if (executables.Count == 0)
         {
-            return null;
+            return new ExecutableSelection(null, false);
         }
 
-        var preferredName = root.Name + ".exe";
-        return executables.FirstOrDefault(file => file.RelativePath.Equals(preferredName, StringComparison.OrdinalIgnoreCase))
-            ?? executables[0];
+        var dataDirectories = directories
+            .Where(path => !path.Contains('/') && path.EndsWith("_Data", StringComparison.OrdinalIgnoreCase))
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (dataDirectories.Length == 1)
+        {
+            var dataBaseName = dataDirectories[0][..^"_Data".Length];
+            var dataBaseExecutable = executables.FirstOrDefault(file =>
+                file.RelativePath.Equals(dataBaseName + ".exe", StringComparison.OrdinalIgnoreCase));
+            if (dataBaseExecutable is not null)
+            {
+                return new ExecutableSelection(dataBaseExecutable, false);
+            }
+        }
+
+        var rootNameExecutable = executables.FirstOrDefault(file =>
+            file.RelativePath.Equals(root.Name + ".exe", StringComparison.OrdinalIgnoreCase));
+        if (rootNameExecutable is not null)
+        {
+            return new ExecutableSelection(rootNameExecutable, false);
+        }
+
+        var peExecutables = executables
+            .Where(file => PeArchitectureReader.TryRead(file.FullPath, out _))
+            .ToList();
+        return peExecutables.Count switch
+        {
+            1 => new ExecutableSelection(peExecutables[0], false),
+            > 1 => new ExecutableSelection(null, true),
+            _ when executables.Count == 1 => new ExecutableSelection(executables[0], false),
+            _ => new ExecutableSelection(null, true)
+        };
     }
 
     private static ExecutableArchitecture ReadExecutableArchitecture(
         FileEntry executable,
+        bool isMainExecutable,
         List<EvidenceItem> evidence,
         List<string> explanations)
     {
+        if (isMainExecutable)
+        {
+            evidence.Add(new EvidenceItem("Selected executable", executable.RelativePath, "Selected using deterministic top-level executable evidence."));
+        }
+
         if (!PeArchitectureReader.TryRead(executable.FullPath, out var architecture))
         {
             explanations.Add($"The selected executable '{executable.RelativePath}' has a missing or malformed PE header.");
@@ -349,13 +360,21 @@ public sealed class DiscoveryEngine
         {
             try
             {
-                if (new FileInfo(candidate.FullPath).Length > MaximumUnityVersionBytes)
+                using var stream = new FileStream(
+                    candidate.FullPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize: 4096,
+                    options: FileOptions.SequentialScan);
+                if (stream.Length > MaximumUnityVersionBytes)
                 {
                     explanations.Add($"Unity version evidence '{candidate.RelativePath}' exceeded the read limit.");
                     continue;
                 }
 
-                var content = File.ReadAllText(candidate.FullPath, Encoding.UTF8);
+                using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+                var content = reader.ReadToEnd();
                 var match = UnityVersionPattern.Match(content);
                 if (match.Success)
                 {
@@ -363,11 +382,7 @@ public sealed class DiscoveryEngine
                     return match.Value;
                 }
             }
-            catch (IOException)
-            {
-                explanations.Add($"Unity version evidence '{candidate.RelativePath}' could not be read.");
-            }
-            catch (UnauthorizedAccessException)
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
             {
                 explanations.Add($"Unity version evidence '{candidate.RelativePath}' could not be read.");
             }
@@ -400,25 +415,27 @@ public sealed class DiscoveryEngine
                      .DistinctBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase)
                      .OrderBy(file => file.RelativePath, StringComparer.OrdinalIgnoreCase))
         {
-            FileInfo info;
             try
             {
-                info = new FileInfo(candidate.FullPath);
-                if (info.Length > MaximumSelectedFileBytes)
+                using var stream = new FileStream(
+                    candidate.FullPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize: 4096,
+                    options: FileOptions.SequentialScan);
+                var size = stream.Length;
+                if (size > MaximumSelectedFileBytes)
                 {
                     explanations.Add($"Selected file '{candidate.RelativePath}' exceeded the 64 MiB read limit and was omitted.");
                     continue;
                 }
 
-                var hash = ComputeSha256(candidate.FullPath);
-                selected.Add(new SelectedFileEvidence(candidate.RelativePath, info.Length, hash));
+                var hash = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+                selected.Add(new SelectedFileEvidence(candidate.RelativePath, size, hash));
                 evidence.Add(new EvidenceItem("Selected compatibility file", candidate.RelativePath, "Included in fingerprint input."));
             }
-            catch (IOException)
-            {
-                explanations.Add($"Selected file '{candidate.RelativePath}' could not be read.");
-            }
-            catch (UnauthorizedAccessException)
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
             {
                 explanations.Add($"Selected file '{candidate.RelativePath}' could not be read.");
             }
@@ -613,16 +630,12 @@ public sealed class DiscoveryEngine
         }
     }
 
-    private static string ComputeSha256(string path)
-    {
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.SequentialScan);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
-    }
-
     private static string ToRelativePath(string root, string fullPath)
         => Path.GetRelativePath(root, fullPath).Replace(Path.DirectorySeparatorChar, '/');
 
     private sealed record FileEntry(string RelativePath, string FullPath);
+
+    private sealed record ExecutableSelection(FileEntry? Candidate, bool IsAmbiguous);
 
     private sealed record Entry(FileSystemInfo Info);
 }

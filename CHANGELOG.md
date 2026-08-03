@@ -5,7 +5,7 @@ All notable ThroneForge changes are documented here.
 ## Unreleased
 
 - Fixed CI test-result preservation so every test project gets its own TRX artifact and the workflow verifies aggregate completeness before upload.
-- Started M1 discovery task 1 with a local-only, metadata-based Thronefall installation inspector and sanitized fingerprint reports.
+- Completed M1 discovery task 1 with a local-only, metadata-based Thronefall installation inspector and sanitized fingerprint report; output/executable-selection hardening is pending review.
 
 ### Added
 

@@ -14,6 +14,8 @@ dotnet run --project src/ThroneForge.Discovery -- inspect `
 
 `--game-path` must be an absolute directory path. The optional `--overwrite` flag is required to replace a report with the same fingerprint. Without it, an existing report is left unchanged and the command fails. The tool prints only the generated file name, classification, architecture, and fingerprint; it does not echo the supplied installation path.
 
+The output root is validated before any directory is created. It must be outside the inspected game root, must not be the game root or a descendant, and must not be an existing symbolic link/reparse point or pass through one of its parents. Similarly prefixed sibling paths are allowed.
+
 ## Evidence and safety boundaries
 
 The tool reads directory and file metadata below the supplied root, selected PE headers, selected small compatibility files, and selected file contents for SHA-256 hashing. It never launches the game, modifies the installation, loads an assembly, executes code, follows symbolic links or reparse points, scans the computer or Steam library, copies binaries, decompiles source, or writes outside the requested output directory.
@@ -31,6 +33,10 @@ The names below are layout indicators and are not proof of game internals:
 
 All detected signals and missing/conflicting explanations are written to the report.
 
+## Main executable selection
+
+Top-level `*_Data` directories provide the first executable-name signal. With exactly one such directory, the matching `<base>.exe` is preferred. The tool then tries an executable matching the installation directory name, then selects a single remaining valid PE executable. Multiple remaining PE executables are treated as ambiguous and produce architecture `Unknown`; no alphabetical fallback is used.
+
 ## Fingerprint v1
 
 The fingerprint is a lowercase SHA-256 digest of UTF-8, LF-separated, invariant-culture lines using the version marker `throneforge-game-fingerprint-v1`, backend classification, executable architecture, verified Unity-version evidence, and a sorted set of selected compatibility files. Each selected file contributes its normalized relative path, byte size, and lowercase SHA-256. Absolute paths, usernames, machine identifiers, local timestamps, and environment values are excluded. The entire installation is never hashed indiscriminately; selected file reads are limited to 64 MiB each.
@@ -38,3 +44,5 @@ The fingerprint is a lowercase SHA-256 digest of UTF-8, LF-separated, invariant-
 ## Limitations and next steps
 
 Unity version is reported only when stable local evidence is readable. PE architecture supports x86, x64, and Arm64; malformed or unsupported headers produce `Unknown`. A classification does not establish loader compatibility, lifecycle behavior, game API bindings, or a target framework. Those questions require later, evidence-backed discovery tasks and must not be inferred from this report.
+
+Selected compatibility files are opened once for length validation and SHA-256 hashing, with a 64 MiB per-file limit. Path, permission, and filesystem failures are returned as sanitized discovery errors without absolute paths or stack traces in normal CLI output.

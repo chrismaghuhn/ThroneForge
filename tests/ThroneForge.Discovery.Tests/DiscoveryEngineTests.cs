@@ -88,6 +88,164 @@ public sealed class DiscoveryEngineTests
     }
 
     [Fact]
+    public void RejectsOutputRootEqualToGameRootBeforeWriting()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        fixture.CreateMonoLayout();
+
+        var exception = Assert.Throws<DiscoveryException>(() => new DiscoveryEngine().Inspect(new DiscoveryRequest(
+            fixture.Root,
+            fixture.Root)));
+
+        Assert.Contains("outside", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(Directory.GetFiles(fixture.Root, "*.md"));
+        Assert.Empty(Directory.GetFiles(fixture.Root, "*.tmp"));
+    }
+
+    [Fact]
+    public void RejectsOutputRootBelowGameRootBeforeWriting()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        fixture.CreateMonoLayout();
+        var outputRoot = Path.Combine(fixture.Root, "reports");
+
+        var exception = Assert.Throws<DiscoveryException>(() => new DiscoveryEngine().Inspect(new DiscoveryRequest(
+            fixture.Root,
+            outputRoot)));
+
+        Assert.Contains("outside", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(Directory.Exists(outputRoot));
+    }
+
+    [Fact]
+    public void AllowsSimilarlyPrefixedSiblingOutputRoot()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        fixture.CreateMonoLayout();
+        var outputRoot = fixture.CreateExternalOutputRoot($"{Path.GetFileName(fixture.Root)}-Reports");
+
+        var result = new DiscoveryEngine().Inspect(new DiscoveryRequest(fixture.Root, outputRoot));
+
+        Assert.True(File.Exists(result.ReportPath));
+        Assert.DoesNotContain(
+            Path.GetFullPath(fixture.Root) + Path.DirectorySeparatorChar,
+            result.ReportPath,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RejectsOutputRootThatIsAnExistingReparsePointOrHasReparseParent()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        fixture.CreateMonoLayout();
+        if (!fixture.TryCreateExternalDirectoryLink(out var linkPath))
+        {
+            return;
+        }
+
+        var directException = Assert.Throws<DiscoveryException>(() => new DiscoveryEngine().Inspect(new DiscoveryRequest(
+            fixture.Root,
+            linkPath)));
+        var parentException = Assert.Throws<DiscoveryException>(() => new DiscoveryEngine().Inspect(new DiscoveryRequest(
+            fixture.Root,
+            Path.Combine(linkPath, "reports"))));
+
+        Assert.Contains("reparse", directException.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("reparse", parentException.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void RejectsInvalidOutputPathWithoutLeakingThePath()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        fixture.CreateMonoLayout();
+        const string invalidOutputPath = "invalid\0output";
+
+        var exception = Assert.Throws<DiscoveryException>(() => new DiscoveryEngine().Inspect(new DiscoveryRequest(
+            fixture.Root,
+            invalidOutputPath)));
+
+        Assert.DoesNotContain(invalidOutputPath, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(fixture.Root, exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SelectsRenamedInstallationDataBaseExecutable()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        var installation = Path.Combine(fixture.Root, "RenamedThronefall");
+        Directory.CreateDirectory(installation);
+        var dataRoot = Path.Combine(installation, "RenamedThronefall_Data", "Managed");
+        Directory.CreateDirectory(Path.Combine(installation, "RenamedThronefall_Data", "MonoBleedingEdge"));
+        Directory.CreateDirectory(dataRoot);
+        File.WriteAllText(Path.Combine(dataRoot, "Assembly-CSharp.dll"), "synthetic mono assembly");
+        DiscoveryTestFixture.WriteMinimalPe(Path.Combine(installation, "RenamedThronefall.exe"), 0x8664);
+
+        var result = new DiscoveryEngine().Inspect(new DiscoveryRequest(installation, fixture.OutputRoot));
+
+        Assert.Contains(result.DetectedEvidence, item => item.RelativePath == "RenamedThronefall.exe");
+        Assert.Equal(ExecutableArchitecture.X64, result.ExecutableArchitecture);
+    }
+
+    [Fact]
+    public void PrefersDataBaseExecutableOverAlphabeticallyEarlierCrashHandler()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        fixture.CreateMonoLayout();
+        DiscoveryTestFixture.WriteMinimalPe(Path.Combine(fixture.Root, "a-crashhandler.exe"), 0x014C);
+
+        var result = Inspect(fixture);
+
+        Assert.Contains(result.DetectedEvidence, item => item.RelativePath == "Thronefall.exe");
+        Assert.DoesNotContain(result.DetectedEvidence, item => item.RelativePath == "a-crashhandler.exe");
+        Assert.Equal(ExecutableArchitecture.X64, result.ExecutableArchitecture);
+    }
+
+    [Fact]
+    public void ReportsUnknownArchitectureForMultipleAmbiguousExecutables()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        fixture.CreateMonoLayout(executableName: "a.exe", dataDirectoryName: "Game_Data");
+        DiscoveryTestFixture.WriteMinimalPe(Path.Combine(fixture.Root, "b.exe"), 0x8664);
+
+        var result = Inspect(fixture);
+
+        Assert.Equal(ExecutableArchitecture.Unknown, result.ExecutableArchitecture);
+        Assert.Contains(result.MissingOrConflictingEvidence, item => item.Contains("multiple", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void SelectsTheOnlyTopLevelExecutableWhenNoNameMatchExists()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        fixture.CreateMonoLayout(executableName: "only.exe", dataDirectoryName: "Game_Data");
+
+        var result = Inspect(fixture);
+
+        Assert.Contains(result.DetectedEvidence, item => item.RelativePath == "only.exe");
+        Assert.Equal(ExecutableArchitecture.X64, result.ExecutableArchitecture);
+    }
+
+    [Fact]
+    public void CliFailureDoesNotPrintTheSuppliedAbsoluteGamePath()
+    {
+        using var fixture = new DiscoveryTestFixture();
+        fixture.CreateMonoLayout();
+        using var stdout = new StringWriter();
+        using var stderr = new StringWriter();
+
+        var exitCode = DiscoveryCli.Run(
+            ["inspect", "--game-path", fixture.Root, "--output-root", "invalid\0output"],
+            stdout,
+            stderr);
+
+        Assert.Equal(2, exitCode);
+        Assert.DoesNotContain(fixture.Root, stdout.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(fixture.Root, stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("at ", stderr.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DoesNotTraverseReparsePointOutsideTheRoot()
     {
         using var fixture = new DiscoveryTestFixture();
@@ -201,7 +359,7 @@ public sealed class DiscoveryEngineTests
     {
         var outputRoot = outputName is null
             ? fixture.OutputRoot
-            : Path.Combine(fixture.Root, outputName);
+            : fixture.CreateExternalOutputRoot(outputName);
         return new DiscoveryEngine().Inspect(new DiscoveryRequest(
             fixture.Root,
             outputRoot,
