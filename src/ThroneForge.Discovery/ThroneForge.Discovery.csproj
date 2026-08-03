@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ThroneForge.Discovery</AssemblyName>
+    <RootNamespace>ThroneForge.Discovery</RootNamespace>
+  </PropertyGroup>
+</Project>

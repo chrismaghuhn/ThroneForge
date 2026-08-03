@@ -1,4 +1,5 @@
-using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Xml.Linq;
 using Xunit;
 
@@ -22,7 +23,8 @@ public sealed class ArchitectureBoundaryTests
         "ThroneForge.Cli",
         "ThroneForge.Studio",
         "ThroneForge.InGameUI",
-        "ThroneForge.TestKit"
+        "ThroneForge.TestKit",
+        "ThroneForge.Discovery"
     ];
 
     private static readonly Dictionary<string, string[]> AllowedProjectReferences =
@@ -85,7 +87,8 @@ public sealed class ArchitectureBoundaryTests
                 "ThroneForge.Logic",
                 "ThroneForge.Runtime",
                 "ThroneForge.GameAdapter.Abstractions"
-            ]
+            ],
+            ["ThroneForge.Discovery"] = []
         };
 
     private static readonly string[] ForbiddenCoreReferenceTokens =
@@ -183,15 +186,24 @@ public sealed class ArchitectureBoundaryTests
                 continue;
             }
 
-            // Follow-up before M1 target-framework divergence: replace this with metadata-only PE inspection.
-            // M0 intentionally avoids adding a dependency solely for that future refactor.
-            var references = Assembly.LoadFrom(assemblyPath).GetReferencedAssemblies();
-            foreach (var reference in references)
+            // Keep this metadata-only so inspection never executes or loads the assembly.
+            // The target framework remains provisional; revisit this if M1 introduces divergent TFMs.
+            using var stream = File.OpenRead(assemblyPath);
+            using var peReader = new PEReader(stream);
+            if (!peReader.HasMetadata)
             {
+                continue;
+            }
+
+            var metadataReader = peReader.GetMetadataReader();
+            foreach (var handle in metadataReader.AssemblyReferences)
+            {
+                var reference = metadataReader.GetAssemblyReference(handle);
+                var referenceName = metadataReader.GetString(reference.Name);
                 if (ForbiddenCoreReferenceTokens.Any(token =>
-                        reference.Name?.Contains(token, StringComparison.OrdinalIgnoreCase) == true))
+                        referenceName.Contains(token, StringComparison.OrdinalIgnoreCase)))
                 {
-                    violations.Add($"{projectName} references {reference.Name}.");
+                    violations.Add($"{projectName} references {referenceName}.");
                 }
             }
         }
