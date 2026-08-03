@@ -70,7 +70,7 @@ M1 local validation used the installed x86 .NET SDK `10.0.110` from the parent d
 
 ### M1 discovery hardening validation
 
-The hardening implementation is complete locally on `agent/m1-discovery-hardening`; hosted verification is pending for this branch.
+The hardening implementation is complete and hosted-verified on `agent/m1-discovery-hardening`; M1 task 1 is merge-ready, while M1 task 2 has not started.
 
 - Output roots are validated before any output directory is created: the game root, descendants, existing reparse points, and reparse-point parents are rejected. Filesystem failures are converted to sanitized `DiscoveryException` messages.
 - Main-executable selection is deterministic: unique top-level `*_Data` base-name match, then installation-directory-name match, then exactly one valid top-level PE executable; multiple candidates remain ambiguous and produce architecture `Unknown`.
@@ -80,7 +80,12 @@ The hardening implementation is complete locally on `agent/m1-discovery-hardenin
 - Local `dotnet format --verify-no-changes --no-restore` could not run because the formatter's build host resolves the repository's exact SDK requirement `10.0.100`, which is not installed on this machine. The exact pinned format/build/test path remains subject to hosted CI.
 - Private report re-run passed with the sanitized evidence unchanged: `Mono`, `X64`, Unity `Unknown`, fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`, and no absolute path, username, machine name, or temporary file.
 
-Hosted Windows/Linux run: pending. Once complete, record the run ID, tested head SHA, runner SDK versions, TRX counts, aggregate test counts, and artifact inspection here.
+Hosted verification passed in GitHub Actions run [30843657857](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30843657857) for hardening commit `7d206ac19ebb26147b5c96833e4029e02cdc0d64`:
+
+- `windows-latest`: PASS; job `91786534020`; SDK `10.0.100`; 10 TRX files representing 45 tests, 0 failed, 0 errors; artifact `throneforge-test-results-windows-latest-30843657857` (artifact `8867871535`).
+- `ubuntu-latest`: PASS; job `91786534027`; SDK `10.0.100`; 10 TRX files representing 45 tests, 0 failed, 0 errors; artifact `throneforge-test-results-ubuntu-latest-30843657857` (artifact `8867814159`).
+
+Both jobs completed locked restore, exact-SDK information, format verification, Release build, full tests, TRX completeness verification, and upload. Both downloaded artifacts were independently parsed. No `Overwriting results file` warning occurred in either log, and each artifact contains one TRX per test project. No local game installation was available to CI.
 
 ## Unverified assumptions
 
@@ -96,8 +101,8 @@ Hosted Windows/Linux run: pending. Once complete, record the run ID, tested head
 - The M0 baseline is committed; future changes must continue to exclude the local game directory.
 - Exact SDK `10.0.100` local formatting/validation remains unverified; hosted CI is required for that pinned-toolchain result.
 - The private report records only local layout evidence: Mono indicators were found under `MonoBleedingEdge` and `thronefall_Data/Managed`, plus `Assembly-CSharp.dll`; Unity version evidence was unavailable. No loader, target framework, lifecycle hook, catalog source, or runtime compatibility conclusion is claimed.
-- Hardening is not merge-verified until output paths are proven external to the inspected installation and ambiguous executable layouts produce `Unknown`.
+- The hardening branch is merge-ready; merge into protected `main` remains a repository-owner action. The next M1 task must wait until that merge and must remain limited to loader/managed-runtime compatibility discovery.
 
 ## Next task
 
-Complete and verify `agent/m1-discovery-hardening`; then limit the next M1 investigation to loader and managed-runtime compatibility discovery. Do not install or execute a loader, inspect game methods, or implement lifecycle/custom-wave behavior.
+Merge and protect the reviewed `agent/m1-discovery-hardening` result, then limit the next M1 investigation to loader and managed-runtime compatibility discovery. Do not install or execute a loader, inspect game methods, or implement lifecycle/custom-wave behavior.
