@@ -1,6 +1,6 @@
 # ADR-0002: Target-framework split pending M1 discovery
 
-- Status: Provisional recommendation recorded during M1 task 2; hardening hosted verification pending
+- Status: Provisional recommendation recorded during M1 task 2; hardening hosted verification passed in run `30852340193`
 - Date: 2026-08-03
 
 ## Context

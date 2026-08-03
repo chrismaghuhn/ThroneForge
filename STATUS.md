@@ -6,7 +6,7 @@ M1 - Thronefall discovery spike, task 2 hardening on `agent/m1-runtime-compatibi
 
 ## State
 
-M0 and M1 discovery task 1 are complete and merged into protected `main` at `e0c46a16fde527dd3a0f99cd5e30f8d5baba571a`. M1 task 2 implementation and private evidence generation were completed on `agent/m1-runtime-compatibility`; reviewed head `9511e999226c572115762a83d3baf3211c75d9d9` passed hosted Windows/Linux CI in run `30849281168`. This branch hardens fingerprint binding, clean-profile readiness, confidence reporting, and evidence categories; its hosted result is pending. M1 overall remains incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main` at `e0c46a16fde527dd3a0f99cd5e30f8d5baba571a`. M1 task 2 hardening is complete on `agent/m1-runtime-compatibility-hardening` at `09850c955eff216264ad23a84b035c1057e8bcca`, with hosted Windows/Linux verification recorded below. M1 task 3 and M1 overall remain incomplete.
 
 ## Completed
 
@@ -118,18 +118,21 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Exact SDK `10.0.100` local formatting/validation remains unverified; hosted CI is required for that pinned-toolchain result.
 - The private reports record local layout evidence: Mono indicators were found under `MonoBleedingEdge` and `thronefall_Data/Managed`, plus `Assembly-CSharp.dll`; Task 2 adds bounded Unity, managed-framework, and loader-indicator evidence. All conclusions remain installation-specific.
 - Task 2 remains metadata-only and bounded. The BepInEx 5.4.23.5 Unity Mono x64 candidate is a provisional recommendation only; no loader was downloaded, installed, or executed. A clean-profile smoke test is still required.
-- Hosted Task 2 hardening validation and artifact inspection are still outstanding for the current branch head.
+- Task 2 hardening hosted validation is complete; the remaining integration prerequisite is the separate, reversible clean-profile loader smoke test in M1 task 3.
 
 ### M1 discovery task 2 hardening status
 
-- Fingerprint recomputation, clean-profile readiness separation, evidence-specific TFM confidence, and independent evidence categories are in progress on `agent/m1-runtime-compatibility-hardening`.
-- Local hardening build/test validation with the installed parent-directory SDK `10.0.110`: Release build PASS with 0 warnings/errors; full solution tests PASS with 90 tests, 0 failed, 0 skipped; focused Discovery tests PASS with 80 tests, 0 failed, 0 skipped; Architecture tests PASS with 11 tests and Contracts tests PASS with 1 test.
+- Fingerprint recomputation, clean-profile readiness separation, evidence-specific TFM confidence, and independent evidence categories are complete on `agent/m1-runtime-compatibility-hardening`.
+- Local hardening build/test validation with the installed parent-directory SDK `10.0.110`: Release build PASS with 0 warnings/errors; full solution tests PASS with 99 tests, 0 failed, 0 skipped; focused Discovery tests PASS with 80 tests, 0 failed, 0 skipped; Architecture tests PASS with 11 tests and Contracts tests PASS with 1 test.
 - Local `dotnet format SDK\ThroneForge.slnx --verify-no-changes --no-restore` remains blocked because the host lacks the repository-pinned SDK `10.0.100`; hosted CI is required for the exact-toolchain formatting result.
 - Private hardening re-run, with the absolute game path redacted here, passed against the documented fingerprint: `Mono`, `X64`, `Netstandard21Candidate`, confidence `Medium`, readiness `ReadyForReversibleTest`; the report contains no absolute path or private system information.
-- No new hosted validation is claimed until the hardened branch head completes on both Windows and Ubuntu.
+- Final hosted validation passed in run [30852340193](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30852340193) for commit `09850c955eff216264ad23a84b035c1057e8bcca`:
+  - `windows-latest`: PASS; job `91815084102`; SDK `10.0.100`; 10 TRX files, 99 tests, 0 failures, 0 errors, 0 skipped; artifact `throneforge-test-results-windows-latest-30852340193`.
+  - `ubuntu-latest`: PASS; job `91815084082`; SDK `10.0.100`; 10 TRX files, 99 tests, 0 failures, 0 errors, 0 skipped; artifact `throneforge-test-results-ubuntu-latest-30852340193`.
+  - Both artifacts were downloaded and independently parsed. No `Overwriting results file` warning appeared in either hosted log.
 - Task 3 remains unstarted; no loader has been installed or executed.
 - The fingerprint-specific report now records `netstandard2.1 candidate`, confidence `Medium`, basis `netstandard compatibility surface plus Unity 2022.3 evidence`, `ReadyForReversibleTest`, and the bounded `globalgamemanagers` note under `Inspection limitations`.
 
 ## Next task
 
-Complete the Task 2 hardening, run the new hosted Windows/Linux matrix, inspect both TRX artifacts, and merge only after the hardened branch-head checks pass. The next M1 task is a reversible clean-profile loader smoke test for the provisional BepInEx 5 candidate; do not start it in this branch.
+Open/merge the reviewed hardening PR into protected `main`. Only after that merge, begin M1 task 3 on a new branch for the reversible clean-profile loader smoke test of the provisional BepInEx 5 candidate; do not start it in this branch.

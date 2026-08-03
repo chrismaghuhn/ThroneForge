@@ -137,15 +137,17 @@ M1 Task 3 is a reversible clean-profile loader smoke test for the selected offic
 
 This follow-up closes review findings without installing or executing a loader. It keeps Task 3 out of scope and preserves the existing fingerprint-v1 inputs.
 
-- [ ] Refactor Task 1 and Task 2 to consume one non-writing installation snapshot and fingerprint service.
-- [ ] Recompute fingerprint v1 before runtime report generation and reject mismatched supplied fingerprints without creating output.
-- [ ] Add regression coverage for matching, mismatched, changed-file, changed-backend, uppercase, deterministic, and no-write fingerprint cases.
-- [ ] Separate provisional loader-candidate selection from structured clean-profile smoke-test readiness.
-- [ ] Block readiness for every non-absent loader/bootstrap indicator, conflicting evidence, unsupported backend, unknown architecture, or unusable framework evidence.
-- [ ] Replace generic TFM confidence prose with an evidence-specific assessment and confidence level.
-- [ ] Categorize conflict, missing evidence, bounded-inspection limitations, and warnings independently in the runtime report.
-- [ ] Correct the fingerprint-specific report and project documentation only after the new branch-head hosted CI run passes.
-- [ ] Inspect every hosted TRX artifact and record the exact current-head evidence; leave M1 Task 3 unstarted.
+- [x] Refactor Task 1 and Task 2 to consume one non-writing installation snapshot and fingerprint service.
+- [x] Recompute fingerprint v1 before runtime report generation and reject mismatched supplied fingerprints without creating output.
+- [x] Add regression coverage for matching, mismatched, changed-file, changed-backend, uppercase, deterministic, and no-write fingerprint cases.
+- [x] Separate provisional loader-candidate selection from structured clean-profile smoke-test readiness.
+- [x] Block readiness for every non-absent loader/bootstrap indicator, conflicting evidence, unsupported backend, unknown architecture, or unusable framework evidence.
+- [x] Replace generic TFM confidence prose with an evidence-specific assessment and confidence level.
+- [x] Categorize conflict, missing evidence, bounded-inspection limitations, and warnings independently in the runtime report.
+- [x] Correct the fingerprint-specific report and project documentation after the branch-head hosted CI run passed.
+- [x] Inspect every hosted TRX artifact and record the exact current-head evidence; leave M1 Task 3 unstarted.
+
+Final hardening validation: run `30852340193` tested commit `09850c955eff216264ad23a84b035c1057e8bcca`. Windows and Ubuntu each passed with SDK `10.0.100`, 10 TRX files, 99 represented tests, 0 failures/errors, and 0 skipped tests. No overwrite warning occurred.
 
 ## M1 discovery task 1 hardening checklist
 
