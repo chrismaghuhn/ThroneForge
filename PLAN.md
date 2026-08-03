@@ -126,7 +126,7 @@ This task starts from merged `main@e0c46a16fde527dd3a0f99cd5e30f8d5baba571a` on 
 - [x] Verify official BepInEx candidate metadata, document the provisional stable BepInEx 5 Unity Mono x64 recommendation, and record uncertainty until a clean-profile smoke test.
 - [x] Run synthetic tests before private inspection; generate and manually sanitize the fingerprint-specific runtime report only after tests pass.
 - [x] Update discovery documentation, ADR-0002 with a provisional evidence-based recommendation, `STATUS.md`, and `CHANGELOG.md`; keep M1 incomplete.
-- [ ] Run exact-SDK hosted Windows/Linux CI, inspect both TRX artifacts, and close this task only after the branch-head run is green.
+- [x] Run exact-SDK hosted Windows/Linux CI, inspect both TRX artifacts, and close this task only after the branch-head run is green. Run `30848993321` validated implementation commit `51d30d611af85f41205da5d0f1d7f68514081a58`: Windows and Ubuntu each produced 10 TRX files representing 70 tests with 0 failures/errors and no overwrite warnings.
 
 ## Next executable task after M1 discovery task 2
 

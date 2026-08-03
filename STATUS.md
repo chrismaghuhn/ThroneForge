@@ -6,7 +6,7 @@ M1 - Thronefall discovery spike, task 2 loader and managed-runtime compatibility
 
 ## State
 
-M0 and M1 discovery task 1 are complete and merged into protected `main` at `e0c46a16fde527dd3a0f99cd5e30f8d5baba571a`. M1 task 2 implementation and private evidence generation are complete locally on `agent/m1-runtime-compatibility`; hosted branch-head verification is pending. M1 overall remains incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main` at `e0c46a16fde527dd3a0f99cd5e30f8d5baba571a`. M1 task 2 implementation and private evidence generation are complete on `agent/m1-runtime-compatibility`; implementation commit `51d30d6` passed hosted Windows/Linux CI. M1 overall remains incomplete.
 
 ## Completed
 
@@ -99,7 +99,10 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Focused `ThroneForge.Discovery.Tests`: PASS; 49 tests passed, 0 failed, 0 skipped.
 - Private command, with the absolute game path redacted here: `dotnet run --project src/ThroneForge.Discovery --no-restore -- runtime-compatibility --game-path <redacted> --fingerprint 1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d --output-root docs/discovery --overwrite`: PASS.
 - Private report review: PASS; no absolute path, username, machine name, arbitrary listing, binary content, decompiled source, or temporary report remained. The report contains only relative paths and selected compatibility metadata.
-- Hosted branch-head CI: pending. No hosted Task 2 result is claimed until both required matrix jobs and TRX artifacts complete successfully.
+- Hosted Task 2 verification passed in run [30848993321](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30848993321) for implementation commit `51d30d611af85f41205da5d0f1d7f68514081a58`:
+  - `ubuntu-latest`: PASS; job `91804166118`; SDK `10.0.100`; 10 TRX files representing 70 tests, 0 failed/errors; artifact `throneforge-test-results-ubuntu-latest-30848993321` (artifact `8869845353`).
+  - `windows-latest`: PASS; job `91804166149`; SDK `10.0.100`; 10 TRX files representing 70 tests, 0 failed/errors; artifact `throneforge-test-results-windows-latest-30848993321` (artifact `8869873772`).
+  - Both uploaded artifacts were downloaded and parsed independently. No `Overwriting results file` warning occurred in either job log.
 
 ## Unverified assumptions
 
