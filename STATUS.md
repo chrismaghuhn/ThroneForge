@@ -6,7 +6,7 @@ M1 - Thronefall discovery spike, task 2 hardening on `agent/m1-runtime-compatibi
 
 ## State
 
-M0 and M1 discovery task 1 are complete and merged into protected `main` at `e0c46a16fde527dd3a0f99cd5e30f8d5baba571a`. M1 task 2 hardening is complete on `agent/m1-runtime-compatibility-hardening` at `09850c955eff216264ad23a84b035c1057e8bcca`, with hosted Windows/Linux verification recorded below. M1 task 3 and M1 overall remain incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main` at `e0c46a16fde527dd3a0f99cd5e30f8d5baba571a`. M1 task 2 hardening is complete on `agent/m1-runtime-compatibility-hardening`; the implementation/documentation head `456360480c265e29817aa6c818274341cdbced54` passed the final hosted Windows/Linux verification recorded below. M1 task 3 and M1 overall remain incomplete.
 
 ## Completed
 
@@ -126,9 +126,9 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Local hardening build/test validation with the installed parent-directory SDK `10.0.110`: Release build PASS with 0 warnings/errors; full solution tests PASS with 99 tests, 0 failed, 0 skipped; focused Discovery tests PASS with 80 tests, 0 failed, 0 skipped; Architecture tests PASS with 11 tests and Contracts tests PASS with 1 test.
 - Local `dotnet format SDK\ThroneForge.slnx --verify-no-changes --no-restore` remains blocked because the host lacks the repository-pinned SDK `10.0.100`; hosted CI is required for the exact-toolchain formatting result.
 - Private hardening re-run, with the absolute game path redacted here, passed against the documented fingerprint: `Mono`, `X64`, `Netstandard21Candidate`, confidence `Medium`, readiness `ReadyForReversibleTest`; the report contains no absolute path or private system information.
-- Final hosted validation passed in run [30852340193](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30852340193) for commit `09850c955eff216264ad23a84b035c1057e8bcca`:
-  - `windows-latest`: PASS; job `91815084102`; SDK `10.0.100`; 10 TRX files, 99 tests, 0 failures, 0 errors, 0 skipped; artifact `throneforge-test-results-windows-latest-30852340193`.
-  - `ubuntu-latest`: PASS; job `91815084082`; SDK `10.0.100`; 10 TRX files, 99 tests, 0 failures, 0 errors, 0 skipped; artifact `throneforge-test-results-ubuntu-latest-30852340193`.
+- Final hosted validation passed in run [30852764951](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30852764951) for commit `456360480c265e29817aa6c818274341cdbced54`:
+  - `windows-latest`: PASS; job `91816522849`; SDK `10.0.100`; 10 TRX files, 99 tests, 0 failures, 0 errors, 0 skipped; artifact `throneforge-test-results-windows-latest-30852764951`.
+  - `ubuntu-latest`: PASS; job `91816522702`; SDK `10.0.100`; 10 TRX files, 99 tests, 0 failures, 0 errors, 0 skipped; artifact `throneforge-test-results-ubuntu-latest-30852764951`.
   - Both artifacts were downloaded and independently parsed. No `Overwriting results file` warning appeared in either hosted log.
 - Task 3 remains unstarted; no loader has been installed or executed.
 - The fingerprint-specific report now records `netstandard2.1 candidate`, confidence `Medium`, basis `netstandard compatibility surface plus Unity 2022.3 evidence`, `ReadyForReversibleTest`, and the bounded `globalgamemanagers` note under `Inspection limitations`.
