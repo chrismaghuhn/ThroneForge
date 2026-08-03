@@ -47,6 +47,11 @@ public static class SmokeTestReportWriter
         Append(builder, "Overall result", data.Outcome.ToString());
         Append(builder, "Rollback result", data.RollbackResult);
         Append(builder, "Original installation post-verification", data.OriginalPostVerification);
+        Append(builder, "Original full-manifest post-verification", data.OriginalFullManifestPostVerification);
+        Append(builder, "Original runtime-readiness post-verification", data.OriginalRuntimeReadinessPostVerification);
+        Append(builder, "Original loader-indicator post-verification", data.OriginalLoaderIndicatorPostVerification);
+        Append(builder, "Disposable full-manifest rollback verification", data.DisposableFullManifestRollbackVerification);
+        Append(builder, "Recovery or rollback state", data.RecoveryOrRollbackState);
         Append(builder, "Remaining uncertainty", data.RemainingUncertainty);
         Append(builder, "Next permitted task", data.NextPermittedTask);
         builder.AppendLine("## Security and privacy statement");

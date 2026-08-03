@@ -2,11 +2,11 @@
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 3 reversible loader bootstrap smoke test completed on `agent/m1-loader-smoke-test`
+M1 - Task 3 loader bootstrap smoke-test hardening in progress on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
 
 ## State
 
-M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 is complete for the documented fingerprint: the private disposable-copy smoke test passed and hosted synthetic CI verification passed in run `30857539959`. M1 overall remains incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has a credible historical private bootstrap result, but this branch is hardening the reusable harness before merge. M1 overall remains incomplete.
 
 ## Completed
 
@@ -150,4 +150,15 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 
 ## Next task
 
-Task 3 handoff is complete. The next M1 task may address the plugin/runtime compatibility boundary only after review; do not add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves in this branch.
+### M1 Task 3 hardening current state
+
+- Branch: `agent/m1-loader-smoke-test-hardening`, based on pre-hardening head `697419a2adba75933f02b4009a16cddf3ff4b0b6`.
+- Historical private bootstrap result: `Passed` for the documented fingerprint, with BepInEx `5.4.23.5` preloader/chainloader evidence and zero custom plugins. The historical run retained compatibility-fingerprint and loader-indicator post-checks, but did not retain complete original/disposable manifests; the report now says so explicitly.
+- Harness hardening now requires complete original and disposable manifest equality, fresh-copy or manifest-backed resume validation, real post-runtime/readiness checks, guarded post-apply rollback, manual-closure recovery state, and a repository-derived committed report path.
+- Local hardening validation with the installed parent-directory SDK `10.0.110`: locked restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 146 tests (including 47 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and Contracts tests PASS with 1 test. The repository-pinned `dotnet format` command remains locally blocked because SDK `10.0.100` is not installed; hosted CI is required for exact-toolchain format verification.
+- The private experiment was not rerun. No loader, game binary, archive, raw log, recovery marker, or private path was committed.
+- Hosted validation for this hardening branch is pending; no final branch-head run is claimed yet. After the hosted run, record its run ID, tested SHA, Windows/Linux TRX totals, and SDK `10.0.100` here.
+
+## Next task
+
+After this branch is reviewed and merged, M1 Task 4 may address the plugin/runtime boundary only. Do not add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves in this branch.

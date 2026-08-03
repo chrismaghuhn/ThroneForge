@@ -16,7 +16,6 @@ public static class InstallationCopyService
         var temporaryRoot = Path.Combine(
             roots.ExperimentRoot,
             $".clean-game-copy-{Guid.NewGuid():N}.tmp");
-        var entries = new List<FileManifestEntry>();
         try
         {
             Directory.CreateDirectory(temporaryRoot);
@@ -30,11 +29,11 @@ public static class InstallationCopyService
                     Directory.CreateDirectory(parent);
                 }
 
-                entries.Add(CopyAndHash(sourceFile, destination, relativePath));
+                CopyAndHash(sourceFile, destination, relativePath);
             }
 
             Directory.Move(temporaryRoot, roots.CleanGameRoot);
-            return new CopyManifest(entries.OrderBy(item => item.RelativePath, StringComparer.Ordinal).ToArray());
+            return CaptureManifest(roots.CleanGameRoot);
         }
         catch (SmokeTestException)
         {
@@ -50,23 +49,37 @@ public static class InstallationCopyService
 
     public static CopyManifest CaptureManifest(string root)
     {
-        var normalized = Path.GetFullPath(root);
-        SmokeTestPathValidator.EnsureExistingTreeHasNoReparsePoints(normalized);
-        var entries = EnumerateFilesSafely(normalized)
-            .Select(path => FileManifestHasher.HashFile(normalized, path))
-            .OrderBy(item => item.RelativePath, StringComparer.Ordinal)
-            .ToArray();
-        return new CopyManifest(entries);
+        try
+        {
+            var normalized = Path.GetFullPath(root);
+            SmokeTestPathValidator.EnsureExistingTreeHasNoReparsePoints(normalized);
+            var entries = EnumerateFilesSafely(normalized)
+                .Select(path => FileManifestHasher.HashFile(normalized, path))
+                .OrderBy(item => item.RelativePath, StringComparer.Ordinal)
+                .ToArray();
+            var directories = Directory.EnumerateDirectories(normalized, "*", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(normalized, path).Replace('\\', '/'))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+            return new CopyManifest(entries, directories);
+        }
+        catch (SmokeTestException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            throw new SmokeTestException("The complete profile manifest could not be captured safely.", exception);
+        }
     }
 
-    public static void RestoreFilesToManifest(string root, CopyManifest baseline)
+    public static ManifestVerificationResult RestoreFilesToManifest(string root, CopyManifest baseline)
     {
         ArgumentNullException.ThrowIfNull(baseline);
         var expected = baseline.Files
             .Select(item => item.RelativePath)
             .ToHashSet(StringComparer.Ordinal);
-        var expectedDirectories = baseline.Files
-            .SelectMany(item => ParentDirectories(item.RelativePath))
+        var expectedDirectories = (baseline.Directories ?? [])
             .ToHashSet(StringComparer.Ordinal);
         foreach (var file in EnumerateFilesSafely(root).ToArray())
         {
@@ -88,16 +101,57 @@ public static class InstallationCopyService
                 Directory.Delete(directory);
             }
         }
+
+        return CompareManifests(baseline, CaptureManifest(root));
     }
 
-    private static IEnumerable<string> ParentDirectories(string relativePath)
+    public static ManifestVerificationResult CompareManifests(CopyManifest expected, CopyManifest actual)
     {
-        var directory = Path.GetDirectoryName(relativePath.Replace('/', Path.DirectorySeparatorChar));
-        while (!string.IsNullOrEmpty(directory))
-        {
-            yield return directory.Replace('\\', '/');
-            directory = Path.GetDirectoryName(directory);
-        }
+        ArgumentNullException.ThrowIfNull(expected);
+        ArgumentNullException.ThrowIfNull(actual);
+        var expectedFiles = expected.Files.ToDictionary(item => item.RelativePath, StringComparer.Ordinal);
+        var actualFiles = actual.Files.ToDictionary(item => item.RelativePath, StringComparer.Ordinal);
+        var added = actualFiles.Keys
+            .Except(expectedFiles.Keys, StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .Select(path => new ManifestDifference(path, null, actualFiles[path]))
+            .ToArray();
+        var removed = expectedFiles.Keys
+            .Except(actualFiles.Keys, StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .Select(path => new ManifestDifference(path, expectedFiles[path], null))
+            .ToArray();
+        var changed = expectedFiles.Keys
+            .Intersect(actualFiles.Keys, StringComparer.Ordinal)
+            .Where(path => expectedFiles[path].Size != actualFiles[path].Size
+                || !string.Equals(expectedFiles[path].Sha256, actualFiles[path].Sha256, StringComparison.OrdinalIgnoreCase))
+            .Order(StringComparer.Ordinal)
+            .Select(path => new ManifestDifference(path, expectedFiles[path], actualFiles[path]))
+            .ToArray();
+        var expectedDirectories = (expected.Directories ?? []).ToHashSet(StringComparer.Ordinal);
+        var actualDirectories = (actual.Directories ?? []).ToHashSet(StringComparer.Ordinal);
+        var unexpectedDirectories = actualDirectories
+            .Except(expectedDirectories, StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var missingDirectories = expectedDirectories
+            .Except(actualDirectories, StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var status = changed.Length > 0
+            ? ManifestVerificationStatus.ChangedFiles
+            : added.Length > 0 || unexpectedDirectories.Length > 0
+                ? ManifestVerificationStatus.AddedFiles
+                : removed.Length > 0 || missingDirectories.Length > 0
+                    ? ManifestVerificationStatus.RemovedFiles
+                    : ManifestVerificationStatus.Matches;
+        return new ManifestVerificationResult(
+            status,
+            added,
+            removed,
+            changed,
+            unexpectedDirectories,
+            missingDirectories);
     }
 
     private static IEnumerable<string> EnumerateFilesSafely(string root)

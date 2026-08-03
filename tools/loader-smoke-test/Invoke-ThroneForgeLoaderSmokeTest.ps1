@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Plan', 'Prepare', 'Baseline', 'Install', 'Launch', 'Verify', 'Rollback', 'Full', 'Cleanup')]
+    [ValidateSet('Plan', 'Prepare', 'Baseline', 'Install', 'Launch', 'Verify', 'Rollback', 'Full', 'Resume', 'Cleanup')]
     [string]$Mode,
 
     [Parameter(Mandatory = $true)]
@@ -88,14 +88,12 @@ if ([string]::IsNullOrWhiteSpace($dotnet)) {
 }
 
 $assembly = Join-Path $repositoryRoot 'artifacts\bin\ThroneForge.LoaderSmokeTest\Release\net10.0\ThroneForge.LoaderSmokeTest.dll'
-$report = Join-Path $repositoryRoot "docs\discovery\$ExpectedFingerprint-loader-smoke-test.md"
 $arguments = @(
     'exec', $assembly, $Mode,
     '--game-path', $GamePath,
     '--experiment-root', $ExperimentRoot,
     '--expected-fingerprint', $ExpectedFingerprint,
-    '--repository-root', $repositoryRoot,
-    '--report-path', $report
+    '--repository-root', $repositoryRoot
 )
 if (-not [string]::IsNullOrWhiteSpace($BepInExArchivePath)) {
     $arguments += @('--bepinex-archive', $BepInExArchivePath)

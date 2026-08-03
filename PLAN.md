@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 3 reversible loader bootstrap smoke test on `agent/m1-loader-smoke-test`.
+M1 - Task 3 loader bootstrap smoke-test hardening on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
 
 ## Milestones
 
@@ -143,7 +143,19 @@ Task 2 is complete and merged by PR #2 into protected `main` at `d3f1bb4fde9f77e
 - [x] Commit only a sanitized outcome report; do not claim plugin, Harmony, lifecycle, or game API compatibility.
 - [x] Run the final hosted Windows/Linux matrix and independently inspect every TRX artifact.
 
-Task-3 outcome: `Passed` for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`; BepInEx `5.4.23.5` reported preloader and chainloader initialization with zero plugins and no warnings/errors. Final hosted run `30857539959` on commit `634d3e97552d4f9ea619a2b7d9359ffc8bb1cb68` passed on both runners with 11 TRX files and 130 tests per runner using SDK `10.0.100`. M1 remains incomplete.
+Task-3 historical outcome: BepInEx `5.4.23.5` reported preloader and chainloader initialization with zero plugins and no warnings/errors for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`. The historical run restored the compatibility fingerprint, but did not retain complete original/disposable manifests; the sanitized report records that limitation. Pre-hardening hosted run `30857962381` on commit `697419a2adba75933f02b4009a16cddf3ff4b0b6` passed on both runners with 11 TRX files and 130 tests per runner using SDK `10.0.100`. M1 remains incomplete.
+
+## M1 Task 3 hardening: fail-closed verification and rollback
+
+- [x] Capture and compare complete original-installation manifests before and after the experiment.
+- [x] Re-run original runtime compatibility, readiness, and loader-indicator checks after rollback and feed the structured results into the report.
+- [x] Capture and compare complete disposable-copy manifests before launch and after rollback, with fingerprint v1 as an additional check.
+- [x] Reject existing `clean-game` directories for fresh `Full` runs and add manifest-backed explicit resume validation.
+- [x] Guard every post-apply failure path with deterministic rollback or an explicit manual-closure recovery state.
+- [x] Derive and validate the committed report path below `docs/discovery`; remove arbitrary direct CLI report destinations.
+- [x] Add regression tests for manifest verification, resume safety, post-apply rollback, recovery markers, and report-path containment.
+- [x] Update the Task 3 report and project documentation without fabricating complete historical manifest evidence.
+- [ ] Run local and hosted validation; do not begin M1 Task 4 until this branch is reviewed and merged.
 
 ## M1 discovery task 2 hardening (completed and merged)
 

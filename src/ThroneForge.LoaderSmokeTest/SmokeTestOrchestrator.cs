@@ -32,10 +32,18 @@ public static class SmokeTestOrchestrator
     private const string ExpectedArchiveName = "BepInEx_win_x64_5.4.23.5.zip";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public static SmokeTestExecutionResult Run(LoaderSmokeTestRequest request)
+    public static SmokeTestExecutionResult Run(
+        LoaderSmokeTestRequest request,
+        SmokeTestExecutionHooks? hooks = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         ValidateExpectedFingerprint(request.ExpectedFingerprint);
+        if (!string.IsNullOrWhiteSpace(request.ReportPath))
+        {
+            throw new SmokeTestException("Arbitrary report paths are not accepted; the committed report location is derived below the repository docs/discovery directory.");
+        }
+
+        hooks ??= new SmokeTestExecutionHooks();
         var roots = SmokeTestPathValidator.ValidateRoots(
             request.RepositoryRoot,
             request.GamePath,
@@ -66,7 +74,8 @@ public static class SmokeTestOrchestrator
             SmokeTestMode.Launch => LaunchInstalled(request, roots, preflight),
             SmokeTestMode.Verify => Verify(request, roots, preflight),
             SmokeTestMode.Rollback => Rollback(request, roots, preflight),
-            SmokeTestMode.Full => RunFull(request, roots, preflight),
+            SmokeTestMode.Full => RunFull(request, roots, preflight, hooks, resume: false),
+            SmokeTestMode.Resume => RunFull(request, roots, preflight, hooks, resume: true),
             _ => throw new SmokeTestException("The requested smoke-test mode is unsupported.")
         };
     }
@@ -94,8 +103,9 @@ public static class SmokeTestOrchestrator
         SmokeTestRoots roots,
         Preflight preflight)
     {
+        DisposableProfileBaselineService.RequireFreshProfile(roots);
         var manifest = InstallationCopyService.Copy(roots);
-        SaveJson(Path.Combine(roots.ManifestsRoot, "baseline-copy-manifest.json"), manifest);
+        SaveBaseline(roots, request.ExpectedFingerprint, preflight.OriginalManifest, manifest);
         EnsureCopiedProfile(roots, request, preflight, manifest);
         return new SmokeTestExecutionResult(
             SmokeTestOutcome.Inconclusive,
@@ -135,12 +145,13 @@ public static class SmokeTestOrchestrator
         EnsureCopiedProfile(roots, request, preflight, null);
         if (!File.Exists(Path.Combine(roots.ManifestsRoot, "baseline-copy-manifest.json")))
         {
-            SaveJson(
-                Path.Combine(roots.ManifestsRoot, "baseline-copy-manifest.json"),
+            SaveBaseline(
+                roots,
+                request.ExpectedFingerprint,
+                preflight.OriginalManifest,
                 InstallationCopyService.CaptureManifest(roots.CleanGameRoot));
         }
         var plan = InstallArchive(request, roots);
-        SaveJson(Path.Combine(roots.ManifestsRoot, "transaction-plan.json"), plan);
         return new SmokeTestExecutionResult(
             SmokeTestOutcome.Inconclusive,
             "The official archive was applied to the disposable profile; launch and verification remain separate modes.",
@@ -207,17 +218,24 @@ public static class SmokeTestOrchestrator
         var plan = LoadJson<TransactionPlan>(planPath);
         LoaderTransactionService.Rollback(roots, plan);
         var baselinePath = Path.Combine(roots.ManifestsRoot, "baseline-copy-manifest.json");
-        if (File.Exists(baselinePath))
+        if (!File.Exists(baselinePath))
         {
-            InstallationCopyService.RestoreFilesToManifest(
-                roots.CleanGameRoot,
-                LoadJson<CopyManifest>(baselinePath));
+            throw new SmokeTestException("No schema-backed disposable baseline exists for rollback.");
         }
+        var baseline = LoadBaseline(roots);
+        var manifestResult = InstallationCopyService.RestoreFilesToManifest(
+            roots.CleanGameRoot,
+            baseline.DisposableManifest);
         var copied = InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint;
-        var succeeded = string.Equals(copied, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase);
+        var succeeded = manifestResult.Matches
+            && string.Equals(copied, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase);
+        if (succeeded)
+        {
+            SmokeTestRecoveryMarkerService.Clear(Path.Combine(roots.ManifestsRoot, "recovery-marker.json"));
+        }
         return new SmokeTestExecutionResult(
             succeeded ? SmokeTestOutcome.Passed : SmokeTestOutcome.Failed,
-            succeeded ? "Disposable profile rollback restored the expected fingerprint." : "Disposable profile rollback did not restore the expected fingerprint.",
+            succeeded ? "Disposable profile rollback restored the expected complete manifest and fingerprint." : "Disposable profile rollback did not restore the expected complete manifest and fingerprint.",
             null,
             preflight.Snapshot.Fingerprint,
             copied,
@@ -228,15 +246,36 @@ public static class SmokeTestOrchestrator
     private static SmokeTestExecutionResult RunFull(
         LoaderSmokeTestRequest request,
         SmokeTestRoots roots,
-        Preflight preflight)
+        Preflight preflight,
+        SmokeTestExecutionHooks hooks,
+        bool resume)
     {
-        var copyManifest = Directory.Exists(roots.CleanGameRoot)
-            ? InstallationCopyService.CaptureManifest(roots.CleanGameRoot)
-            : InstallationCopyService.Copy(roots);
-        SaveJson(Path.Combine(roots.ManifestsRoot, "baseline-copy-manifest.json"), copyManifest);
+        CopyManifest copyManifest;
+        if (resume)
+        {
+            var baseline = LoadBaseline(roots);
+            copyManifest = baseline.DisposableManifest;
+            var current = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+            DisposableProfileBaselineService.LoadAndValidateResume(
+                BaselinePath(roots),
+                request.ExpectedFingerprint,
+                preflight.OriginalManifest,
+                current,
+                preflight.Runtime.SmokeTestReadiness.Status,
+                preflight.Runtime.LoaderIndicators);
+        }
+        else
+        {
+            DisposableProfileBaselineService.RequireFreshProfile(roots);
+            copyManifest = InstallationCopyService.Copy(roots);
+            SaveBaseline(roots, request.ExpectedFingerprint, preflight.OriginalManifest, copyManifest);
+        }
+
         var copiedSnapshot = EnsureCopiedProfile(roots, request, preflight, copyManifest);
-        var baseline = LaunchCopiedExecutable(roots, copiedSnapshot.SelectedExecutableRelativePath);
-        if (!baseline.Started || !baseline.StableInitialized || baseline.RequiresManualClosure)
+        var baselineLaunch = hooks.Launch is null
+            ? LaunchCopiedExecutable(roots, copiedSnapshot.SelectedExecutableRelativePath)
+            : hooks.Launch(roots, copiedSnapshot.SelectedExecutableRelativePath!);
+        if (!baselineLaunch.Started || !baselineLaunch.StableInitialized || baselineLaunch.RequiresManualClosure)
         {
             return WriteOutcomeReport(
                 request,
@@ -246,55 +285,85 @@ public static class SmokeTestOrchestrator
                 SmokeTestOutcome.Inconclusive,
                 "BaselineLaunchInconclusive: the copied executable did not reach a bounded stable state or requires manual closure.",
                 "Not attempted because the baseline launch was inconclusive.",
-                baseline,
+                baselineLaunch,
                 new LoaderLogSummary(null, false, false, false, 0, 0, 0, 0, [], false),
                 "No loader transaction was attempted.",
-                "No loader was installed.");
+                "No loader was installed.",
+                preflight,
+                copyManifest,
+                null,
+                hooks,
+                SmokeTestRollbackState.NotApplied);
         }
 
         var plan = InstallArchive(request, roots);
-        SaveJson(Path.Combine(roots.ManifestsRoot, "transaction-plan.json"), plan);
-        var loaderLaunch = LaunchCopiedExecutable(roots, copiedSnapshot.SelectedExecutableRelativePath);
-        if (loaderLaunch.RequiresManualClosure)
+        var guard = SmokeTestPostApplyGuard.Execute(
+            launch: () => hooks.Launch is null
+                ? LaunchCopiedExecutable(roots, copiedSnapshot.SelectedExecutableRelativePath)
+                : hooks.Launch(roots, copiedSnapshot.SelectedExecutableRelativePath!),
+            readLog: () => hooks.ReadLoaderLog is null ? ReadKnownLoaderLog(roots.CleanGameRoot) : hooks.ReadLoaderLog(roots.CleanGameRoot),
+            parseLog: text => hooks.ParseLoaderLog is null ? LoaderLogParser.Parse(text) : hooks.ParseLoaderLog(text),
+            classify: summary => SmokeTestOutcomeClassifier.Classify(true, true, summary),
+            rollback: () => RollbackAppliedProfile(roots, plan, copyManifest),
+            writeRecoveryMarker: () => SaveRecoveryMarker(roots));
+
+        var loaderLaunch = guard.Launch ?? new LaunchObservationResult(false, false, true, null, true, false, TimeSpan.Zero, guard.FailureCategory);
+        var summary = guard.LogSummary ?? new LoaderLogSummary(null, false, false, false, 0, 0, 0, 0, [], false);
+        if (guard.RollbackState == SmokeTestRollbackState.ManualClosureRequired)
         {
-            throw new SmokeTestException("The loader-enabled process requires manual graceful closure before rollback can proceed.");
+            return WriteOutcomeReport(
+                request,
+                roots,
+                preflight.Snapshot.Fingerprint,
+                copiedSnapshot.Fingerprint,
+                SmokeTestOutcome.Inconclusive,
+                "The copied loader process requires manual graceful closure.",
+                "Manual closure is required before rollback can proceed.",
+                loaderLaunch,
+                summary,
+                "Validated archive extraction and transactional apply completed.",
+                "Rollback deferred while the copied process remains active.",
+                preflight,
+                copyManifest,
+                null,
+                hooks,
+                guard.RollbackState);
         }
 
-        var logText = ReadKnownLoaderLog(roots.CleanGameRoot);
-        var summary = LoaderLogParser.Parse(logText);
-        var outcome = SmokeTestOutcomeClassifier.Classify(
-            true,
-            loaderLaunch.Started && loaderLaunch.StableInitialized,
-            summary);
-
-        LoaderTransactionService.Rollback(roots, plan);
-        InstallationCopyService.RestoreFilesToManifest(roots.CleanGameRoot, copyManifest);
-        var copiedAfterRollback = InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint;
-        var originalAfter = InstallationFingerprintService.Capture(roots.OriginalGameRoot).Fingerprint;
-        var rollbackVerified = string.Equals(copiedAfterRollback, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase);
-        var originalVerified = string.Equals(originalAfter, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase);
-        if (!rollbackVerified || !originalVerified)
+        var copiedAfterRollback = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+        var originalPost = VerifyOriginalAfterExperiment(request, roots, preflight);
+        var rollbackVerified = guard.RollbackState == SmokeTestRollbackState.RollbackSucceeded
+            && InstallationCopyService.CompareManifests(copyManifest, copiedAfterRollback).Matches
+            && string.Equals(InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase);
+        var outcome = guard.Outcome;
+        if (guard.Launch is not null && (!guard.Launch.Started || !guard.Launch.StableInitialized))
+        {
+            outcome = SmokeTestOutcome.Failed;
+        }
+        if (!rollbackVerified || !originalPost.Passed)
         {
             outcome = SmokeTestOutcome.Failed;
         }
 
-        var reportResult = WriteOutcomeReport(
+        return WriteOutcomeReport(
             request,
             roots,
-            originalAfter,
-            copiedAfterRollback,
+            originalPost.Snapshot.Fingerprint,
+            InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint,
             outcome,
             "The copied executable reached a bounded stable state and was gracefully closed before installation.",
-            "The loader-enabled copied executable reached a bounded stable state and was gracefully closed.",
+            guard.RollbackState == SmokeTestRollbackState.ManualClosureRequired
+                ? "Manual closure is required; rollback was intentionally deferred."
+                : "The loader-enabled copied executable completed bounded observation.",
             loaderLaunch,
             summary,
             "Validated archive extraction and transactional apply completed.",
-            rollbackVerified ? "Rollback restored the copied fingerprint." : "Rollback did not restore the copied fingerprint.");
-        return reportResult with
-        {
-            OriginalInstallationVerified = originalVerified,
-            RollbackVerified = rollbackVerified
-        };
+            rollbackVerified ? "Rollback restored the complete copied manifest and fingerprint." : "Rollback did not restore the complete copied manifest and fingerprint.",
+            preflight,
+            copyManifest,
+            new PostExperimentVerification(originalPost, rollbackVerified, guard.RollbackState),
+            hooks,
+            guard.RollbackState);
     }
 
     private static TransactionPlan InstallArchive(LoaderSmokeTestRequest request, SmokeTestRoots roots)
@@ -319,8 +388,30 @@ public static class SmokeTestOrchestrator
 
         var extracted = ArchiveSafetyService.Extract(archivePath, roots.ExtractedLoaderRoot);
         var plan = LoaderTransactionService.Prepare(roots, extracted);
+        SaveJson(Path.Combine(roots.ManifestsRoot, "transaction-plan.json"), plan);
         LoaderTransactionService.Apply(roots, plan, extracted);
         return plan;
+    }
+
+    private static bool RollbackAppliedProfile(
+        SmokeTestRoots roots,
+        TransactionPlan plan,
+        CopyManifest baseline)
+    {
+        try
+        {
+            LoaderTransactionService.Rollback(roots, plan);
+            return InstallationCopyService.RestoreFilesToManifest(roots.CleanGameRoot, baseline).Matches;
+        }
+        catch (SmokeTestException)
+        {
+            return false;
+        }
+    }
+
+    private static void SaveRecoveryMarker(SmokeTestRoots roots)
+    {
+        SmokeTestRecoveryMarkerService.Write(Path.Combine(roots.ManifestsRoot, "recovery-marker.json"));
     }
 
     private static Preflight VerifyOriginalInstallation(LoaderSmokeTestRequest request, SmokeTestRoots roots)
@@ -344,8 +435,64 @@ public static class SmokeTestOrchestrator
             throw new SmokeTestException("The original installation is no longer ready for a reversible clean-profile test.");
         }
 
-        return new Preflight(snapshot, runtime);
+        return new Preflight(snapshot, runtime, InstallationCopyService.CaptureManifest(roots.OriginalGameRoot));
     }
+
+    private static OriginalPostVerification VerifyOriginalAfterExperiment(
+        LoaderSmokeTestRequest request,
+        SmokeTestRoots roots,
+        Preflight preflight)
+    {
+        var snapshot = InstallationFingerprintService.Capture(roots.OriginalGameRoot);
+        var runtimeRoot = Path.Combine(roots.ExperimentRoot, "evidence", "original-post-runtime-compatibility");
+        var runtime = new RuntimeCompatibilityEngine().Inspect(new RuntimeCompatibilityRequest(
+            roots.OriginalGameRoot,
+            request.ExpectedFingerprint,
+            runtimeRoot,
+            OverwriteExisting: true));
+        var manifest = InstallationCopyService.CaptureManifest(roots.OriginalGameRoot);
+        var manifestResult = InstallationCopyService.CompareManifests(preflight.OriginalManifest, manifest);
+        var fingerprintMatches = string.Equals(snapshot.Fingerprint, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase);
+        var readinessMatches = runtime.SmokeTestReadiness.Status == SmokeTestReadiness.ReadyForReversibleTest;
+        var indicatorsAbsent = runtime.LoaderIndicators.All(item => item.Status == LoaderIndicatorStatus.Absent);
+        var backendMatches = runtime.ManagedRuntimeProfile == ManagedRuntimeProfile.Mono;
+        var architectureMatches = runtime.ExecutableArchitecture == ExecutableArchitecture.X64;
+        var unityMatches = string.Equals(runtime.UnityVersion, "2022.3.62f2", StringComparison.OrdinalIgnoreCase);
+        var targetFrameworkMatches = runtime.TargetFrameworkRecommendation == TargetFrameworkRecommendation.Netstandard21Candidate;
+        var confidenceMatches = runtime.TargetFrameworkAssessment.Confidence == TargetFrameworkConfidence.Medium;
+        return new OriginalPostVerification(
+            snapshot,
+            runtime,
+            manifestResult,
+            fingerprintMatches,
+            readinessMatches,
+            indicatorsAbsent,
+            backendMatches,
+            architectureMatches,
+            unityMatches,
+            targetFrameworkMatches,
+            confidenceMatches);
+    }
+
+    private static string BaselinePath(SmokeTestRoots roots)
+        => Path.Combine(roots.ManifestsRoot, "baseline-copy-manifest.json");
+
+    private static void SaveBaseline(
+        SmokeTestRoots roots,
+        string expectedFingerprint,
+        CopyManifest originalManifest,
+        CopyManifest disposableManifest)
+        => DisposableProfileBaselineService.Save(
+            BaselinePath(roots),
+            new DisposableProfileBaseline(
+                DisposableProfileBaselineService.SchemaVersion,
+                DisposableProfileBaselineService.TaskVersion,
+                expectedFingerprint.ToLowerInvariant(),
+                originalManifest,
+                disposableManifest));
+
+    private static DisposableProfileBaseline LoadBaseline(SmokeTestRoots roots)
+        => LoadJson<DisposableProfileBaseline>(BaselinePath(roots));
 
     private static InstallationDiscoverySnapshot EnsureCopiedProfile(
         SmokeTestRoots roots,
@@ -362,6 +509,12 @@ public static class SmokeTestOrchestrator
         if (!string.Equals(copied.Fingerprint, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase))
         {
             throw new SmokeTestException("The disposable copy does not match the expected game fingerprint.");
+        }
+
+        if (manifest is not null
+            && !InstallationCopyService.CompareManifests(manifest, InstallationCopyService.CaptureManifest(roots.CleanGameRoot)).Matches)
+        {
+            throw new SmokeTestException("The disposable copy does not match the saved complete baseline manifest.");
         }
 
         var runtimeRoot = Path.Combine(roots.ExperimentRoot, "evidence", "copied-runtime-compatibility");
@@ -426,20 +579,39 @@ public static class SmokeTestOrchestrator
         LaunchObservationResult launch,
         LoaderLogSummary summary,
         string transactionSummary,
-        string rollbackResult)
+        string rollbackResult,
+        Preflight preflight,
+        CopyManifest copyManifest,
+        PostExperimentVerification? postVerification,
+        SmokeTestExecutionHooks hooks,
+        SmokeTestRollbackState rollbackState)
     {
-        var reportPath = request.ReportPath;
-        if (string.IsNullOrWhiteSpace(reportPath))
-        {
-            throw new SmokeTestException("A report path is required for the full smoke-test mode.");
-        }
+        var reportPath = SmokeTestPathValidator.ValidateCommittedReportPath(roots, request.ExpectedFingerprint);
 
         var archivePath = request.BepInExArchivePath;
         var archiveName = archivePath is null ? "Unknown" : Path.GetFileName(archivePath);
         var observedHash = archivePath is null || !File.Exists(archivePath) ? "Unknown" : ComputeHash(archivePath);
+        var originalManifestText = postVerification is null
+            ? "Historical Task-3 evidence did not retain a complete original manifest for this state."
+            : postVerification.Original.ManifestComparison.Matches
+                ? "Matches the complete original pre-experiment manifest (relative paths, sizes, and SHA-256 values)."
+                : "Does not match the complete original pre-experiment manifest.";
+        var originalRuntimeText = postVerification is null
+            ? "Post-experiment runtime/readiness inspection was not performed while manual closure was required."
+            : $"Readiness={postVerification.Original.Runtime.SmokeTestReadiness.Status}; backend={postVerification.Original.Runtime.ManagedRuntimeProfile}; architecture={postVerification.Original.Runtime.ExecutableArchitecture}; Unity={postVerification.Original.Runtime.UnityVersion}; TFM={postVerification.Original.Runtime.TargetFrameworkRecommendation}; confidence={postVerification.Original.Runtime.TargetFrameworkAssessment.Confidence}.";
+        var indicatorText = postVerification is null
+            ? "Post-experiment loader-indicator inspection was deferred because the copied process remained active."
+            : postVerification.Original.IndicatorsAbsent
+                ? "All inspected original-installation loader indicators were Absent."
+                : "One or more original-installation loader indicators were non-absent.";
+        var disposableText = postVerification is null
+            ? "Complete disposable-manifest rollback comparison was deferred because manual closure is required."
+            : postVerification.DisposableManifestMatches
+                ? "Matches the complete disposable pre-installation manifest (relative paths, sizes, directories, and SHA-256 values), plus fingerprint v1."
+                : "Does not match the complete disposable pre-installation manifest.";
         var data = new SmokeTestDetailedReport(
             request.ExpectedFingerprint.ToLowerInvariant(),
-            "m1-loader-smoke-test-v1",
+            DisposableProfileBaselineService.TaskVersion,
             DateTimeOffset.UtcNow,
             outcome,
             "Fingerprint and runtime readiness matched before and after the experiment; absolute path omitted.",
@@ -457,21 +629,47 @@ public static class SmokeTestOrchestrator
             $"Known BepInEx log evidence was read from the disposable copy; configuration generated: {summary.ConfigurationGenerated}; equivalent preloader/chainloader initialization evidence: {summary.StableInitialized}.",
             summary,
             rollbackResult,
-            "Original fingerprint after the experiment matched the expected fingerprint; loader indicators remained absent.",
+            postVerification is null
+                ? "Post-experiment original verification was deferred; compatibility fingerprint was unchanged before manual closure."
+                : postVerification.Original.Passed
+                    ? "Complete original manifest, compatibility fingerprint, runtime readiness, and expected compatibility evidence matched."
+                    : "One or more original post-verification checks failed.",
             summary.WarningCount == 0 ? [] : ["Non-fatal loader warnings were present."],
             summary.ErrorCategories,
             "Bootstrap evidence does not establish plugin TFM, Harmony compatibility, lifecycle bindings, game APIs, or custom-wave support.",
-            "M1 task 4: evidence-backed bootstrap/plugin boundary design, only after this report is reviewed.");
-        var markdown = SmokeTestReportWriter.BuildReport(data);
-        var written = SmokeTestReportWriter.WriteAtomic(Path.GetFullPath(reportPath), markdown, overwrite: true);
+            "M1 task 4: evidence-backed bootstrap/plugin boundary design, only after this report is reviewed.",
+            originalManifestText,
+            originalRuntimeText,
+            indicatorText,
+            disposableText,
+            rollbackState == SmokeTestRollbackState.ManualClosureRequired
+                ? "ManualClosureRequired. After graceful closure, run `dotnet exec <loader-smoke-test.dll> Rollback --game-path <redacted> --experiment-root <redacted> --expected-fingerprint <fingerprint> --repository-root <redacted>`; no automatic cleanup was attempted."
+                : rollbackState.ToString());
+        string written;
+        try
+        {
+            var markdown = hooks.BuildReport is null ? SmokeTestReportWriter.BuildReport(data) : hooks.BuildReport(data);
+            written = hooks.WriteReport is null
+                ? SmokeTestReportWriter.WriteAtomic(reportPath, markdown, overwrite: true)
+                : hooks.WriteReport(reportPath, markdown, true);
+        }
+        catch (SmokeTestException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            throw new SmokeTestException("The sanitized smoke-test report could not be prepared or written safely.", exception);
+        }
         return new SmokeTestExecutionResult(
             outcome,
             loaderLaunchResult,
             written,
             originalFingerprint,
             copiedFingerprint,
-            true,
-            rollbackResult.Contains("restored", StringComparison.OrdinalIgnoreCase));
+            postVerification?.Original.Passed ?? false,
+            postVerification?.DisposableManifestMatches == true
+                && rollbackState == SmokeTestRollbackState.RollbackSucceeded);
     }
 
     private static string ComputeHash(string path)
@@ -529,5 +727,35 @@ public static class SmokeTestOrchestrator
 
     private sealed record Preflight(
         InstallationDiscoverySnapshot Snapshot,
-        RuntimeCompatibilityResult Runtime);
+        RuntimeCompatibilityResult Runtime,
+        CopyManifest OriginalManifest);
+
+    private sealed record OriginalPostVerification(
+        InstallationDiscoverySnapshot Snapshot,
+        RuntimeCompatibilityResult Runtime,
+        ManifestVerificationResult ManifestComparison,
+        bool FingerprintMatches,
+        bool ReadinessMatches,
+        bool IndicatorsAbsent,
+        bool BackendMatches,
+        bool ArchitectureMatches,
+        bool UnityMatches,
+        bool TargetFrameworkMatches,
+        bool ConfidenceMatches)
+    {
+        public bool Passed => ManifestComparison.Matches
+            && FingerprintMatches
+            && ReadinessMatches
+            && IndicatorsAbsent
+            && BackendMatches
+            && ArchitectureMatches
+            && UnityMatches
+            && TargetFrameworkMatches
+            && ConfidenceMatches;
+    }
+
+    private sealed record PostExperimentVerification(
+        OriginalPostVerification Original,
+        bool DisposableManifestMatches,
+        SmokeTestRollbackState RollbackState);
 }

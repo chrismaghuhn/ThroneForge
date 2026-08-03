@@ -18,7 +18,24 @@ public enum SmokeTestMode
     Verify,
     Rollback,
     Full,
+    Resume,
     Cleanup
+}
+
+public enum ManifestVerificationStatus
+{
+    Matches,
+    AddedFiles,
+    RemovedFiles,
+    ChangedFiles
+}
+
+public enum SmokeTestRollbackState
+{
+    NotApplied,
+    RollbackSucceeded,
+    RollbackFailed,
+    ManualClosureRequired
 }
 
 public enum TransactionChangeKind
@@ -55,7 +72,37 @@ public sealed record SmokeTestRoots(
 
 public sealed record FileManifestEntry(string RelativePath, long Size, string Sha256);
 
-public sealed record CopyManifest(IReadOnlyList<FileManifestEntry> Files);
+public sealed record CopyManifest(
+    IReadOnlyList<FileManifestEntry> Files,
+    IReadOnlyList<string>? Directories = null);
+
+public sealed record ManifestDifference(
+    string RelativePath,
+    FileManifestEntry? Expected,
+    FileManifestEntry? Actual);
+
+public sealed record ManifestVerificationResult(
+    ManifestVerificationStatus Status,
+    IReadOnlyList<ManifestDifference> AddedFiles,
+    IReadOnlyList<ManifestDifference> RemovedFiles,
+    IReadOnlyList<ManifestDifference> ChangedFiles,
+    IReadOnlyList<string> UnexpectedDirectories,
+    IReadOnlyList<string> MissingDirectories)
+{
+    public bool Matches => Status == ManifestVerificationStatus.Matches
+        && AddedFiles.Count == 0
+        && RemovedFiles.Count == 0
+        && ChangedFiles.Count == 0
+        && UnexpectedDirectories.Count == 0
+        && MissingDirectories.Count == 0;
+}
+
+public sealed record DisposableProfileBaseline(
+    string SchemaVersion,
+    string TaskVersion,
+    string ExpectedOriginalFingerprint,
+    CopyManifest OriginalManifest,
+    CopyManifest DisposableManifest);
 
 public sealed record ArchiveSafetyLimits(
     int MaximumEntries = 4096,
@@ -107,6 +154,22 @@ public sealed record LoaderLogSummary(
     IReadOnlyList<string> ErrorCategories,
     bool StableInitialized);
 
+public sealed record SmokeTestPostApplyResult(
+    SmokeTestOutcome Outcome,
+    SmokeTestRollbackState RollbackState,
+    LaunchObservationResult? Launch,
+    LoaderLogSummary? LogSummary,
+    string FailureCategory,
+    Exception? OperationException = null,
+    Exception? RollbackException = null);
+
+public sealed record SmokeTestExecutionHooks(
+    Func<SmokeTestRoots, string, LaunchObservationResult>? Launch = null,
+    Func<string, string>? ReadLoaderLog = null,
+    Func<string, LoaderLogSummary>? ParseLoaderLog = null,
+    Func<SmokeTestDetailedReport, string>? BuildReport = null,
+    Func<string, string, bool, string>? WriteReport = null);
+
 public sealed record SmokeTestReportData(
     string Fingerprint,
     string OriginalGamePath,
@@ -140,4 +203,9 @@ public sealed record SmokeTestDetailedReport(
     IReadOnlyList<string> Warnings,
     IReadOnlyList<string> Errors,
     string RemainingUncertainty,
-    string NextPermittedTask);
+    string NextPermittedTask,
+    string OriginalFullManifestPostVerification = "Not performed.",
+    string OriginalRuntimeReadinessPostVerification = "Not performed.",
+    string OriginalLoaderIndicatorPostVerification = "Not performed.",
+    string DisposableFullManifestRollbackVerification = "Not performed.",
+    string RecoveryOrRollbackState = "Not recorded.");

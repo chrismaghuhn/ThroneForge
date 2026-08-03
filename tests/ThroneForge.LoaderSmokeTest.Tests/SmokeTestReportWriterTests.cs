@@ -67,6 +67,11 @@ public sealed class SmokeTestReportWriterTests
         Assert.Contains("Baseline launch succeeded.", report, StringComparison.Ordinal);
         Assert.Contains("Loader launch succeeded.", report, StringComparison.Ordinal);
         Assert.Contains("## Sanitized log summary", report, StringComparison.Ordinal);
+        Assert.Contains("## Original full-manifest post-verification", report, StringComparison.Ordinal);
+        Assert.Contains("## Original runtime-readiness post-verification", report, StringComparison.Ordinal);
+        Assert.Contains("## Original loader-indicator post-verification", report, StringComparison.Ordinal);
+        Assert.Contains("## Disposable full-manifest rollback verification", report, StringComparison.Ordinal);
+        Assert.Contains("## Recovery or rollback state", report, StringComparison.Ordinal);
         Assert.DoesNotContain("Original absolute path", report, StringComparison.OrdinalIgnoreCase);
     }
 }

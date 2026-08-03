@@ -24,7 +24,6 @@ public static class LoaderSmokeTestCli
             string? expectedFingerprint = null;
             string? repositoryRoot = Directory.GetCurrentDirectory();
             string? archivePath = null;
-            string? reportPath = null;
             string? officialDigest = null;
             string? officialAssetId = null;
             string? officialAssetSize = null;
@@ -48,9 +47,6 @@ public static class LoaderSmokeTestCli
                         break;
                     case "--bepinex-archive":
                         archivePath = ReadValue(args, ref index, "--bepinex-archive");
-                        break;
-                    case "--report-path":
-                        reportPath = ReadValue(args, ref index, "--report-path");
                         break;
                     case "--official-digest":
                         officialDigest = ReadValue(args, ref index, "--official-digest");
@@ -88,7 +84,7 @@ public static class LoaderSmokeTestCli
                 expectedFingerprint,
                 repositoryRoot,
                 archivePath,
-                reportPath,
+                null,
                 whatIf,
                 OfficialAssetDigest: officialDigest,
                 OfficialAssetId: officialAssetId,
@@ -124,7 +120,7 @@ public static class LoaderSmokeTestCli
     private static SmokeTestMode ParseMode(string value)
         => Enum.TryParse<SmokeTestMode>(value, ignoreCase: true, out var mode)
             ? mode
-            : throw new ArgumentException("The mode must be Plan, Prepare, Baseline, Install, Launch, Verify, Rollback, or Full.");
+            : throw new ArgumentException("The mode must be Plan, Prepare, Baseline, Install, Launch, Verify, Rollback, Full, Resume, or Cleanup.");
 
     private static string ReadValue(string[] args, ref int index, string option)
     {
@@ -140,9 +136,9 @@ public static class LoaderSmokeTestCli
     private static void PrintUsage(TextWriter writer)
     {
         writer.WriteLine("Usage:");
-        writer.WriteLine("  dotnet run --project src/ThroneForge.LoaderSmokeTest -- <Plan|Prepare|Baseline|Install|Launch|Verify|Rollback|Full|Cleanup>");
+        writer.WriteLine("  dotnet run --project src/ThroneForge.LoaderSmokeTest -- <Plan|Prepare|Baseline|Install|Launch|Verify|Rollback|Full|Resume|Cleanup>");
         writer.WriteLine("    --game-path <absolute-path> --experiment-root <external-absolute-path>");
         writer.WriteLine("    --expected-fingerprint <sha256> --repository-root <repository-absolute-path>");
-        writer.WriteLine("    [--bepinex-archive <BepInEx_win_x64_5.4.23.5.zip>] [--report-path <absolute-path>] [--what-if]");
+        writer.WriteLine("    [--bepinex-archive <BepInEx_win_x64_5.4.23.5.zip>] [--what-if]");
     }
 }

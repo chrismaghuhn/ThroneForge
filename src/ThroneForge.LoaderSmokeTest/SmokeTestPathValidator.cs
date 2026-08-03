@@ -95,6 +95,33 @@ public static class SmokeTestPathValidator
         return executable;
     }
 
+    public static string ValidateCommittedReportPath(SmokeTestRoots roots, string expectedFingerprint)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        if (string.IsNullOrWhiteSpace(expectedFingerprint)
+            || expectedFingerprint.Length != 64
+            || expectedFingerprint.Any(character => !Uri.IsHexDigit(character)))
+        {
+            throw new SmokeTestException("The expected fingerprint must be a 64-character SHA-256 value.");
+        }
+
+        var discoveryRoot = Path.Combine(roots.RepositoryRoot, "docs", "discovery");
+        var reportPath = Path.Combine(
+            discoveryRoot,
+            $"{expectedFingerprint.ToLowerInvariant()}-loader-smoke-test.md");
+        var normalized = CanonicalizeAbsolute(reportPath, "committed report");
+        if (!IsStrictDescendant(roots.RepositoryRoot, normalized)
+            || !IsStrictDescendant(discoveryRoot, normalized)
+            || IsSameOrDescendant(roots.OriginalGameRoot, normalized)
+            || IsSameOrDescendant(roots.CleanGameRoot, normalized))
+        {
+            throw new SmokeTestException("The committed report must remain below the repository docs/discovery directory and outside both game profiles.");
+        }
+
+        EnsureNoReparseOnExistingPath(normalized);
+        return normalized;
+    }
+
     internal static string ValidateNewDirectoryPath(string path)
     {
         var normalized = CanonicalizeAbsolute(path, "target directory");
