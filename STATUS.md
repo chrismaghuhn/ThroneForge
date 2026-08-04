@@ -6,7 +6,7 @@ M1 - Task 3 final transaction-state correction complete on `agent/m1-loader-smok
 
 ## State
 
-M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has a credible historical private bootstrap result, but this branch is hardening the reusable harness before merge. M1 overall remains incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has a credible historical private bootstrap result, and this branch now completes the reusable harness hardening without rerunning the private experiment. M1 overall remains incomplete.
 
 The current final correction started from `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Its pre-fix hosted run was `30864571605`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 154 tests, and had 0 failures, errors, or skips. Final hosted validation for the versioned transaction-state, persisted-path, applied-profile, staged-Verify, and report-wording corrections passed in run `30866207996` and is recorded below.
 

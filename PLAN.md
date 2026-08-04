@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 3 loader bootstrap smoke-test hardening on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
+M1 - Task 3 loader bootstrap smoke-test hardening complete on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
 
 ## Milestones
 
