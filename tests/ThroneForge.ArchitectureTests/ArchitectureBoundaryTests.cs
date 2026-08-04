@@ -173,6 +173,19 @@ public sealed class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void PluginApiAndRuntimeAdmissionBoundaryDoNotReferenceLoaderOrConcreteAdapter()
+    {
+        foreach (var projectName in new[] { "ThroneForge.API", "ThroneForge.Runtime" })
+        {
+            var projectText = File.ReadAllText(GetProjectPath(projectName));
+
+            Assert.DoesNotContain("ThroneForge.GameAdapter.Thronefall", projectText, StringComparison.Ordinal);
+            Assert.DoesNotContain("ThroneForge.LoaderSmokeTest", projectText, StringComparison.Ordinal);
+            Assert.DoesNotContain("ThroneForge.Discovery", projectText, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void BuiltCoreAssembliesDoNotReferenceGameRuntimeAssemblies()
     {
         var missing = new List<string>();

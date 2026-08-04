@@ -4,6 +4,9 @@ All notable ThroneForge changes are documented here.
 
 ## Unreleased
 
+- Completed M1 Task 4 trust-evidence hardening on `agent/m1-plugin-runtime-boundary-hardening`: canonical mod identity/version rules, artifact- and fingerprint-bound integrity/approval/adapter evidence, deterministic admission bindings, and fail-closed reason-code precedence. Implementation head `382fe877f5685bb71d77ee6b5cf04afc8a57a7bf` passed hosted run `30878049044` on Windows and Ubuntu with 11 TRX files and 212 tests per runner using SDK `10.0.100`; no plugin was loaded.
+- Completed the bounded M1 Task 4 plugin/runtime boundary slice: portable code-mod identity/integrity/approval contracts, `IThroneForgeMod` lifecycle boundary, deterministic pre-load admission gate, ADR-0006, and architecture tests. Final documentation head `5d7c69a` passed hosted run `30868670093` on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, and 175 tests per runner; no plugin was loaded.
+- Started M1 Task 4 on `agent/m1-plugin-runtime-boundary` from merged main commit `06554d845a9fe46132c1a19ec0c2f18b8722acf2`. The task is limited to portable full-trust code-mod contracts and a deterministic pre-load admission boundary; it does not load a plugin or claim game/runtime compatibility.
 - Implemented the final Task 3 transaction-state correction: atomic versioned loader state, persisted-entry and backup containment validation, complete applied-profile verification, staged `Verify` bootstrap-evidence requirements, fail-closed stale/failed transaction handling, and consistent no-transaction report wording. Hosted run `30866207996` validated the implementation on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, and 165 tests per runner; the private loader experiment was not rerun.
 - Added the final Task 3 hardening review corrections: evidence-derived original post-check claims, saved-baseline requirements for all staged modes, and explicit recovery-marker persistence status in reports and CLI output. Hosted run `30864308531` validated the implementation on Windows and Ubuntu with 11 TRX files and 154 tests per runner; the private loader experiment was not rerun.
 - Fixed CI test-result preservation so every test project gets its own TRX artifact and the workflow verifies aggregate completeness before upload.
@@ -23,5 +26,5 @@ All notable ThroneForge changes are documented here.
 
 ### Not yet implemented
 
-- The final Task 3 transaction-state correction has passed hosted Windows/Linux validation and is ready for review/PR merge. M1 Task 4 remains unstarted.
+- M1 Task 4 plugin/runtime boundary work is in progress. No plugin loading, loader integration, game API binding, lifecycle integration, or custom-wave functionality is implemented.
 - Runtime integration, loaders, game API bindings, and custom-wave support remain unimplemented.

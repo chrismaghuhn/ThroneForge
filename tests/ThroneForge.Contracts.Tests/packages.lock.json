@@ -93,6 +93,12 @@
           "xunit.extensibility.core": "[2.9.3]"
         }
       },
+      "throneforge.api": {
+        "type": "Project",
+        "dependencies": {
+          "ThroneForge.Contracts": "[1.0.0, )"
+        }
+      },
       "throneforge.contracts": {
         "type": "Project"
       }

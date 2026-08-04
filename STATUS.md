@@ -2,13 +2,13 @@
 
 ## Current milestone
 
-M1 - Task 3 final transaction-state correction complete on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
+M1 - Task 4 evidence-backed plugin/runtime boundary hardening in progress on `agent/m1-plugin-runtime-boundary-hardening`, based on reviewed head `18f7b1135b6aaba04290198f355e6e9ac6a97b5d` and merged `main@06554d845a9fe46132c1a19ec0c2f18b8722acf2`.
 
 ## State
 
-M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has a credible historical private bootstrap result, and this branch now completes the reusable harness hardening without rerunning the private experiment. M1 overall remains incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. The bounded M1 Task 4 plugin/runtime boundary slice is implemented and hosted-validated on its branch. M1 overall remains incomplete.
 
-The current final correction started from `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Its pre-fix hosted run was `30864571605`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 154 tests, and had 0 failures, errors, or skips. Final hosted validation for the versioned transaction-state, persisted-path, applied-profile, staged-Verify, and report-wording corrections passed in run `30866207996` and is recorded below.
+The Task 4 bounded-slice baseline passed hosted run `30868670093` with 11 TRX files and 175 tests per runner using SDK `10.0.100`. This hardening branch has not yet completed hosted validation; its new results must replace that baseline before merge.
 
 ## Completed
 
@@ -158,7 +158,20 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Local Task 3 hardening validation with the installed parent-directory SDK `10.0.110`: locked restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 154 tests (55 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and Contracts tests PASS with 1 test. Focused review-follow-up tests pass 24/24. `dotnet format --verify-no-changes --no-restore` remains blocked locally because SDK `10.0.100` is not installed; hosted exact-SDK validation is recorded below.
 - Final hosted review-follow-up validation passed in run [30864308531](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30864308531) for implementation commit `de3159e85c177526c2dafc6b5a60fa80e38c0bc9`: Windows and Ubuntu each used SDK `10.0.100`, uploaded 11 TRX files representing 154 tests, and reported 0 failures, 0 errors, and 0 not-executed tests. Both artifacts were downloaded and parsed independently; no `Overwriting results file` warning occurred.
 
+## M1 Task 4 hardening current work
+
+- Branch: `agent/m1-plugin-runtime-boundary-hardening`.
+- Baseline: reviewed Task 4 head `18f7b1135b6aaba04290198f355e6e9ac6a97b5d`, based on merged `main@06554d845a9fe46132c1a19ec0c2f18b8722acf2`.
+- Scope: bind portable full-trust code-mod integrity, approval, compatibility, request, and admission-decision evidence to one exact artifact and game build before any future loader activation.
+- Explicitly out of scope: assembly loading, BepInEx/Harmony/Unity references, plugin TFM selection, lifecycle bindings, game API inspection, catalog export, and custom waves.
+- Implemented in this branch: canonical immutable mod identity/version and SHA-256 rules, structured artifact/game-bound integrity and approval evidence, fingerprint-bound adapter evidence, a redesigned activation request, and a deterministic admission-binding digest. The public API remains unchanged in scope and portable in dependency/signature shape; binary target-framework compatibility is not proven.
+- Local focused validation with SDK `10.0.110`: Contracts tests PASS with 27 tests; Runtime tests PASS with 21 tests. Full solution restore/build/test PASS with 212 tests (12 Architecture, 27 Contracts, 21 Runtime, 80 Discovery, 66 LoaderSmokeTest, and the remaining skeleton suites). Exact-SDK formatting remains pending because SDK `10.0.100` is not installed locally.
+- Hosted validation for implementation commit `382fe877f5685bb71d77ee6b5cf04afc8a57a7bf`: run `30878049044` passed on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 11 TRX files representing 212 tests, with 0 failures, errors, or skips. Both artifacts were independently parsed and no `Overwriting results file` warning appeared.
+- No plugin is loaded and no game-facing compatibility conclusion has been claimed. Plugin TFM, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, and custom waves remain unverified. Evidence records are trusted runtime inputs, not cryptographic signatures or an OS sandbox.
+
 ## Next task
+
+After this hardening branch passes validation and merges, the next task must be separately scoped around a plugin-load experiment. It must not be treated as a functioning plugin or lifecycle integration until a later clean-profile experiment proves those claims.
 
 ### M1 Task 3 earlier hardening evidence
 
