@@ -4,6 +4,7 @@ All notable ThroneForge changes are documented here.
 
 ## Unreleased
 
+- Started M1 Task 5 hardening from reviewed head `10897f7b03d45f1e470b5930a9dc1341939cde6f` on `agent/m1-plugin-load-smoke-test-hardening`: strict metadata-only single-assembly closure, shared API/Contracts resolution, module-initializer/native/sidecar rejection, public closed contract-shape validation, exact-byte capture, and bounded collectible unload observation. No private Thronefall/BepInEx experiment was run.
 - Started M1 Task 5 on `agent/m1-plugin-load-smoke-test` from merged `main@5f4b4dd`: a repository-only synthetic plugin-load probe that re-runs the artifact/game-bound admission gate immediately before loading a test fixture. No Thronefall plugin is loaded or invoked.
 - Added the synthetic `ThroneForge.PluginLoadTest` probe, collectible-context loading, bounded exact-byte hashing, sanitized load results, source-only single/duplicate fixtures, and 14 fail-closed regression tests. Local SDK `10.0.110` validation passed; exact SDK `10.0.100` formatting remains hosted-only on this workstation.
 - Final Task-5 hosted run `30880625516` passed on Windows and Ubuntu with SDK `10.0.100`, 12 TRX files, and 226 tests per runner. The TRX completeness check now counts only `IsTestProject=true` projects so source-only fixtures do not create false failures; no overwrite warning occurred.
@@ -30,5 +31,5 @@ All notable ThroneForge changes are documented here.
 
 ### Not yet implemented
 
-- M1 Task 5 synthetic plugin-load probing is in progress. No Thronefall plugin loading, loader integration, game API binding, lifecycle integration, or custom-wave functionality is implemented.
+- M1 Task 5 synthetic plugin-load probing and its closure hardening are repository-only. No Thronefall plugin loading, loader integration, game API binding, lifecycle integration, or custom-wave functionality is implemented.
 - Runtime integration, loaders, game API bindings, and custom-wave support remain unimplemented.

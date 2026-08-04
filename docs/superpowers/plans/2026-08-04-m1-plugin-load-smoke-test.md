@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a repository-only, fingerprint- and artifact-bound probe that loads a synthetic `IThroneForgeMod` assembly without invoking it or claiming game compatibility.
+**Goal:** Add a repository-only, fingerprint- and artifact-bound probe that loads one synthetic `IThroneForgeMod` assembly without explicitly invoking its constructor or ThroneForge lifecycle methods, while documenting that assembly loading remains full-trust and claiming no game compatibility.
 
-**Architecture:** Add an external `ThroneForge.PluginLoadTest` project that hashes one explicit assembly artifact, rebuilds verified integrity evidence, re-evaluates the existing admission gate immediately before a collectible `AssemblyLoadContext` load, and returns sanitized evidence. Add a source-only fixture library and focused tests; keep the API, contracts, runtime, adapters, discovery, and loader-smoke projects free of new game-facing dependencies.
+**Architecture:** Add an external `ThroneForge.PluginLoadTest` project that captures and hashes one explicit assembly artifact, performs metadata-only single-assembly closure/module-initializer/native preflight, rebuilds verified integrity evidence, re-evaluates the existing admission gate immediately before a strict collectible `AssemblyLoadContext` load, and returns sanitized evidence. Add source-only fixtures and focused tests; keep the API, contracts, runtime, adapters, discovery, and loader-smoke projects free of new game-facing dependencies. Arbitrary sidecars are out of scope and rejected.
 
 **Tech Stack:** .NET `10.0.100` repository SDK, C#, `System.Runtime.Loader`, `System.Security.Cryptography`, xUnit, existing Contracts/API/Runtime projects, no new NuGet package.
 
@@ -92,7 +92,7 @@ The result may contain only normalized assembly/type identities and sanitized ca
 
 - [x] **Step 4: Implement collectible loading without invocation.**
 
-Load the exact artifact into a private collectible `AssemblyLoadContext`, inspect only assembly name and types assignable to `IThroneForgeMod`, require exactly one contract implementation, record its full type name, then unload the context. Do not call constructors or interface methods. Convert loader exceptions into `Failed` with a stable reason code and no raw path.
+Load the exact captured artifact into a private collectible `AssemblyLoadContext`, inspect only assembly name and types assignable to `IThroneForgeMod`, require exactly one public top-level closed contract implementation, request unload, and require bounded unload observation. Do not explicitly call constructors or interface methods; module initializers are rejected by metadata preflight for this synthetic slice. Convert loader exceptions into `Failed` with stable reason codes and no raw path.
 
 - [x] **Step 5: Make the fixture minimal and game-free.**
 

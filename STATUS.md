@@ -2,11 +2,11 @@
 
 ## Current milestone
 
-M1 - Task 5 repository-only synthetic plugin-load probe complete on `agent/m1-plugin-load-smoke-test`, based on merged `main@5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`; PR creation/merge remains a repository-owner decision.
+M1 - Task 5 repository-only synthetic plugin-load probe hardening in progress on `agent/m1-plugin-load-smoke-test-hardening`, based on reviewed head `10897f7b03d45f1e470b5930a9dc1341939cde6f`; PR creation/merge remains a repository-owner decision.
 
 ## State
 
-M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 is complete as a repository-only synthetic plugin-load probe; no Thronefall plugin was loaded and M1 overall remains incomplete.
+M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 base implementation passed its pre-hardening hosted run; the current single-assembly/module-initializer/contract/unload hardening is in progress. No Thronefall plugin was loaded and M1 overall remains incomplete.
 
 The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below.
 
@@ -169,14 +169,24 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Hosted validation for implementation commit `382fe877f5685bb71d77ee6b5cf04afc8a57a7bf`: run `30878049044` passed on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 11 TRX files representing 212 tests, with 0 failures, errors, or skips. Both artifacts were independently parsed and no `Overwriting results file` warning appeared.
 - No plugin is loaded and no game-facing compatibility conclusion has been claimed. Plugin TFM, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, and custom waves remain unverified. Evidence records are trusted runtime inputs, not cryptographic signatures or an OS sandbox.
 
-## M1 Task 5 completed evidence
+## M1 Task 5 baseline evidence
 
 - Branch: `agent/m1-plugin-load-smoke-test`, based on merged `main@5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`.
-- Scope: a synthetic, repository-only assembly-load probe that re-runs the existing admission gate immediately before loading one test fixture into a collectible context.
+- Scope: a synthetic, repository-only assembly-load probe that re-runs the existing admission gate immediately before loading one test fixture into a collectible context. The baseline did not yet bind arbitrary sidecars or prove unload observation.
 - Explicitly out of scope: BepInEx installation, Thronefall launch, private game inspection, plugin invocation, lifecycle binding, Unity/Harmony/game references, game API inspection, catalog extraction, and custom waves.
 - The exact SDK `10.0.100` is not installed on this workstation; local validation distinguishes SDK `10.0.110` compile/test feedback from hosted exact-SDK evidence.
 - Local Task-5 validation with SDK `10.0.110` from the parent directory: restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 226 tests (14 PluginLoadTest, 12 Architecture, 27 Contracts, 21 Runtime, 80 Discovery, 66 LoaderSmokeTest, and remaining skeleton tests), focused PluginLoadTest tests PASS with 14, and architecture tests PASS with 12. `dotnet format --verify-no-changes --no-restore` was attempted but is blocked because the repository-pinned SDK `10.0.100` is not installed locally.
-- Final hosted Task-5 validation: run [30880625516](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30880625516), head `15127329aa0fd916438a0404ba51a8dfdfbf59eb`. Windows and Ubuntu used SDK `10.0.100`; each uploaded 12 TRX files representing 226 tests with 0 failures, 0 errors, and 0 skips. Both artifacts were independently downloaded and parsed; no `Overwriting results file` warning occurred. The first run `30880510322` failed only because fixture projects were included in the expected-project count; the workflow now filters for `IsTestProject=true`.
+- Final pre-hardening hosted Task-5 validation: run [30880625516](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30880625516), head `10897f7b03d45f1e470b5930a9dc1341939cde6f`. Windows and Ubuntu used SDK `10.0.100`; each uploaded 12 TRX files representing 226 tests with 0 failures, 0 errors, and 0 skips. Both artifacts were independently downloaded and parsed; no `Overwriting results file` warning occurred. The first run `30880510322` failed only because fixture projects were included in the expected-project count; the workflow now filters for `IsTestProject=true`.
+
+## M1 Task 5 hardening status
+
+- Branch: `agent/m1-plugin-load-smoke-test-hardening`, created from reviewed head `10897f7b03d45f1e470b5930a9dc1341939cde6`.
+- The probe now performs metadata-only PE/metadata preflight. It records the primary SHA-256, exact shared API/Contracts identities, trusted platform references, and non-platform references; arbitrary sidecars, duplicate API/Contracts identities, detectable native imports, and module initializers are rejected before `LoadFromStream`.
+- The collectible context no longer uses `AssemblyDependencyResolver`. It shares only the exact default-context API/Contracts identities, defers trusted platform references, rejects other managed references, and rejects unmanaged resolution.
+- Contract inspection requires exactly one public, top-level, non-abstract, closed class implementing the shared `IThroneForgeMod`. Internal, nested, abstract, open-generic, duplicate, and private-duplicate-contract shapes are covered by source-only fixtures.
+- The primary file is captured once; the same captured bytes are hashed, admitted, and passed to `LoadFromStream`. The result distinguishes unload requested, unload observed, and bounded unload-not-observed states. Assembly loading remains full-trust; only explicit constructor/lifecycle invocation is absent, and module initializers are rejected for this synthetic slice.
+- Local focused validation with SDK `10.0.110`: build PASS with 0 warnings/errors; PluginLoadTest tests PASS with 27 tests. Exact SDK `10.0.100` is not installed locally, so exact local `dotnet format` remains unavailable.
+- Hosted validation for this hardening branch is pending. Do not claim Task-5 hardening complete until the new Windows/Linux run passes with SDK `10.0.100` and its TRX artifacts are independently checked.
 
 ## Next task
 
@@ -203,4 +213,4 @@ After Task 5 is reviewed and merged, the next separately approved experiment may
 
 ## Handoff
 
-After this branch is reviewed and merged, M1 Task 4 may address the plugin/runtime boundary only. Do not add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves in this branch.
+After this branch is reviewed and merged, a separately approved disposable-profile synthetic plugin experiment may be planned. It must remain outside the original Thronefall installation and must not claim plugin TFM, BepInEx runtime, lifecycle, or game-API compatibility beyond its recorded evidence. Do not add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves in this branch.

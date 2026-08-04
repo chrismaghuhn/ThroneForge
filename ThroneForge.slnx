@@ -31,4 +31,13 @@
   <Project Path="tests/ThroneForge.PluginLoadFixture/ThroneForge.PluginLoadFixture.csproj" />
   <Project Path="tests/ThroneForge.PluginLoadDuplicateFixture/ThroneForge.PluginLoadDuplicateFixture.csproj" />
   <Project Path="tests/ThroneForge.PluginLoadTest.Tests/ThroneForge.PluginLoadTest.Tests.csproj" />
+  <Project Path="tests/ThroneForge.PluginLoadHelperFixture/ThroneForge.PluginLoadHelperFixture.csproj" />
+  <Project Path="tests/ThroneForge.PluginLoadHelperDependentFixture/ThroneForge.PluginLoadHelperDependentFixture.csproj" />
+  <Project Path="tests/ThroneForge.PluginLoadNativeFixture/ThroneForge.PluginLoadNativeFixture.csproj" />
+  <Project Path="tests/ThroneForge.PluginLoadModuleInitializerFixture/ThroneForge.PluginLoadModuleInitializerFixture.csproj" />
+  <Project Path="tests/ThroneForge.PluginLoadInvalidShapesFixture/ThroneForge.PluginLoadInvalidShapesFixture.csproj" />
+  <Project Path="tests/ThroneForge.PluginLoadDuplicateApiDependency/ThroneForge.PluginLoadDuplicateApiDependency.csproj" />
+  <Project Path="tests/ThroneForge.PluginLoadDuplicateApiFixture/ThroneForge.PluginLoadDuplicateApiFixture.csproj" />
+  <Project Path="tests/ThroneForge.PluginLoadDuplicateContractsDependency/ThroneForge.PluginLoadDuplicateContractsDependency.csproj" />
+  <Project Path="tests/ThroneForge.PluginLoadDuplicateContractsFixture/ThroneForge.PluginLoadDuplicateContractsFixture.csproj" />
 </Solution>

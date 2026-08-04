@@ -1,6 +1,6 @@
 # ADR-0006: Full-trust code-mod admission boundary
 
-- Status: Accepted for M1 Task 4; M1 Task 5 synthetic load probe complete
+- Status: Accepted for M1 Task 4; M1 Task 5 synthetic load probe hardening in progress
 - Date: 2026-08-04
 
 ## Context
@@ -25,5 +25,6 @@ Task 4 defines three separate concerns:
 - The stable API and runtime remain free of game-specific dependencies and can be tested without a game installation.
 - The records are trusted runtime inputs rather than cryptographic signatures, and package integrity/approval are not an OS-level security sandbox.
 - A future loader must compare the decision binding immediately before loading, preserve the package hash and approval decision, and add separate evidence for assembly loading and game compatibility.
-- M1 Task 5 may load only a source-controlled synthetic fixture into a collectible test context, must re-run the admission gate immediately before loading, and must not invoke the fixture or access a game installation.
+- M1 Task 5 may load only a source-controlled synthetic primary fixture into a collectible test context. Metadata-only preflight permits only exact shared API/Contracts and trusted platform references, rejects arbitrary sidecars, native imports, and module initializers, and requires exactly one public top-level closed implementation. The admission gate is re-run immediately before loading the captured bytes. No plugin constructor or ThroneForge lifecycle method is explicitly invoked; assembly loading remains full-trust. The probe must not access a game installation.
+- The Task-5 primary-file hash does not establish multi-file package-closure integrity. A future multi-file package needs a separate manifest and approval design.
 - Plugin target framework remains unverified at the binary level; assembly loading, Harmony compatibility, lifecycle bindings, and game APIs remain unverified until a later bounded task and clean-profile evidence exist.

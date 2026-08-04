@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 5 repository-only synthetic plugin-load probe complete on `agent/m1-plugin-load-smoke-test`, based on merged `main@5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. No plugin was loaded in Thronefall and no game-facing behavior is claimed.
+M1 - Task 5 repository-only synthetic plugin-load probe hardening in progress on `agent/m1-plugin-load-smoke-test-hardening`, based on reviewed head `10897f7b03d45f1e470b5930a9dc1341939cde6f`. No plugin was loaded in Thronefall and no game-facing behavior is claimed.
 
 ## Milestones
 
@@ -197,7 +197,7 @@ Task-4 bounded-slice validation: final documentation head `5d7c69a66dd431da98e16
 
 ## M1 Task 5: repository-only synthetic plugin-load probe
 
-Task 4 and its evidence-binding hardening are complete and merged into `main` by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. This task is deliberately narrower than a real Thronefall plugin experiment. It adds an external probe that hashes an explicit synthetic assembly artifact, rebuilds verified integrity evidence, re-runs the Task-4 admission gate immediately before loading, and loads one test-only `IThroneForgeMod` implementation into a collectible .NET `AssemblyLoadContext` without invoking constructors or lifecycle methods.
+Task 4 and its evidence-binding hardening are complete and merged into `main` by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. This task is deliberately narrower than a real Thronefall plugin experiment. It adds an external probe that captures and hashes one explicit synthetic primary assembly, performs metadata-only single-assembly closure preflight, rebuilds verified integrity evidence, re-runs the Task-4 admission gate immediately before loading, and loads one public closed test-only `IThroneForgeMod` implementation into a collectible .NET `AssemblyLoadContext`. It explicitly invokes no plugin constructor or ThroneForge lifecycle method; assembly loading remains full-trust.
 
 - [x] Add the external `ThroneForge.PluginLoadTest` project and a source-only synthetic plugin fixture.
 - [x] Reuse the existing admission gate and bind the exact artifact hash, canonical mod identity, game fingerprint, adapter evidence, and approval before loading.
@@ -207,7 +207,19 @@ Task 4 and its evidence-binding hardening are complete and merged into `main` by
 
 Task-5 final hosted validation: run `30880625516` tested head `15127329aa0fd916438a0404ba51a8dfdfbf59eb`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 226 tests, and reported 0 failures, 0 errors, and 0 skipped tests. The first CI attempt `30880510322` exposed that fixture projects were incorrectly counted as test projects; the workflow now derives expected TRX projects from `IsTestProject=true`. No overwrite warning occurred in the final run. No private loader or game experiment was run.
 
-The detailed design is [`docs/superpowers/specs/2026-08-04-m1-plugin-load-smoke-test-design.md`](docs/superpowers/specs/2026-08-04-m1-plugin-load-smoke-test-design.md), and the execution plan is [`docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test.md`](docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test.md). The next separate experiment, if approved, must use an explicit disposable profile and remain distinct from game lifecycle/API compatibility.
+The detailed design is [`docs/superpowers/specs/2026-08-04-m1-plugin-load-smoke-test-design.md`](docs/superpowers/specs/2026-08-04-m1-plugin-load-smoke-test-design.md), and the execution plan is [`docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test.md`](docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test.md). The next separate experiment, if approved, must use an explicit disposable profile and remain distinct from game lifecycle/API compatibility. Task-5 hashes only the primary assembly; multi-file package closure integrity is not designed.
+
+### M1 Task 5 hardening: single-assembly closure and unload evidence
+
+This follow-up starts from reviewed head `10897f7b03d45f1e470b5930a9dc1341939cde6` on `agent/m1-plugin-load-smoke-test-hardening`. It remains repository-only: no private Thronefall/BepInEx experiment, plugin package, loader binary, game reference, lifecycle invocation, or game API inspection is permitted. The detailed plan is [`docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test-hardening.md`](docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test-hardening.md).
+
+- [x] Replace arbitrary sidecar resolution with metadata-only single-assembly closure validation and exact shared API/Contracts resolution.
+- [x] Reject native imports and module initializers before `LoadFromStream`; describe assembly loading as full-trust.
+- [x] Require exactly one public, top-level, non-abstract, closed `IThroneForgeMod` implementation.
+- [x] Preserve one captured byte buffer for size validation, hashing, admission, and loading.
+- [x] Require bounded collectible-context unload observation and test retained-reference failure reporting.
+- [x] Add source-only helper/native/module-initializer/invalid-shape fixtures and sanitized regression tests.
+- [ ] Update documentation only after the new branch-head hosted run is complete; keep M1 overall incomplete.
 
 ### M1 Task 4 hardening: bound trust evidence and admission artifacts
 

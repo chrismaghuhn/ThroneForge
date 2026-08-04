@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ThroneForge.PluginLoadHelperDependentFixture</AssemblyName>
+    <RootNamespace>ThroneForge.PluginLoadHelperDependentFixture</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/ThroneForge.API/ThroneForge.API.csproj" />
+    <ProjectReference Include="../ThroneForge.PluginLoadHelperFixture/ThroneForge.PluginLoadHelperFixture.csproj" />
+  </ItemGroup>
+</Project>

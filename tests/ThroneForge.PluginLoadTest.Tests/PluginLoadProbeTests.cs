@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Reflection;
+using System.Runtime.Loader;
 using ThroneForge.Contracts;
 using ThroneForge.PluginLoadTest;
 using ThroneForge.Runtime;
@@ -9,7 +11,7 @@ namespace ThroneForge.PluginLoadTest.Tests;
 public sealed class PluginLoadProbeTests
 {
     [Fact]
-    public void MatchingBoundFixtureLoadsWithoutInvokingThePlugin()
+    public void MatchingBoundFixtureLoadsWithoutExplicitlyInvokingPluginCode()
     {
         var artifactPath = typeof(ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod).Assembly.Location;
         var request = CreateRequest(artifactPath);
@@ -21,9 +23,174 @@ public sealed class PluginLoadProbeTests
         Assert.Equal(
             "ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod",
             Assert.Single(result.ImplementedContractTypes));
-        Assert.Equal(0, ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod.ConstructorCalls);
-        Assert.Equal(0, ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod.InitializeCalls);
-        Assert.Equal(0, ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod.ShutdownCalls);
+        Assert.Equal(PluginUnloadStatus.UnloadObserved, result.UnloadStatus);
+        Assert.True(result.UnloadRequested);
+        Assert.Contains("full-trust", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("without invoking plugin code", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SuccessfulResultRecordsTheSingleAssemblyClosure()
+    {
+        var artifactPath = typeof(ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod).Assembly.Location;
+
+        var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+        Assert.NotNull(result.ClosureEvidence);
+        Assert.Equal(CreateHash(artifactPath).ToLowerInvariant(), result.ClosureEvidence!.PrimaryArtifactSha256.Value);
+        Assert.Contains(result.ClosureEvidence.SharedAssemblyIdentities, identity => identity.StartsWith("ThroneForge.API,", StringComparison.Ordinal));
+        Assert.Contains(result.ClosureEvidence.SharedAssemblyIdentities, identity => identity.StartsWith("ThroneForge.Contracts,", StringComparison.Ordinal));
+        Assert.Empty(result.ClosureEvidence.NonPlatformAssemblyReferences);
+        Assert.False(result.ClosureEvidence.NativeDependenciesDetected);
+    }
+
+    [Fact]
+    public void HelperDependentArtifactIsRejectedBeforeAssemblyLoad()
+    {
+        var artifactPath = FixturePath("ThroneForge.PluginLoadHelperDependentFixture");
+
+        var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+        Assert.Equal(PluginLoadStatus.Rejected, result.Status);
+        Assert.Equal(PluginLoadReasonCodes.ManagedDependencyNotAllowed, result.ReasonCode);
+        Assert.Null(result.AssemblyName);
+        Assert.DoesNotContain(artifactPath, result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NativeDependencyIsRejectedDuringMetadataPreflight()
+    {
+        var artifactPath = FixturePath("ThroneForge.PluginLoadNativeFixture");
+
+        var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+        Assert.Equal(PluginLoadStatus.Rejected, result.Status);
+        Assert.Equal(PluginLoadReasonCodes.NativeDependencyNotAllowed, result.ReasonCode);
+        Assert.Null(result.AssemblyName);
+    }
+
+    [Fact]
+    public void ModuleInitializerIsRejectedBeforeLoad()
+    {
+        var artifactPath = FixturePath("ThroneForge.PluginLoadModuleInitializerFixture");
+
+        var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+        Assert.Equal(PluginLoadStatus.Rejected, result.Status);
+        Assert.Equal(PluginLoadReasonCodes.ModuleInitializerNotAllowed, result.ReasonCode);
+        Assert.Null(result.AssemblyName);
+        Assert.DoesNotContain(artifactPath, result.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InvalidContractShapesAreRejectedWithStableIssues()
+    {
+        var artifactPath = FixturePath("ThroneForge.PluginLoadInvalidShapesFixture");
+
+        var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+        Assert.Equal(PluginLoadStatus.Failed, result.Status);
+        Assert.Equal(PluginLoadReasonCodes.ContractInvalid, result.ReasonCode);
+        Assert.Contains(PluginContractIssueCodes.Internal, result.ContractIssues);
+        Assert.Contains(PluginContractIssueCodes.Nested, result.ContractIssues);
+        Assert.Contains(PluginContractIssueCodes.Abstract, result.ContractIssues);
+        Assert.Contains(PluginContractIssueCodes.OpenGeneric, result.ContractIssues);
+        Assert.Equal(PluginUnloadStatus.UnloadObserved, result.UnloadStatus);
+    }
+
+    [Fact]
+    public void InternalContractImplementationIsRejected()
+    {
+        var result = PluginLoadProbe.Load(CreateRequest(FixturePath("ThroneForge.PluginLoadInvalidShapesFixture")));
+
+        Assert.Equal(PluginLoadReasonCodes.ContractInvalid, result.ReasonCode);
+        Assert.Contains(PluginContractIssueCodes.Internal, result.ContractIssues);
+    }
+
+    [Fact]
+    public void NestedContractImplementationIsRejected()
+    {
+        var result = PluginLoadProbe.Load(CreateRequest(FixturePath("ThroneForge.PluginLoadInvalidShapesFixture")));
+
+        Assert.Equal(PluginLoadReasonCodes.ContractInvalid, result.ReasonCode);
+        Assert.Contains(PluginContractIssueCodes.Nested, result.ContractIssues);
+    }
+
+    [Fact]
+    public void AbstractAndOpenGenericContractImplementationsAreRejected()
+    {
+        var result = PluginLoadProbe.Load(CreateRequest(FixturePath("ThroneForge.PluginLoadInvalidShapesFixture")));
+
+        Assert.Equal(PluginLoadReasonCodes.ContractInvalid, result.ReasonCode);
+        Assert.Contains(PluginContractIssueCodes.Abstract, result.ContractIssues);
+        Assert.Contains(PluginContractIssueCodes.OpenGeneric, result.ContractIssues);
+    }
+
+    [Fact]
+    public void DuplicateApiIdentityIsRejectedBeforeLoad()
+    {
+        var artifactPath = FixturePath("ThroneForge.PluginLoadDuplicateApiFixture");
+
+        var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+        Assert.Equal(PluginLoadStatus.Rejected, result.Status);
+        Assert.Equal(PluginLoadReasonCodes.ManagedDependencyNotAllowed, result.ReasonCode);
+        Assert.Null(result.AssemblyName);
+    }
+
+    [Fact]
+    public void DuplicateContractsIdentityIsRejectedBeforeLoad()
+    {
+        var artifactPath = FixturePath("ThroneForge.PluginLoadDuplicateContractsFixture");
+
+        var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+        Assert.Equal(PluginLoadStatus.Rejected, result.Status);
+        Assert.Equal(PluginLoadReasonCodes.ManagedDependencyNotAllowed, result.ReasonCode);
+        Assert.Null(result.AssemblyName);
+    }
+
+    [Fact]
+    public void CapturedBytesRemainTheLoadInputAfterTheDiskFileChanges()
+    {
+        var sourcePath = typeof(ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod).Assembly.Location;
+        var tempPath = Path.Combine(Path.GetTempPath(), $"throneforge-captured-{Guid.NewGuid():N}.dll");
+        File.Copy(sourcePath, tempPath);
+
+        try
+        {
+            var capture = PluginLoadProbe.CaptureArtifact(tempPath);
+            File.WriteAllBytes(tempPath, new byte[] { 0x4D, 0x5A, 0x00, 0x01 });
+
+            var result = PluginLoadProbe.Load(CreateRequest(tempPath, packageHashOverride: capture.Sha256.Value), capture);
+
+            Assert.Equal(PluginLoadStatus.Loaded, result.Status);
+            Assert.Equal(PluginUnloadStatus.UnloadObserved, result.UnloadStatus);
+        }
+        finally
+        {
+            File.Delete(tempPath);
+        }
+    }
+
+    [Fact]
+    public void RetainedAssemblyReferenceReportsBoundedUnloadFailure()
+    {
+        var artifactPath = typeof(ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod).Assembly.Location;
+        var retained = RetainedAssembly.Load(File.ReadAllBytes(artifactPath));
+
+        try
+        {
+            Assert.Equal(
+                PluginUnloadStatus.UnloadNotObservedWithinBound,
+                PluginLoadProbe.ObserveUnload(retained.ContextReference));
+        }
+        finally
+        {
+            retained.Release();
+        }
+
+        Assert.Equal(PluginUnloadStatus.UnloadObserved, PluginLoadProbe.ObserveUnload(retained.ContextReference));
     }
 
     [Fact]
@@ -123,6 +290,25 @@ public sealed class PluginLoadProbeTests
     }
 
     [Fact]
+    public void UnknownCompatibilityIsRejectedBeforeLoading()
+    {
+        var artifactPath = typeof(ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod).Assembly.Location;
+        var request = CreateRequest(
+            artifactPath,
+            compatibility: new AdapterCompatibilityEvidence(
+                CreateFingerprint(),
+                "thronefall.adapter",
+                "1.0.0",
+                (AdapterCompatibility)int.MaxValue));
+
+        var result = PluginLoadProbe.Load(request);
+
+        Assert.Equal(PluginLoadStatus.Rejected, result.Status);
+        Assert.Equal(CodeModAdmissionReasonCodes.CompatibilityUnsupported, result.ReasonCode);
+        Assert.Null(result.AssemblyName);
+    }
+
+    [Fact]
     public void DeniedApprovalIsRejectedBeforeLoading()
     {
         var artifactPath = typeof(ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod).Assembly.Location;
@@ -144,7 +330,7 @@ public sealed class PluginLoadProbeTests
     [Fact]
     public void ArtifactWithoutContractIsRejectedAfterAdmission()
     {
-        var artifactPath = typeof(PluginLoadProbe).Assembly.Location;
+        var artifactPath = typeof(ThroneForge.API.IThroneForgeMod).Assembly.Location;
         var request = CreateRequest(artifactPath);
 
         var result = PluginLoadProbe.Load(request);
@@ -232,6 +418,54 @@ public sealed class PluginLoadProbeTests
         Assert.DoesNotContain(artifactPath, result.ReasonCode, StringComparison.Ordinal);
         Assert.DoesNotContain(artifactPath, result.AssemblyName ?? string.Empty, StringComparison.Ordinal);
         Assert.DoesNotContain(artifactPath, string.Join("\n", result.ImplementedContractTypes), StringComparison.Ordinal);
+    }
+
+    private static string FixturePath(string projectName)
+    {
+        var fileName = projectName is "ThroneForge.PluginLoadDuplicateApiDependency"
+            ? "ThroneForge.API.dll"
+            : projectName is "ThroneForge.PluginLoadDuplicateContractsDependency"
+                ? "ThroneForge.Contracts.dll"
+                : $"{projectName}.dll";
+        var repositoryRoot = FindRepositoryRoot();
+        var path = Path.Combine(repositoryRoot, "artifacts", "bin", projectName, "Release", "net10.0", fileName);
+        Assert.True(File.Exists(path), $"Expected source-only fixture output was not built: {projectName}.");
+        return path;
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "AGENTS.md")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? throw new DirectoryNotFoundException("Could not find the repository root.");
+    }
+
+    private sealed class RetainedAssembly
+    {
+        private Assembly? _assembly;
+
+        private RetainedAssembly(AssemblyLoadContext context, Assembly assembly)
+        {
+            _assembly = assembly;
+            ContextReference = new WeakReference(context);
+            context.Unload();
+        }
+
+        public WeakReference ContextReference { get; }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        public static RetainedAssembly Load(byte[] bytes)
+        {
+            var context = new AssemblyLoadContext("retained-plugin-context", isCollectible: true);
+            var assembly = context.LoadFromStream(new MemoryStream(bytes, writable: false));
+            return new RetainedAssembly(context, assembly);
+        }
+
+        public void Release() => _assembly = null;
     }
 
     [Fact]

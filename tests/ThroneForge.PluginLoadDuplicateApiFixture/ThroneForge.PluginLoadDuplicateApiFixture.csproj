@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ThroneForge.PluginLoadDuplicateApiFixture</AssemblyName>
+    <RootNamespace>ThroneForge.PluginLoadDuplicateApiFixture</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ThroneForge.PluginLoadDuplicateApiDependency/ThroneForge.PluginLoadDuplicateApiDependency.csproj" />
+  </ItemGroup>
+</Project>
