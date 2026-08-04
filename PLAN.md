@@ -178,9 +178,9 @@ The review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`, wh
 - [x] Ensure failed or rolled-back transaction states cannot be used as proof of installation and cannot produce a false-positive staged verification.
 - [x] Correct staged launch failure state persistence and the remaining no-transaction report wording.
 - [x] Add regression coverage for empty/stale/mismatched transaction state, applied-profile drift, unsafe persisted paths, and bootstrap evidence requirements.
-- [ ] Run and independently inspect the final hosted Windows/Linux matrix before requesting merge; do not rerun the private experiment.
+- [x] Run and independently inspect the final hosted Windows/Linux matrix before requesting merge; do not rerun the private experiment.
 
-This correction continues from reviewed head `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Its pre-fix hosted validation was run `30864571605` with 11 TRX files and 154 tests per runner. M1 Task 4 remains unstarted.
+This correction continues from reviewed head `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Implementation commit `08940f274d00d6c681c08d36364deedb04474a3d` passed hosted run `30866207996` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 11 TRX files representing 165 tests with 0 failures, errors, and skips, and no overwrite warning occurred. M1 Task 4 remains unstarted.
 
 ## M1 discovery task 2 hardening (completed and merged)
 

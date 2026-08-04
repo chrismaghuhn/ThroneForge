@@ -2,13 +2,13 @@
 
 ## Current milestone
 
-M1 - Task 3 final transaction-state correction in progress on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
+M1 - Task 3 final transaction-state correction complete on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
 
 ## State
 
 M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has a credible historical private bootstrap result, but this branch is hardening the reusable harness before merge. M1 overall remains incomplete.
 
-The current final correction started from `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Its pre-fix hosted run was `30864571605`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 154 tests, and had 0 failures, errors, or skips. Final hosted validation for the versioned transaction-state, persisted-path, applied-profile, staged-Verify, and report-wording corrections is pending and will be recorded only after the new branch head completes CI.
+The current final correction started from `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Its pre-fix hosted run was `30864571605`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 154 tests, and had 0 failures, errors, or skips. Final hosted validation for the versioned transaction-state, persisted-path, applied-profile, staged-Verify, and report-wording corrections passed in run `30866207996` and is recorded below.
 
 ## Completed
 
@@ -160,9 +160,9 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 
 ## Next task
 
-### M1 Task 3 hardening current state
+### M1 Task 3 earlier hardening evidence
 
-- Branch: `agent/m1-loader-smoke-test-hardening`, based on pre-hardening head `697419a2adba75933f02b4009a16cddf3ff4b0b6`.
+- Earlier hardening baseline: branch `agent/m1-loader-smoke-test-hardening`, based on pre-hardening head `697419a2adba75933f02b4009a16cddf3ff4b0b6`.
 - Historical private bootstrap result: `Passed` for the documented fingerprint, with BepInEx `5.4.23.5` preloader/chainloader evidence and zero custom plugins. The historical run retained compatibility-fingerprint and loader-indicator post-checks, but did not retain complete original/disposable manifests; the report now says so explicitly.
 - Harness hardening now requires complete original and disposable manifest equality, fresh-copy or manifest-backed resume validation, real post-runtime/readiness checks, guarded post-apply rollback, manual-closure recovery state, and a repository-derived committed report path.
 - Local hardening validation with the installed parent-directory SDK `10.0.110`: locked restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 146 tests (including 47 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and Contracts tests PASS with 1 test. The repository-pinned `dotnet format` command remains locally blocked because SDK `10.0.100` is not installed; hosted CI is required for exact-toolchain format verification.
@@ -175,9 +175,10 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - The persisted loader state is now schema- and task-versioned, atomically written, and bound to the expected fingerprint, baseline manifest identity, exact archive name, and observed archive SHA-256.
 - `Applied` and `LaunchObserved` are accepted only after full applied-profile verification. `FailedAndRolledBack` and empty/stale/mismatched states cannot be used by staged `Launch` or `Verify`.
 - Every persisted destination and backup path is revalidated for normalized containment before staged operations and rollback. Staged `Verify` requires recorded BepInEx 5.4.23.5, preloader, chainloader, zero custom plugins, and zero fatal loader errors.
-- Local synthetic validation of the correction passed with SDK `10.0.110` from the parent directory: Release build PASS with 0 warnings/errors; focused LoaderSmokeTest tests PASS with 66 tests. Full-solution and hosted final validation are pending.
+- Local synthetic validation of the correction passed with SDK `10.0.110` from the parent directory: locked restore PASS, Release build PASS with 0 warnings/errors, full-solution tests PASS with 165 tests (66 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and focused LoaderSmokeTest tests PASS with 66 tests. Local format verification remains blocked because SDK `10.0.100` is not installed; hosted exact-SDK formatting passed.
+- Final hosted validation for implementation commit `08940f274d00d6c681c08d36364deedb04474a3d` passed in run [30866207996](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30866207996): Windows and Ubuntu each used SDK `10.0.100`, uploaded 11 TRX files representing 165 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were downloaded and independently parsed; no `Overwriting results file` warning occurred.
 - The private loader experiment was not rerun. No loader/game binary, archive, raw log, transaction state, recovery marker, private path, or other prohibited artifact was committed.
 
-## Next task
+## Handoff
 
 After this branch is reviewed and merged, M1 Task 4 may address the plugin/runtime boundary only. Do not add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves in this branch.

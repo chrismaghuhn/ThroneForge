@@ -249,6 +249,6 @@ Confirm no loader/game binary, archive, raw log, proprietary file, private absol
 - [x] Reject empty, stale, failed-and-rolled-back, fingerprint-mismatched, baseline-mismatched, and drifted transaction state.
 - [x] Derive no-transaction report wording from the actual post-verification state.
 - [x] Run synthetic local checks without rerunning the private loader experiment.
-- [ ] Run and inspect the final hosted Windows/Linux checks before merge.
+- [x] Run and inspect the final hosted Windows/Linux checks before merge.
 
-The correction continues from reviewed head `c98c35bd333f5a82dd008ede7f02ae9217c4140d`; pre-fix hosted run `30864571605` recorded 11 TRX files and 154 tests per runner. M1 Task 4 remains unstarted.
+The correction continues from reviewed head `c98c35bd333f5a82dd008ede7f02ae9217c4140d`; implementation commit `08940f274d00d6c681c08d36364deedb04474a3d` passed hosted run `30866207996` with SDK `10.0.100`, 11 TRX files, and 165 tests per runner. M1 Task 4 remains unstarted.

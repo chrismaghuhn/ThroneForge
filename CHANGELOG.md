@@ -4,7 +4,7 @@ All notable ThroneForge changes are documented here.
 
 ## Unreleased
 
-- Implemented the final Task 3 transaction-state correction: atomic versioned loader state, persisted-entry and backup containment validation, complete applied-profile verification, staged `Verify` bootstrap-evidence requirements, fail-closed stale/failed transaction handling, and consistent no-transaction report wording. Hosted validation is pending for this branch head; the private loader experiment was not rerun.
+- Implemented the final Task 3 transaction-state correction: atomic versioned loader state, persisted-entry and backup containment validation, complete applied-profile verification, staged `Verify` bootstrap-evidence requirements, fail-closed stale/failed transaction handling, and consistent no-transaction report wording. Hosted run `30866207996` validated the implementation on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, and 165 tests per runner; the private loader experiment was not rerun.
 - Added the final Task 3 hardening review corrections: evidence-derived original post-check claims, saved-baseline requirements for all staged modes, and explicit recovery-marker persistence status in reports and CLI output. Hosted run `30864308531` validated the implementation on Windows and Ubuntu with 11 TRX files and 154 tests per runner; the private loader experiment was not rerun.
 - Fixed CI test-result preservation so every test project gets its own TRX artifact and the workflow verifies aggregate completeness before upload.
 - Completed and hardened M1 discovery task 1 with a local-only, metadata-based Thronefall installation inspector, protected output boundaries, deterministic executable selection, and a sanitized fingerprint report; hosted verification passed on Windows and Ubuntu.
@@ -23,5 +23,5 @@ All notable ThroneForge changes are documented here.
 
 ### Not yet implemented
 
-- The final Task 3 transaction-state correction still requires hosted Windows/Linux validation and review before merge.
+- The final Task 3 transaction-state correction has passed hosted Windows/Linux validation and is ready for review/PR merge. M1 Task 4 remains unstarted.
 - Runtime integration, loaders, game API bindings, and custom-wave support remain unimplemented.
