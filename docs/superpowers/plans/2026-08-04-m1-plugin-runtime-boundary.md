@@ -90,6 +90,28 @@
 - [ ] Confirm no tracked game/loader binaries, private paths, downloaded archives, raw logs, or new forbidden dependency declarations exist.
 - [ ] Record exact local results and leave M1 incomplete with the next task limited to the next evidence-backed runtime boundary investigation; do not claim a functioning plugin.
 
+## Task-4 hardening: bind trust evidence to the exact artifact and game build
+
+This follow-up starts from reviewed head `18f7b1135b6aaba04290198f355e6e9ac6a97b5d` on `agent/m1-plugin-runtime-boundary-hardening`. It closes the review findings in the portable boundary without loading a plugin or adding loader/game dependencies.
+
+### Hardening steps
+
+- [ ] Rewrite contract tests first for canonical mod identity/version rules, structured integrity evidence, structured approval, fingerprint-bound adapter evidence, decision bindings, and deterministic binding digests.
+- [ ] Implement a shared SHA-256 value type and canonical encoding rules; keep records immutable and free of paths, streams, assemblies, executable objects, and personal data.
+- [ ] Redesign `CodeModActivationRequest` to carry descriptor, game fingerprint, integrity evidence, optional approval, and compatibility evidence instead of independent booleans/enums.
+- [ ] Implement deterministic gate precedence: malformed request; descriptor/hash mismatch; missing or failed integrity; missing/unsupported compatibility; fingerprint mismatch; denied/mismatched approval; missing approval; approved.
+- [ ] Include the exact artifact/game/adapter binding and digest in decisions wherever sufficient evidence exists; centralize stable reason codes.
+- [ ] Update ADR-0005, ADR-0006, `PLAN.md`, `STATUS.md`, `README.md`, and `CHANGELOG.md` to state that the records are trusted runtime inputs, not signatures or an OS sandbox, and that binary plugin-TFM compatibility remains unverified.
+- [ ] Run the repository validation, tracked-file hygiene checks, hosted Windows/Linux matrix, and TRX artifact inspection. Do not begin plugin loading or lifecycle integration.
+
+### Hardening acceptance
+
+- [ ] Canonically equivalent IDs compare equal and unsafe identities/versions fail construction.
+- [ ] Integrity, approval, compatibility, request, and decision records reject or fail closed on every cross-record mismatch.
+- [ ] Binding digest changes when identity, package hash, game fingerprint, adapter ID, or adapter version changes and remains deterministic otherwise.
+- [ ] Unknown compatibility values and warnings never reach `Approved`; missing approval returns `RequiresExplicitApproval`, while denied or stale approval returns `Rejected`.
+- [ ] Hosted exact-SDK validation passes with no forbidden dependencies, no plugin load, and no proprietary or private-path artifacts.
+
 ## Self-review against the specification
 
 - Section 5.6 is preserved: the repository will not claim to sandbox arbitrary .NET code.

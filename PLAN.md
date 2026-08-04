@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 4 bounded plugin/runtime boundary slice complete on `agent/m1-plugin-runtime-boundary`, based on merged `main@06554d845a9fe46132c1a19ec0c2f18b8722acf2`. No plugin is loaded and no game-facing behavior is claimed.
+M1 - Task 4 evidence-backed plugin/runtime boundary hardening in progress on `agent/m1-plugin-runtime-boundary-hardening`, based on reviewed head `18f7b1135b6aaba04290198f355e6e9ac6a97b5d`. No plugin is loaded and no game-facing behavior is claimed.
 
 ## Milestones
 
@@ -194,6 +194,19 @@ Task 3 is merged into `main` by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722ac
 - [x] Run exact local/hosted validation and update `STATUS.md`; keep M1 incomplete and defer actual plugin/runtime integration.
 
 Task-4 bounded-slice validation: final documentation head `5d7c69a66dd431da98e16e6d2e9ea154728d8387` passed hosted run `30868670093` on Windows and Ubuntu with SDK `10.0.100`. Each runner uploaded 11 TRX files representing 175 tests with 0 failures, errors, or skips; no TRX overwrite warning occurred. The implementation head `c680083` had the same green result in run `30868441588`. Local SDK `10.0.110` also passed locked restore, Release build with 0 warnings/errors, and all 175 tests; exact local formatting remained unavailable because SDK `10.0.100` is not installed. M1 remains incomplete: no plugin assembly has been loaded, and plugin TFM, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, and custom waves remain unverified.
+
+### M1 Task 4 hardening: bound trust evidence and admission artifacts
+
+This follow-up starts from reviewed head `18f7b1135b6aaba04290198f355e6e9ac6a97b5d` on `agent/m1-plugin-runtime-boundary-hardening`. It remains a data-only boundary task: no plugin is loaded, no assembly is inspected, and no loader or game dependency is introduced.
+
+- [x] Add canonical, bounded mod identity and version value rules; reject control characters, whitespace, path/device syntax, empty ID components, and invalid version text.
+- [x] Replace integrity and approval booleans with immutable records bound to the canonical mod identity, exact package SHA-256, and exact game fingerprint.
+- [x] Replace naked adapter compatibility with canonical, fingerprint-bound compatibility evidence and fail closed for missing, warning, conflicting, or unknown states.
+- [x] Add an immutable admission binding and deterministic UTF-8/SHA-256 binding digest to every decision with sufficient evidence.
+- [x] Enforce deterministic fail-closed gate precedence and stable reason-code constants without assembly loading, reflection, process launch, or game access.
+- [x] Add regression tests for identity canonicalization, cross-record mismatches, digest changes, unknown states, path-free records, and existing architecture boundaries.
+- [x] Update ADR-0005, ADR-0006, README, STATUS, CHANGELOG, and the detailed Task-4 plan to describe evidence binding as trusted input rather than a cryptographic signature or OS sandbox.
+- [ ] Run local validation and exact-SDK hosted Windows/Linux validation; inspect every TRX artifact before requesting merge. M1 remains incomplete.
 
 ## M1 discovery task 2 hardening (completed and merged)
 
