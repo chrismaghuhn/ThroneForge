@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 3 loader bootstrap smoke-test hardening complete on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
+M1 - Task 4 plugin/runtime boundary design in progress on `agent/m1-plugin-runtime-boundary`, based on merged `main@06554d845a9fe46132c1a19ec0c2f18b8722acf2`. No plugin is loaded and no game-facing behavior is claimed.
 
 ## Milestones
 
@@ -181,6 +181,17 @@ The review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`, wh
 - [x] Run and independently inspect the final hosted Windows/Linux matrix before requesting merge; do not rerun the private experiment.
 
 This correction continues from reviewed head `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Implementation commit `08940f274d00d6c681c08d36364deedb04474a3d` passed hosted run `30866207996` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 11 TRX files representing 165 tests with 0 failures, errors, and skips, and no overwrite warning occurred. M1 Task 4 remains unstarted.
+
+## M1 Task 4: evidence-backed plugin/runtime boundary
+
+Task 3 is merged into `main` by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`. This task is limited to a portable full-trust code-mod boundary and a deterministic pre-load admission gate. It does not load an assembly, select a plugin TFM, add BepInEx/Harmony/Unity references, inspect game methods, implement lifecycle bindings, export a catalog, or implement custom waves. The detailed execution plan is [`docs/superpowers/plans/2026-08-04-m1-plugin-runtime-boundary.md`](docs/superpowers/plans/2026-08-04-m1-plugin-runtime-boundary.md).
+
+- [x] Record the explicit trust and activation-boundary ADR.
+- [x] Add immutable portable code-mod identity, integrity, and approval request contracts.
+- [x] Add the public lifecycle contract without invented event payloads or game types.
+- [x] Add a runtime admission gate that requires verified package integrity, supported adapter compatibility, and explicit user approval; do not load or invoke code.
+- [x] Add regression and architecture tests for the boundary and forbidden dependencies.
+- [ ] Run exact local/hosted validation and update `STATUS.md`; keep M1 incomplete and defer actual plugin/runtime integration.
 
 ## M1 discovery task 2 hardening (completed and merged)
 
