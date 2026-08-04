@@ -52,7 +52,10 @@ jobs:
         run: |
           $resultDirectory = "artifacts/test-results/${{ matrix.runner_os }}"
           $expectedProjects = @(
-              Get-ChildItem "tests" -Recurse -Filter "*.csproj" -File
+              Get-ChildItem "tests" -Recurse -Filter "*.csproj" -File | Where-Object {
+                  $project = [xml](Get-Content -LiteralPath $_.FullName -Raw)
+                  @($project.Project.PropertyGroup.IsTestProject) -contains "true"
+              }
           )
           $trxFiles = @(
               Get-ChildItem $resultDirectory -Recurse -Filter "*.trx" -File
