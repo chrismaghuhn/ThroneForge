@@ -38,6 +38,34 @@ public enum SmokeTestRollbackState
     ManualClosureRequired
 }
 
+public enum OriginalInstallationVerificationState
+{
+    PreflightPassedPostCheckPending,
+    CompletePostCheckPassed,
+    CompletePostCheckFailed,
+    ManualClosureDeferred
+}
+
+public sealed record OriginalInstallationVerificationEvidence(
+    OriginalInstallationVerificationState State,
+    IReadOnlyList<string> FailedCategories)
+{
+    public string ToReportText()
+        => State switch
+        {
+            OriginalInstallationVerificationState.PreflightPassedPostCheckPending
+                => "Preflight passed; complete original post-verification is pending.",
+            OriginalInstallationVerificationState.CompletePostCheckPassed
+                => "Preflight and complete original post-verification passed; all required compatibility and integrity checks matched.",
+            OriginalInstallationVerificationState.CompletePostCheckFailed
+                => "Preflight passed; complete original post-verification failed: "
+                    + (FailedCategories.Count == 0 ? "unspecified check." : string.Join(", ", FailedCategories) + "."),
+            OriginalInstallationVerificationState.ManualClosureDeferred
+                => "Preflight passed; complete original post-verification was deferred because manual closure is required.",
+            _ => "Original installation post-verification state is unknown."
+        };
+}
+
 public enum TransactionChangeKind
 {
     NewFile,
@@ -161,7 +189,9 @@ public sealed record SmokeTestPostApplyResult(
     LoaderLogSummary? LogSummary,
     string FailureCategory,
     Exception? OperationException = null,
-    Exception? RollbackException = null);
+    Exception? RollbackException = null,
+    bool RecoveryMarkerPersisted = false,
+    string? RecoveryMarkerFailureCategory = null);
 
 public sealed record SmokeTestExecutionHooks(
     Func<SmokeTestRoots, string, LaunchObservationResult>? Launch = null,

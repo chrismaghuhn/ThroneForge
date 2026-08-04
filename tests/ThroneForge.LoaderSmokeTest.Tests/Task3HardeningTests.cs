@@ -7,6 +7,111 @@ namespace ThroneForge.LoaderSmokeTest.Tests;
 public sealed class Task3HardeningTests
 {
     [Fact]
+    public void OriginalVerificationEvidenceDistinguishesPendingPassedFailedAndDeferredStates()
+    {
+        var pending = new OriginalInstallationVerificationEvidence(
+            OriginalInstallationVerificationState.PreflightPassedPostCheckPending,
+            []);
+        var passed = new OriginalInstallationVerificationEvidence(
+            OriginalInstallationVerificationState.CompletePostCheckPassed,
+            []);
+        var failed = new OriginalInstallationVerificationEvidence(
+            OriginalInstallationVerificationState.CompletePostCheckFailed,
+            ["complete manifest", "readiness"]);
+        var deferred = new OriginalInstallationVerificationEvidence(
+            OriginalInstallationVerificationState.ManualClosureDeferred,
+            []);
+
+        Assert.Contains("pending", pending.ToReportText(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("matched before and after", pending.ToReportText(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("passed", passed.ToReportText(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("complete manifest", failed.ToReportText(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("readiness", failed.ToReportText(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("deferred", deferred.ToReportText(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("matched before and after", deferred.ToReportText(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void SavedBaselineValidationDoesNotCreateOrRewriteABaseline()
+    {
+        using var fixture = new SmokeTestFixture();
+        var baselinePath = Path.Combine(fixture.Root, "missing-baseline.json");
+        var manifest = new CopyManifest([new FileManifestEntry("game.txt", 4, "hash")], []);
+
+        Assert.Throws<SmokeTestException>(() => DisposableProfileBaselineService.LoadAndValidateSavedBaseline(
+            baselinePath,
+            new string('a', 64),
+            manifest));
+        Assert.False(File.Exists(baselinePath));
+    }
+
+    [Fact]
+    public void EveryStagedModeUsesTheExistingBaselineGate()
+    {
+        using var fixture = new SmokeTestFixture();
+        var baselinePath = Path.Combine(fixture.Root, "missing-baseline.json");
+        var manifest = new CopyManifest([new FileManifestEntry("game.txt", 4, "hash")], []);
+
+        foreach (var mode in new[]
+        {
+            SmokeTestMode.Baseline,
+            SmokeTestMode.Install,
+            SmokeTestMode.Launch,
+            SmokeTestMode.Verify,
+            SmokeTestMode.Rollback
+        })
+        {
+            var exception = Assert.Throws<SmokeTestException>(() =>
+                DisposableProfileBaselineService.RequireExistingBaseline(
+                    baselinePath,
+                    new string('a', 64),
+                    manifest,
+                    mode));
+
+            Assert.Contains("baseline", exception.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void InstalledProfileValidationRequiresAnExistingTransactionState()
+    {
+        using var fixture = new SmokeTestFixture();
+        var baselinePath = Path.Combine(fixture.Root, "missing-baseline.json");
+        var manifest = new CopyManifest([new FileManifestEntry("game.txt", 4, "hash")], []);
+
+        Assert.Throws<SmokeTestException>(() => DisposableProfileBaselineService.LoadAndValidateInstalledProfile(
+            baselinePath,
+            new string('a', 64),
+            manifest));
+    }
+
+    [Fact]
+    public void ValidSavedBaselineCanBeValidatedForAnInstalledStagedModeWithoutRewritingIt()
+    {
+        using var fixture = new SmokeTestFixture();
+        var manifest = new CopyManifest([new FileManifestEntry("game.txt", 4, "hash")], []);
+        var baselinePath = Path.Combine(fixture.Root, "baseline.json");
+        DisposableProfileBaselineService.Save(
+            baselinePath,
+            new DisposableProfileBaseline(
+                DisposableProfileBaselineService.SchemaVersion,
+                DisposableProfileBaselineService.TaskVersion,
+                new string('a', 64),
+                manifest,
+                manifest));
+        var before = File.ReadAllText(baselinePath);
+
+        var result = DisposableProfileBaselineService.RequireExistingBaseline(
+            baselinePath,
+            new string('a', 64),
+            manifest,
+            SmokeTestMode.Launch);
+
+        Assert.True(InstallationCopyService.CompareManifests(manifest, result.DisposableManifest).Matches);
+        Assert.Equal(before, File.ReadAllText(baselinePath));
+    }
+
+    [Fact]
     public void CompleteManifestComparisonReportsAddedRemovedAndChangedFiles()
     {
         var expected = new CopyManifest(
@@ -246,6 +351,85 @@ public sealed class Task3HardeningTests
         Assert.Equal(SmokeTestRollbackState.ManualClosureRequired, result.RollbackState);
         Assert.Equal(1, markerCalls);
         Assert.Equal(0, rollbackCalls);
+        Assert.True(result.RecoveryMarkerPersisted);
+        Assert.Null(result.RecoveryMarkerFailureCategory);
+    }
+
+    [Fact]
+    public void ManualClosureReportsMarkerUnavailableWithoutRollingBack()
+    {
+        var rollbackCalls = 0;
+        var result = SmokeTestPostApplyGuard.Execute(
+            launch: () => SuccessfulLaunch() with { RequiresManualClosure = true, Exited = false },
+            readLog: () => "never",
+            parseLog: _ => throw new InvalidOperationException(),
+            classify: _ => SmokeTestOutcome.Passed,
+            rollback: () =>
+            {
+                rollbackCalls++;
+                return true;
+            },
+            writeRecoveryMarker: () => throw new IOException("synthetic marker failure"));
+
+        Assert.Equal(SmokeTestOutcome.Inconclusive, result.Outcome);
+        Assert.Equal(SmokeTestRollbackState.ManualClosureRequired, result.RollbackState);
+        Assert.False(result.RecoveryMarkerPersisted);
+        Assert.Equal("marker-write-failed", result.RecoveryMarkerFailureCategory);
+        Assert.Equal(0, rollbackCalls);
+    }
+
+    [Fact]
+    public void MarkerUnavailableIsExplicitInTheRecoveryReportText()
+    {
+        var report = SmokeTestReportWriter.BuildReport(new SmokeTestDetailedReport(
+            "a".PadLeft(64, 'a'),
+            DisposableProfileBaselineService.TaskVersion,
+            DateTimeOffset.UtcNow,
+            SmokeTestOutcome.Inconclusive,
+            "Preflight passed; complete original post-verification is pending.",
+            "synthetic copy",
+            "synthetic baseline",
+            "synthetic release",
+            "archive.zip",
+            "unknown",
+            "unknown",
+            "unknown",
+            "unknown",
+            "synthetic extraction",
+            "synthetic transaction",
+            "Manual closure is required.",
+            "synthetic loader evidence",
+            new LoaderLogSummary(null, false, false, false, 0, 0, 0, 0, [], false),
+            "Rollback deferred.",
+            "Preflight passed; complete original post-verification is pending.",
+            [],
+            [],
+            "synthetic uncertainty",
+            "synthetic next task",
+            RecoveryOrRollbackState: "ManualClosureRequired — marker unavailable (marker-write-failed). Use the explicit redacted Rollback command."));
+
+        Assert.Contains("marker unavailable", report, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("matched before and after", report, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CliRecoveryStatusExplicitlyReportsAnUnavailableMarker()
+    {
+        var result = new SmokeTestExecutionResult(
+            SmokeTestOutcome.Inconclusive,
+            "manual closure",
+            null,
+            new string('a', 64),
+            null,
+            false,
+            false,
+            false,
+            "marker-write-failed");
+
+        var status = LoaderSmokeTestCli.FormatRecoveryMarkerStatus(result);
+
+        Assert.Contains("marker unavailable", status, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("marker-write-failed", status, StringComparison.Ordinal);
     }
 
     [Fact]

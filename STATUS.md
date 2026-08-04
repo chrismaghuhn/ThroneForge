@@ -2,11 +2,13 @@
 
 ## Current milestone
 
-M1 - Task 3 loader bootstrap smoke-test hardening in progress on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
+M1 - Task 3 loader bootstrap smoke-test hardening review follow-up in progress on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
 
 ## State
 
 M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has a credible historical private bootstrap result, but this branch is hardening the reusable harness before merge. M1 overall remains incomplete.
+
+The current review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`. Its pre-fix hosted run was `30860548085`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 146 tests, and had 0 failures, errors, or skips. New hosted validation is pending after the evidence-derived report, staged-baseline, and recovery-marker corrections.
 
 ## Completed
 
@@ -147,6 +149,13 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
   - `ubuntu-latest`: PASS; SDK `10.0.100`; 11 TRX files, 130 tests, 0 failures, 0 errors, 0 skipped.
   - Both artifacts were downloaded and independently parsed. No `Overwriting results file` warning appeared in either hosted log.
 - The focused Loader-Smoke-Test suite represented 31 tests in the final hosted total. No hosted job ran the real game or loader experiment.
+
+### M1 task 3 review follow-up status
+
+- Original-installation report claims are derived from structured post-check state: pending after preflight, passed only after a complete successful post-check, failed with sanitized categories, or deferred during manual closure.
+- `Baseline`, `Install`, `Launch`, `Verify`, and `Rollback` require an existing schema/task-versioned baseline; only `Prepare` and a fresh `Full` run may create one. Post-install modes additionally require an existing transaction plan.
+- Recovery-marker persistence is explicit. Active profiles are never modified when marker writing fails; the result, report, and CLI expose `marker unavailable` and the redacted manual rollback instruction.
+- Local Task 3 hardening validation with the installed parent-directory SDK `10.0.110`: locked restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 157 tests (55 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and Contracts tests PASS with 1 test. Focused review-follow-up tests pass 24/24. `dotnet format --verify-no-changes --no-restore` remains blocked locally because SDK `10.0.100` is not installed; hosted exact-SDK validation is pending.
 
 ## Next task
 

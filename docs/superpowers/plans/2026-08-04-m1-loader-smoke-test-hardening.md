@@ -22,6 +22,16 @@ Make the reusable Task 3 harness fail closed around post-experiment verification
 5. Derive the committed report path from the validated repository root and expected fingerprint; reject arbitrary destinations and reparse-point parents.
 6. Update the report model, documentation, and changelog to distinguish historical evidence limitations from new harness guarantees.
 
+## Review follow-up corrections
+
+The next correction pass is limited to three fail-closed gaps found after the initial hardening:
+
+1. Derive the original-installation verification sentence from structured post-check state, including failed categories and deferred manual-closure state.
+2. Require a saved, schema-valid baseline for every staged mode; only `Prepare` and a fresh `Full` run may create one, while post-install modes must use an explicit transaction state.
+3. Preserve recovery-marker persistence failures in structured results and expose a sanitized manual rollback instruction when the active process prevents rollback.
+
+The private loader experiment remains historical evidence only and is not rerun for this correction pass.
+
 ## Checkpoints
 
 - [ ] Add failing tests for manifest comparison and schema-backed resume validation.
@@ -32,3 +42,5 @@ Make the reusable Task 3 harness fail closed around post-experiment verification
 - [ ] Run the canonical local validation commands and tracked-file hygiene checks.
 - [ ] Push the branch and inspect the hosted Windows/Linux run and all TRX artifacts.
 - [ ] Update `STATUS.md` with the actual current-head hosted run; leave M1 Task 4 unstarted.
+- [ ] Add regression tests for evidence-derived report claims, staged-mode baseline requirements, and recovery-marker persistence outcomes.
+- [ ] Implement the three review follow-up corrections without changing loader behavior or rerunning the private experiment.

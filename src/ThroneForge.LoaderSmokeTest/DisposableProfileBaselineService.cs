@@ -54,6 +54,32 @@ public static class DisposableProfileBaselineService
         ArgumentNullException.ThrowIfNull(originalManifest);
         ArgumentNullException.ThrowIfNull(currentManifest);
         ArgumentNullException.ThrowIfNull(indicators);
+        var baseline = LoadAndValidateSavedBaseline(path, expectedFingerprint, originalManifest);
+
+        if (!InstallationCopyService.CompareManifests(baseline.DisposableManifest, currentManifest).Matches)
+        {
+            throw new SmokeTestException("The disposable profile baseline no longer matches the original and current complete manifests.");
+        }
+
+        if (readiness != ThroneForge.Discovery.SmokeTestReadiness.ReadyForReversibleTest)
+        {
+            throw new SmokeTestException("The disposable profile is not ready for a clean-profile resume.");
+        }
+
+        if (indicators.Any(item => item.Status != ThroneForge.Discovery.LoaderIndicatorStatus.Absent))
+        {
+            throw new SmokeTestException("The disposable profile contains loader indicators; resume is blocked.");
+        }
+
+        return baseline;
+    }
+
+    public static DisposableProfileBaseline LoadAndValidateSavedBaseline(
+        string path,
+        string expectedFingerprint,
+        CopyManifest originalManifest)
+    {
+        ArgumentNullException.ThrowIfNull(originalManifest);
         DisposableProfileBaseline baseline;
         try
         {
@@ -76,22 +102,35 @@ public static class DisposableProfileBaselineService
             throw new SmokeTestException("The disposable profile baseline does not match the expected task schema or original fingerprint.");
         }
 
-        if (!InstallationCopyService.CompareManifests(baseline.OriginalManifest, originalManifest).Matches
-            || !InstallationCopyService.CompareManifests(baseline.DisposableManifest, currentManifest).Matches)
+        if (!InstallationCopyService.CompareManifests(baseline.OriginalManifest, originalManifest).Matches)
         {
-            throw new SmokeTestException("The disposable profile baseline no longer matches the original and current complete manifests.");
-        }
-
-        if (readiness != ThroneForge.Discovery.SmokeTestReadiness.ReadyForReversibleTest)
-        {
-            throw new SmokeTestException("The disposable profile is not ready for a clean-profile resume.");
-        }
-
-        if (indicators.Any(item => item.Status != ThroneForge.Discovery.LoaderIndicatorStatus.Absent))
-        {
-            throw new SmokeTestException("The disposable profile contains loader indicators; resume is blocked.");
+            throw new SmokeTestException("The disposable profile baseline no longer matches the original complete manifest.");
         }
 
         return baseline;
+    }
+
+    public static DisposableProfileBaseline LoadAndValidateInstalledProfile(
+        string path,
+        string expectedFingerprint,
+        CopyManifest originalManifest)
+        => RequireExistingBaseline(path, expectedFingerprint, originalManifest, SmokeTestMode.Launch);
+
+    public static DisposableProfileBaseline RequireExistingBaseline(
+        string path,
+        string expectedFingerprint,
+        CopyManifest originalManifest,
+        SmokeTestMode mode)
+    {
+        if (mode is not (SmokeTestMode.Baseline
+            or SmokeTestMode.Install
+            or SmokeTestMode.Launch
+            or SmokeTestMode.Verify
+            or SmokeTestMode.Rollback))
+        {
+            throw new SmokeTestException("Only staged smoke-test modes may require an existing disposable baseline.");
+        }
+
+        return LoadAndValidateSavedBaseline(path, expectedFingerprint, originalManifest);
     }
 }

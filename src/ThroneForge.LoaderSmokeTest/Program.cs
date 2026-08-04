@@ -93,6 +93,11 @@ public static class LoaderSmokeTestCli
             stdout.WriteLine(result.Message);
             stdout.WriteLine($"Original fingerprint verified: {result.OriginalInstallationVerified}");
             stdout.WriteLine($"Rollback verified: {result.RollbackVerified}");
+            var recoveryStatus = FormatRecoveryMarkerStatus(result);
+            if (recoveryStatus is not null)
+            {
+                stdout.WriteLine(recoveryStatus);
+            }
             if (result.ReportPath is not null)
             {
                 stdout.WriteLine($"Sanitized report: {Path.GetFileName(result.ReportPath)}");
@@ -115,6 +120,19 @@ public static class LoaderSmokeTestCli
             stderr.WriteLine($"Invalid loader smoke-test arguments: {exception.Message}");
             return 2;
         }
+    }
+
+    public static string? FormatRecoveryMarkerStatus(SmokeTestExecutionResult result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        if (result.RecoveryMarkerPersisted)
+        {
+            return "Recovery marker: persisted.";
+        }
+
+        return result.RecoveryMarkerFailureCategory is null
+            ? null
+            : $"Recovery marker unavailable ({result.RecoveryMarkerFailureCategory}). Manual rollback is required after graceful closure.";
     }
 
     private static SmokeTestMode ParseMode(string value)

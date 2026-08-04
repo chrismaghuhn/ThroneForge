@@ -24,21 +24,16 @@ public static class SmokeTestPostApplyGuard
             observation = launch();
             if (observation.RequiresManualClosure && !observation.Exited)
             {
-                try
-                {
-                    writeRecoveryMarker?.Invoke();
-                }
-                catch (Exception)
-                {
-                    // A recovery-marker failure cannot make it safe to touch an active profile.
-                }
+                var marker = TryPersistRecoveryMarker(writeRecoveryMarker);
 
                 return new SmokeTestPostApplyResult(
                     SmokeTestOutcome.Inconclusive,
                     SmokeTestRollbackState.ManualClosureRequired,
                     observation,
                     null,
-                    "manual-closure-required");
+                    "manual-closure-required",
+                    RecoveryMarkerPersisted: marker.Persisted,
+                    RecoveryMarkerFailureCategory: marker.FailureCategory);
             }
 
             var log = readLog();
@@ -51,21 +46,16 @@ public static class SmokeTestPostApplyGuard
         {
             if (observation?.RequiresManualClosure == true && !observation.Exited)
             {
-                try
-                {
-                    writeRecoveryMarker?.Invoke();
-                }
-                catch (Exception)
-                {
-                    // Preserve the manual-closure state even if the marker cannot be written.
-                }
+                var marker = TryPersistRecoveryMarker(writeRecoveryMarker);
 
                 return new SmokeTestPostApplyResult(
                     SmokeTestOutcome.Inconclusive,
                     SmokeTestRollbackState.ManualClosureRequired,
                     observation,
                     summary,
-                    "manual-closure-required");
+                    "manual-closure-required",
+                    RecoveryMarkerPersisted: marker.Persisted,
+                    RecoveryMarkerFailureCategory: marker.FailureCategory);
             }
 
             try
@@ -97,6 +87,24 @@ public static class SmokeTestPostApplyGuard
                     operationException,
                     rollbackException);
             }
+        }
+    }
+
+    private static (bool Persisted, string? FailureCategory) TryPersistRecoveryMarker(Action? writeRecoveryMarker)
+    {
+        if (writeRecoveryMarker is null)
+        {
+            return (false, "marker-unavailable");
+        }
+
+        try
+        {
+            writeRecoveryMarker();
+            return (true, null);
+        }
+        catch (Exception)
+        {
+            return (false, "marker-write-failed");
         }
     }
 

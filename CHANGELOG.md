@@ -4,6 +4,7 @@ All notable ThroneForge changes are documented here.
 
 ## Unreleased
 
+- Added the final Task 3 hardening review corrections: evidence-derived original post-check claims, saved-baseline requirements for all staged modes, and explicit recovery-marker persistence status in reports and CLI output. Hosted validation for this follow-up is pending; the private loader experiment was not rerun.
 - Fixed CI test-result preservation so every test project gets its own TRX artifact and the workflow verifies aggregate completeness before upload.
 - Completed and hardened M1 discovery task 1 with a local-only, metadata-based Thronefall installation inspector, protected output boundaries, deterministic executable selection, and a sanitized fingerprint report; hosted verification passed on Windows and Ubuntu.
 - Added M1 task 2's bounded runtime-compatibility inspection: metadata-only managed-runtime profiling, conservative target-framework recommendations, bounded Unity-version evidence, loader-indicator inventory, and a provisional official BepInEx candidate matrix.

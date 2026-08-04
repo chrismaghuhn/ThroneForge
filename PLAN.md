@@ -159,6 +159,16 @@ Task-3 historical outcome: BepInEx `5.4.23.5` reported preloader and chainloader
 
 Task-3 hardening validation: implementation commit `1643cdb4e26f3e5d0890b7b203df8904ec77795c` passed hosted run `30860012681` on Windows and Ubuntu. Each runner used SDK `10.0.100`, uploaded 11 TRX files representing 146 tests, and reported 0 failures, errors, or skips; no TRX overwrite warning occurred. The private experiment was not rerun.
 
+### M1 Task 3 hardening review follow-up
+
+- [x] Derive the original-installation verification report claim from structured pending, passed, failed, and manual-closure states, including failed check categories.
+- [x] Require a schema-valid saved baseline for `Baseline`, `Install`, `Launch`, `Verify`, and `Rollback`; only `Prepare` and fresh `Full` may create a baseline.
+- [x] Preserve recovery-marker persistence success or failure in guard results, reports, and CLI output without touching an active profile.
+- [x] Add regression tests for report evidence states, staged-mode baseline gates, baseline immutability, marker-write failure, and sanitized CLI/report messaging.
+- [ ] Run the new local validation and hosted Windows/Linux matrix; record the final current-head run before requesting merge.
+
+The review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`, whose pre-fix hosted run was `30860548085` with 11 TRX files and 146 tests per runner. M1 Task 4 remains unstarted and the private loader experiment is not rerun.
+
 ## M1 discovery task 2 hardening (completed and merged)
 
 This completed follow-up closed review findings without installing or executing a loader. It preserved the existing fingerprint-v1 inputs.
