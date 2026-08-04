@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 5 repository-only synthetic plugin-load probe in progress on `agent/m1-plugin-load-smoke-test`, based on merged `main@5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. No plugin is loaded in Thronefall and no game-facing behavior is claimed.
+M1 - Task 5 repository-only synthetic plugin-load probe complete on `agent/m1-plugin-load-smoke-test`, based on merged `main@5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. No plugin was loaded in Thronefall and no game-facing behavior is claimed.
 
 ## Milestones
 
@@ -199,11 +199,13 @@ Task-4 bounded-slice validation: final documentation head `5d7c69a66dd431da98e16
 
 Task 4 and its evidence-binding hardening are complete and merged into `main` by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. This task is deliberately narrower than a real Thronefall plugin experiment. It adds an external probe that hashes an explicit synthetic assembly artifact, rebuilds verified integrity evidence, re-runs the Task-4 admission gate immediately before loading, and loads one test-only `IThroneForgeMod` implementation into a collectible .NET `AssemblyLoadContext` without invoking constructors or lifecycle methods.
 
-- [ ] Add the external `ThroneForge.PluginLoadTest` project and a source-only synthetic plugin fixture.
-- [ ] Reuse the existing admission gate and bind the exact artifact hash, canonical mod identity, game fingerprint, adapter evidence, and approval before loading.
-- [ ] Load only the synthetic fixture in a collectible context; record sanitized assembly/type identities and never invoke the plugin.
-- [ ] Add fail-closed tests for hash, approval, compatibility, malformed assembly, contract-shape, unload, sanitization, and architecture boundaries.
-- [ ] Run exact hosted Windows/Linux validation; do not run a private Thronefall or BepInEx plugin experiment in this task.
+- [x] Add the external `ThroneForge.PluginLoadTest` project and a source-only synthetic plugin fixture.
+- [x] Reuse the existing admission gate and bind the exact artifact hash, canonical mod identity, game fingerprint, adapter evidence, and approval before loading.
+- [x] Load only the synthetic fixture in a collectible context; record sanitized assembly/type identities and never invoke the plugin.
+- [x] Add fail-closed tests for hash, approval, compatibility, malformed assembly, contract-shape, unload, sanitization, and architecture boundaries.
+- [x] Run exact hosted Windows/Linux validation; do not run a private Thronefall or BepInEx plugin experiment in this task.
+
+Task-5 final hosted validation: run `30880625516` tested head `15127329aa0fd916438a0404ba51a8dfdfbf59eb`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 226 tests, and reported 0 failures, 0 errors, and 0 skipped tests. The first CI attempt `30880510322` exposed that fixture projects were incorrectly counted as test projects; the workflow now derives expected TRX projects from `IsTestProject=true`. No overwrite warning occurred in the final run. No private loader or game experiment was run.
 
 The detailed design is [`docs/superpowers/specs/2026-08-04-m1-plugin-load-smoke-test-design.md`](docs/superpowers/specs/2026-08-04-m1-plugin-load-smoke-test-design.md), and the execution plan is [`docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test.md`](docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test.md). The next separate experiment, if approved, must use an explicit disposable profile and remain distinct from game lifecycle/API compatibility.
 

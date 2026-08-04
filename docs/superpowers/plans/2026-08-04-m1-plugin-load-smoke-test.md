@@ -150,7 +150,7 @@ Expected: all new tests and all architecture tests pass; no project contains for
 - Modify: `CHANGELOG.md`
 - Modify: `docs/adr/ADR-0006-full-trust-code-mod-boundary.md`
 
-- [ ] **Step 1: Run canonical validation with the repository SDK.**
+- [x] **Step 1: Run canonical validation with the repository SDK.**
 
 ```powershell
 dotnet --version
@@ -163,7 +163,7 @@ git status --short
 
 Expected hosted toolchain: SDK `10.0.100`, all tests green, no tracked binaries/private paths. Local compile/test with `10.0.110` passed; exact local format verification remains pending because SDK `10.0.100` is not installed.
 
-- [ ] **Step 2: Run hygiene checks.**
+- [x] **Step 2: Run hygiene checks.**
 
 ```powershell
 git ls-files | Select-String -Pattern '\.(dll|exe|so|dylib|pdb|zip|log)$'
@@ -173,21 +173,21 @@ git grep -n -I -E 'C:\\Users\\|/home/|/Users/' -- ':!docs/THRONEFORGE_SPEC.md' '
 
 Expected: no tracked plugin/game/loader binaries, archives, raw logs, experiment state, or private paths.
 
-- [ ] **Step 3: Update handoff documentation.**
+- [x] **Step 3: Update handoff documentation.**
 
 State that Task 5 repository probe is complete only for the synthetic fixture; no plugin was loaded in Thronefall, no loader was installed, and the next permitted experiment is an explicitly approved disposable-profile test.
 
-- [ ] **Step 4: Commit implementation and documentation.**
+- [x] **Step 4: Commit implementation and documentation.**
 
 ```powershell
 git add src/ThroneForge.PluginLoadTest tests/ThroneForge.PluginLoadFixture tests/ThroneForge.PluginLoadTest.Tests tests/ThroneForge.ArchitectureTests ThroneForge.slnx PLAN.md STATUS.md README.md CHANGELOG.md docs/adr/ADR-0006-full-trust-code-mod-boundary.md
 git commit -m "feat: add bound synthetic plugin load probe"
 ```
 
-- [ ] **Step 5: Push and wait for hosted CI before requesting a PR.**
+- [x] **Step 5: Push and wait for hosted CI before requesting a PR.**
 
 ```powershell
 git push -u origin agent/m1-plugin-load-smoke-test
 ```
 
-Record the hosted Windows/Linux run, SDK, TRX counts, and tests. Do not run the private experiment in CI and do not claim real game plugin compatibility.
+Record hosted run `30880625516`: Windows/Linux SDK `10.0.100`, 12 TRX files and 226 tests per runner, 0 failures/errors/skips. Do not run the private experiment in CI and do not claim real game plugin compatibility.
