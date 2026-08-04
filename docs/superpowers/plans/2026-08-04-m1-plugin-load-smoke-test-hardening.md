@@ -17,9 +17,16 @@ Harden the repository-only synthetic plugin-load probe without running a private
 
 - [x] Focused PluginLoadTest tests pass with no compiled fixture artifacts tracked.
 - [x] Architecture tests continue to pass and no forbidden game/loader dependency is introduced.
-- [ ] Full restore, format, Release build, and test validation pass locally where the pinned SDK is available; hosted CI verifies exact SDK `10.0.100` on Windows and Ubuntu.
+- [x] Full restore, format, Release build, and test validation pass in hosted CI with exact SDK `10.0.100` on Windows and Ubuntu; local compile/test validation passes with SDK `10.0.110`, while exact local formatting remains unavailable because `10.0.100` is not installed.
 - [x] No private Thronefall/BepInEx experiment is run and no game, loader, archive, raw log, or private path is committed.
 
 ## Explicit limits
 
 This task validates only one synthetic managed assembly plus shared API/Contracts and trusted platform assemblies. It does not design multi-file package integrity, load a Thronefall plugin, select a plugin TFM, claim BepInEx compatibility, or invoke plugin lifecycle methods.
+
+## Final validation
+
+- Head: `bb32de1dd211ddd5174f8d8f6e6490164da970db`
+- Hosted run: [30895225156](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30895225156)
+- Windows and Ubuntu: SDK `10.0.100`, 12 TRX files, 239 tests, 0 failures/errors/skips each.
+- The artifacts were independently parsed and no `Overwriting results file` warning occurred.

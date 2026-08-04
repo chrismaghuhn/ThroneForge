@@ -2,11 +2,11 @@
 
 ## Current milestone
 
-M1 - Task 5 repository-only synthetic plugin-load probe hardening in progress on `agent/m1-plugin-load-smoke-test-hardening`, based on reviewed head `10897f7b03d45f1e470b5930a9dc1341939cde6f`; PR creation/merge remains a repository-owner decision.
+M1 - Task 5 repository-only synthetic plugin-load probe hardening is complete on `agent/m1-plugin-load-smoke-test-hardening` at `bb32de1dd211ddd5174f8d8f6e6490164da970db`; PR creation/merge remains a repository-owner decision.
 
 ## State
 
-M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 base implementation passed its pre-hardening hosted run; the current single-assembly/module-initializer/contract/unload hardening is in progress. No Thronefall plugin was loaded and M1 overall remains incomplete.
+M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 repository-only hardening is complete and hosted-verified below. No Thronefall plugin was loaded and M1 overall remains incomplete.
 
 The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below.
 
@@ -186,7 +186,7 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Contract inspection requires exactly one public, top-level, non-abstract, closed class implementing the shared `IThroneForgeMod`. Internal, nested, abstract, open-generic, duplicate, and private-duplicate-contract shapes are covered by source-only fixtures.
 - The primary file is captured once; the same captured bytes are hashed, admitted, and passed to `LoadFromStream`. The result distinguishes unload requested, unload observed, and bounded unload-not-observed states. Assembly loading remains full-trust; only explicit constructor/lifecycle invocation is absent, and module initializers are rejected for this synthetic slice.
 - Local focused validation with SDK `10.0.110`: build PASS with 0 warnings/errors; PluginLoadTest tests PASS with 27 tests. Exact SDK `10.0.100` is not installed locally, so exact local `dotnet format` remains unavailable.
-- Hosted validation for this hardening branch is pending. Do not claim Task-5 hardening complete until the new Windows/Linux run passes with SDK `10.0.100` and its TRX artifacts are independently checked.
+- Final hosted validation passed in GitHub Actions run [30895225156](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30895225156) for head `bb32de1dd211ddd5174f8d8f6e6490164da970db`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 239 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were downloaded and independently parsed; no `Overwriting results file` warning occurred. The first attempt `30895090026` failed only on the formatter's import-order check for `PluginLoadProbeTests.cs`; the one-line correction was pushed as `bb32de1` and the complete follow-up run passed.
 
 ## Next task
 

@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 5 repository-only synthetic plugin-load probe hardening in progress on `agent/m1-plugin-load-smoke-test-hardening`, based on reviewed head `10897f7b03d45f1e470b5930a9dc1341939cde6f`. No plugin was loaded in Thronefall and no game-facing behavior is claimed.
+M1 - Task 5 repository-only synthetic plugin-load probe hardening is complete on `agent/m1-plugin-load-smoke-test-hardening` at `bb32de1dd211ddd5174f8d8f6e6490164da970db`; no plugin was loaded in Thronefall and no game-facing behavior is claimed.
 
 ## Milestones
 
@@ -219,7 +219,9 @@ This follow-up starts from reviewed head `10897f7b03d45f1e470b5930a9dc1341939cde
 - [x] Preserve one captured byte buffer for size validation, hashing, admission, and loading.
 - [x] Require bounded collectible-context unload observation and test retained-reference failure reporting.
 - [x] Add source-only helper/native/module-initializer/invalid-shape fixtures and sanitized regression tests.
-- [ ] Update documentation only after the new branch-head hosted run is complete; keep M1 overall incomplete.
+- [x] Update documentation after the branch-head hosted run and keep M1 overall incomplete.
+
+Task-5 hardening hosted validation: run `30895225156` tested head `bb32de1dd211ddd5174f8d8f6e6490164da970db`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 239 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were independently parsed; no `Overwriting results file` warning occurred. Run `30895090026` was superseded after a formatter import-order failure and is retained only as diagnostic history. No private loader or game experiment was run.
 
 ### M1 Task 4 hardening: bound trust evidence and admission artifacts
 
