@@ -1,13 +1,13 @@
 # ADR-0006: Full-trust code-mod admission boundary
 
-- Status: Accepted for M1 Task 4; evidence-binding hardening is in progress and loader implementation remains unstarted
+- Status: Accepted for M1 Task 4; M1 Task 5 synthetic load probe in progress
 - Date: 2026-08-04
 
 ## Context
 
 ThroneForge distinguishes data-only content from executable code mods. A code mod will eventually run in the game process and cannot be securely sandboxed by this SDK. The loader smoke test proved only that the selected BepInEx bootstrap initialized for one fingerprint; it did not prove that a ThroneForge plugin can load, that its target framework is compatible, or that any game-facing API works.
 
-The runtime therefore needs a small, portable decision boundary before a future loader is allowed to activate code. The boundary must be usable by tests and future runtime code without importing BepInEx, Unity, Harmony, private game assemblies, or reflection names into stable projects.
+The runtime therefore needs a small, portable decision boundary before a future loader is allowed to activate code. The boundary must be usable by tests and future runtime code without importing BepInEx, Unity, Harmony, private game assemblies, or reflection names into stable projects. A repository-only synthetic probe can test the boundary and collectible .NET loading without claiming that the game loader or a real plugin works.
 
 ## Decision
 
@@ -25,4 +25,5 @@ Task 4 defines three separate concerns:
 - The stable API and runtime remain free of game-specific dependencies and can be tested without a game installation.
 - The records are trusted runtime inputs rather than cryptographic signatures, and package integrity/approval are not an OS-level security sandbox.
 - A future loader must compare the decision binding immediately before loading, preserve the package hash and approval decision, and add separate evidence for assembly loading and game compatibility.
+- M1 Task 5 may load only a source-controlled synthetic fixture into a collectible test context, must re-run the admission gate immediately before loading, and must not invoke the fixture or access a game installation.
 - Plugin target framework remains unverified at the binary level; assembly loading, Harmony compatibility, lifecycle bindings, and game APIs remain unverified until a later bounded task and clean-profile evidence exist.

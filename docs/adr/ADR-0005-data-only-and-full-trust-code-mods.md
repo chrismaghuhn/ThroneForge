@@ -1,6 +1,6 @@
 # ADR-0005: Data-only content versus full-trust code mods
 
-- Status: Accepted for M0
+- Status: Accepted; M1 Task 5 synthetic load probe in progress
 - Date: 2026-08-03
 
 ## Context
@@ -15,4 +15,4 @@ Content and logic packages are data-only by default. They may contain validated 
 
 - Package validation can offer meaningful constraints for data-only mods without claiming to sandbox code.
 - Code-mod capabilities remain an opt-in escape hatch and require clearer diagnostics, restart behavior, and recovery handling.
-- M1 Task 4 contains no code-mod loader and no executable content. Its records are trusted runtime inputs, not cryptographic signatures or an OS sandbox. Admission approval is not a sandbox, plugin-load proof, binary target-framework decision, or game-API compatibility claim.
+- M1 Task 4 contains no production code-mod loader. M1 Task 5 adds only a repository-local synthetic assembly-load probe for test evidence; it does not load or invoke a Thronefall plugin. The records remain trusted runtime inputs, not cryptographic signatures or an OS sandbox. Admission approval and synthetic loading are not a binary target-framework decision, BepInEx proof, or game-API compatibility claim.

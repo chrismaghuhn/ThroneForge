@@ -4,6 +4,8 @@ All notable ThroneForge changes are documented here.
 
 ## Unreleased
 
+- Started M1 Task 5 on `agent/m1-plugin-load-smoke-test` from merged `main@5f4b4dd`: a repository-only synthetic plugin-load probe that re-runs the artifact/game-bound admission gate immediately before loading a test fixture. No Thronefall plugin is loaded or invoked.
+- Completed and merged M1 Task 4 trust-evidence hardening in PR #4 at `5f4b4dd`; hosted run `30878236039` passed on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, and 212 tests per runner.
 - Completed M1 Task 4 trust-evidence hardening on `agent/m1-plugin-runtime-boundary-hardening`: canonical mod identity/version rules, artifact- and fingerprint-bound integrity/approval/adapter evidence, deterministic admission bindings, and fail-closed reason-code precedence. Implementation head `382fe877f5685bb71d77ee6b5cf04afc8a57a7bf` passed hosted run `30878049044` on Windows and Ubuntu with 11 TRX files and 212 tests per runner using SDK `10.0.100`; no plugin was loaded.
 - Completed the bounded M1 Task 4 plugin/runtime boundary slice: portable code-mod identity/integrity/approval contracts, `IThroneForgeMod` lifecycle boundary, deterministic pre-load admission gate, ADR-0006, and architecture tests. Final documentation head `5d7c69a` passed hosted run `30868670093` on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, and 175 tests per runner; no plugin was loaded.
 - Started M1 Task 4 on `agent/m1-plugin-runtime-boundary` from merged main commit `06554d845a9fe46132c1a19ec0c2f18b8722acf2`. The task is limited to portable full-trust code-mod contracts and a deterministic pre-load admission boundary; it does not load a plugin or claim game/runtime compatibility.
@@ -26,5 +28,5 @@ All notable ThroneForge changes are documented here.
 
 ### Not yet implemented
 
-- M1 Task 4 plugin/runtime boundary work is in progress. No plugin loading, loader integration, game API binding, lifecycle integration, or custom-wave functionality is implemented.
+- M1 Task 5 synthetic plugin-load probing is in progress. No Thronefall plugin loading, loader integration, game API binding, lifecycle integration, or custom-wave functionality is implemented.
 - Runtime integration, loaders, game API bindings, and custom-wave support remain unimplemented.
