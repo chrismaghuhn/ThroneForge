@@ -165,9 +165,9 @@ Task-3 hardening validation: implementation commit `1643cdb4e26f3e5d0890b7b203df
 - [x] Require a schema-valid saved baseline for `Baseline`, `Install`, `Launch`, `Verify`, and `Rollback`; only `Prepare` and fresh `Full` may create a baseline.
 - [x] Preserve recovery-marker persistence success or failure in guard results, reports, and CLI output without touching an active profile.
 - [x] Add regression tests for report evidence states, staged-mode baseline gates, baseline immutability, marker-write failure, and sanitized CLI/report messaging.
-- [ ] Run the new local validation and hosted Windows/Linux matrix; record the final current-head run before requesting merge.
+- [x] Run the new local validation and hosted Windows/Linux matrix; record the final current-head run before requesting merge.
 
-The review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`, whose pre-fix hosted run was `30860548085` with 11 TRX files and 146 tests per runner. M1 Task 4 remains unstarted and the private loader experiment is not rerun.
+The review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`, whose pre-fix hosted run was `30860548085` with 11 TRX files and 146 tests per runner. Implementation commit `de3159e85c177526c2dafc6b5a60fa80e38c0bc9` passed hosted run `30864308531` on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, 154 tests, and 0 failures/errors/skips per runner; no overwrite warnings occurred. M1 Task 4 remains unstarted and the private loader experiment is not rerun.
 
 ## M1 discovery task 2 hardening (completed and merged)
 

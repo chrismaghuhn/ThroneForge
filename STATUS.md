@@ -8,7 +8,7 @@ M1 - Task 3 loader bootstrap smoke-test hardening review follow-up in progress o
 
 M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has a credible historical private bootstrap result, but this branch is hardening the reusable harness before merge. M1 overall remains incomplete.
 
-The current review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`. Its pre-fix hosted run was `30860548085`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 146 tests, and had 0 failures, errors, or skips. New hosted validation is pending after the evidence-derived report, staged-baseline, and recovery-marker corrections.
+The current review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`. Its pre-fix hosted run was `30860548085`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 146 tests, and had 0 failures, errors, or skips. Final hosted validation for the evidence-derived report, staged-baseline, and recovery-marker corrections is recorded below.
 
 ## Completed
 
@@ -155,7 +155,8 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Original-installation report claims are derived from structured post-check state: pending after preflight, passed only after a complete successful post-check, failed with sanitized categories, or deferred during manual closure.
 - `Baseline`, `Install`, `Launch`, `Verify`, and `Rollback` require an existing schema/task-versioned baseline; only `Prepare` and a fresh `Full` run may create one. Post-install modes additionally require an existing transaction plan.
 - Recovery-marker persistence is explicit. Active profiles are never modified when marker writing fails; the result, report, and CLI expose `marker unavailable` and the redacted manual rollback instruction.
-- Local Task 3 hardening validation with the installed parent-directory SDK `10.0.110`: locked restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 157 tests (55 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and Contracts tests PASS with 1 test. Focused review-follow-up tests pass 24/24. `dotnet format --verify-no-changes --no-restore` remains blocked locally because SDK `10.0.100` is not installed; hosted exact-SDK validation is pending.
+- Local Task 3 hardening validation with the installed parent-directory SDK `10.0.110`: locked restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 154 tests (55 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and Contracts tests PASS with 1 test. Focused review-follow-up tests pass 24/24. `dotnet format --verify-no-changes --no-restore` remains blocked locally because SDK `10.0.100` is not installed; hosted exact-SDK validation is recorded below.
+- Final hosted review-follow-up validation passed in run [30864308531](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30864308531) for implementation commit `de3159e85c177526c2dafc6b5a60fa80e38c0bc9`: Windows and Ubuntu each used SDK `10.0.100`, uploaded 11 TRX files representing 154 tests, and reported 0 failures, 0 errors, and 0 not-executed tests. Both artifacts were downloaded and parsed independently; no `Overwriting results file` warning occurred.
 
 ## Next task
 

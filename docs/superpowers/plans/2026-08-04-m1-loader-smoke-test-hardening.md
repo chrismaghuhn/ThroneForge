@@ -34,13 +34,14 @@ The private loader experiment remains historical evidence only and is not rerun 
 
 ## Checkpoints
 
-- [ ] Add failing tests for manifest comparison and schema-backed resume validation.
-- [ ] Add failing tests for original post-check/readiness and structured report sections.
-- [ ] Add failing tests for post-apply rollback guard and recovery state.
-- [ ] Add failing tests for committed report-path containment and CLI rejection of arbitrary paths.
-- [ ] Implement the smallest production changes needed to make each checkpoint pass.
-- [ ] Run the canonical local validation commands and tracked-file hygiene checks.
-- [ ] Push the branch and inspect the hosted Windows/Linux run and all TRX artifacts.
-- [ ] Update `STATUS.md` with the actual current-head hosted run; leave M1 Task 4 unstarted.
-- [ ] Add regression tests for evidence-derived report claims, staged-mode baseline requirements, and recovery-marker persistence outcomes.
-- [ ] Implement the three review follow-up corrections without changing loader behavior or rerunning the private experiment.
+- [x] Add failing tests for manifest comparison and schema-backed resume validation.
+- [x] Add failing tests for original post-check/readiness and structured report sections.
+- [x] Add failing tests for post-apply rollback guard and recovery state.
+- [x] Add failing tests for committed report-path containment and CLI rejection of arbitrary paths.
+- [x] Implement the smallest production changes needed to make each checkpoint pass.
+- [x] Run the canonical local validation commands and tracked-file hygiene checks; local formatting remains blocked by the unavailable exact SDK.
+- [x] Push the branch and inspect the hosted Windows/Linux run and all TRX artifacts.
+- [x] Update `STATUS.md` with the actual current-head hosted run; leave M1 Task 4 unstarted.
+- [x] Add regression tests for evidence-derived report claims, staged-mode baseline requirements, and recovery-marker persistence outcomes.
+- [x] Implement the three review follow-up corrections without changing loader behavior or rerunning the private experiment.
+- [x] Hosted run `30864308531` validated implementation commit `de3159e85c177526c2dafc6b5a60fa80e38c0bc9` with 11 TRX files and 154 tests per runner on SDK `10.0.100`.
