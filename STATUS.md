@@ -2,11 +2,11 @@
 
 ## Current milestone
 
-M1 - Task 4 evidence-backed plugin/runtime boundary in progress on `agent/m1-plugin-runtime-boundary`, based on merged `main@06554d845a9fe46132c1a19ec0c2f18b8722acf2`.
+M1 - Task 4 bounded plugin/runtime boundary slice complete on `agent/m1-plugin-runtime-boundary`, based on merged `main@06554d845a9fe46132c1a19ec0c2f18b8722acf2`.
 
 ## State
 
-M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 has now started as a portable plugin/runtime boundary slice. M1 overall remains incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. The bounded M1 Task 4 plugin/runtime boundary slice is implemented and hosted-validated on its branch. M1 overall remains incomplete.
 
 The current final correction started from `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Its pre-fix hosted run was `30864571605`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 154 tests, and had 0 failures, errors, or skips. Final hosted validation for the versioned transaction-state, persisted-path, applied-profile, staged-Verify, and report-wording corrections passed in run `30866207996` and is recorded below.
 
@@ -164,9 +164,10 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Baseline: merged `main@06554d845a9fe46132c1a19ec0c2f18b8722acf2`.
 - Scope: portable full-trust code-mod contracts and a deterministic runtime admission decision before any future loader activation.
 - Explicitly out of scope: assembly loading, BepInEx/Harmony/Unity references, plugin TFM selection, lifecycle bindings, game API inspection, catalog export, and custom waves.
-- Implemented locally: immutable `ModIdentity`/`CodeModDescriptor`/`CodeModActivationRequest`, portable `IThroneForgeMod`/`IModContext`/`ICapabilityService`, deterministic `CodeModAdmissionGate`, ADR-0006, and architecture/contract/runtime tests.
-- Local validation with SDK `10.0.110`: locked restore PASS after the intentional Contracts-test lockfile update, Release build PASS with 0 warnings/errors, full solution tests PASS with 175 tests (12 Architecture, 4 Contracts, 7 Runtime, 80 Discovery, and 66 LoaderSmokeTest among them). `dotnet format --verify-no-changes --no-restore` is blocked locally because only SDK `10.0.110` is installed while the repository pins exact SDK `10.0.100`; hosted exact-SDK validation is pending.
-- Hosted Task 4 validation has not run yet. No plugin is loaded and no game-facing compatibility conclusion has been claimed.
+- Implemented: immutable `ModIdentity`/`CodeModDescriptor`/`CodeModActivationRequest`, portable `IThroneForgeMod`/`IModContext`/`ICapabilityService`, deterministic `CodeModAdmissionGate`, ADR-0006, and architecture/contract/runtime tests.
+- Local validation with SDK `10.0.110`: locked restore PASS after the intentional Contracts-test lockfile update, Release build PASS with 0 warnings/errors, full solution tests PASS with 175 tests (12 Architecture, 4 Contracts, 7 Runtime, 80 Discovery, and 66 LoaderSmokeTest among them). `dotnet format --verify-no-changes --no-restore` is blocked locally because only SDK `10.0.110` is installed while the repository pins exact SDK `10.0.100`.
+- Final hosted validation: run `30868441588`, head `c680083402fc53f3546adbc54c87f5a1d3d619eb`; Windows and Ubuntu each used SDK `10.0.100`, uploaded 11 TRX files representing 175 tests, with 0 failures, errors, or skips. Both artifacts were independently parsed and no `Overwriting results file` warning appeared.
+- No plugin is loaded and no game-facing compatibility conclusion has been claimed. Plugin TFM, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, and custom waves remain unverified.
 
 ## Next task
 

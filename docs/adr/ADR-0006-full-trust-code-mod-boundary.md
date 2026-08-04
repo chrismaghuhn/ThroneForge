@@ -1,6 +1,6 @@
 # ADR-0006: Full-trust code-mod admission boundary
 
-- Status: Accepted for M1 Task 4 boundary design; loader implementation remains unstarted
+- Status: Accepted and hosted-validated for the M1 Task 4 boundary slice; loader implementation remains unstarted
 - Date: 2026-08-04
 
 ## Context

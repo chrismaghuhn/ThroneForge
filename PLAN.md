@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 4 plugin/runtime boundary design in progress on `agent/m1-plugin-runtime-boundary`, based on merged `main@06554d845a9fe46132c1a19ec0c2f18b8722acf2`. No plugin is loaded and no game-facing behavior is claimed.
+M1 - Task 4 bounded plugin/runtime boundary slice complete on `agent/m1-plugin-runtime-boundary`, based on merged `main@06554d845a9fe46132c1a19ec0c2f18b8722acf2`. No plugin is loaded and no game-facing behavior is claimed.
 
 ## Milestones
 
@@ -191,7 +191,9 @@ Task 3 is merged into `main` by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722ac
 - [x] Add the public lifecycle contract without invented event payloads or game types.
 - [x] Add a runtime admission gate that requires verified package integrity, supported adapter compatibility, and explicit user approval; do not load or invoke code.
 - [x] Add regression and architecture tests for the boundary and forbidden dependencies.
-- [ ] Run exact local/hosted validation and update `STATUS.md`; keep M1 incomplete and defer actual plugin/runtime integration.
+- [x] Run exact local/hosted validation and update `STATUS.md`; keep M1 incomplete and defer actual plugin/runtime integration.
+
+Task-4 bounded-slice validation: commit `c680083402fc53f3546adbc54c87f5a1d3d619eb` passed hosted run `30868441588` on Windows and Ubuntu with SDK `10.0.100`. Each runner uploaded 11 TRX files representing 175 tests with 0 failures, errors, or skips; no TRX overwrite warning occurred. Local SDK `10.0.110` also passed locked restore, Release build with 0 warnings/errors, and all 175 tests; exact local formatting remained unavailable because SDK `10.0.100` is not installed. M1 remains incomplete: no plugin assembly has been loaded, and plugin TFM, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, and custom waves remain unverified.
 
 ## M1 discovery task 2 hardening (completed and merged)
 
