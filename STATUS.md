@@ -2,11 +2,13 @@
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 2 hardening on `agent/m1-runtime-compatibility-hardening`
+M1 - Task 3 final transaction-state correction complete on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
 
 ## State
 
-M0 and M1 discovery task 1 are complete and merged into protected `main` at `e0c46a16fde527dd3a0f99cd5e30f8d5baba571a`. M1 task 2 hardening is complete on `agent/m1-runtime-compatibility-hardening`; the implementation/documentation head `456360480c265e29817aa6c818274341cdbced54` passed the final hosted Windows/Linux verification recorded below. M1 task 3 and M1 overall remain incomplete.
+M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has a credible historical private bootstrap result, and this branch now completes the reusable harness hardening without rerunning the private experiment. M1 overall remains incomplete.
+
+The current final correction started from `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Its pre-fix hosted run was `30864571605`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 154 tests, and had 0 failures, errors, or skips. Final hosted validation for the versioned transaction-state, persisted-path, applied-profile, staged-Verify, and report-wording corrections passed in run `30866207996` and is recorded below.
 
 ## Completed
 
@@ -117,8 +119,8 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - The M0 baseline is committed; future changes must continue to exclude the local game directory.
 - Exact SDK `10.0.100` local formatting/validation remains unverified; hosted CI is required for that pinned-toolchain result.
 - The private reports record local layout evidence: Mono indicators were found under `MonoBleedingEdge` and `thronefall_Data/Managed`, plus `Assembly-CSharp.dll`; Task 2 adds bounded Unity, managed-framework, and loader-indicator evidence. All conclusions remain installation-specific.
-- Task 2 remains metadata-only and bounded. The BepInEx 5.4.23.5 Unity Mono x64 candidate is a provisional recommendation only; no loader was downloaded, installed, or executed. A clean-profile smoke test is still required.
-- Task 2 hardening hosted validation is complete; the remaining integration prerequisite is the separate, reversible clean-profile loader smoke test in M1 task 3.
+- Task 2 remains metadata-only and bounded. Task 3 verified only BepInEx bootstrap for the exact fingerprint; plugin target-framework compatibility, Harmony compatibility, lifecycle hooks, game APIs, catalog extraction, and custom waves remain unverified.
+- The private Task 3 result is complete, but exact-SDK hosted CI for the new synthetic tests and architecture boundaries is still required before closing the branch.
 
 ### M1 discovery task 2 hardening status
 
@@ -130,9 +132,53 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
   - `windows-latest`: PASS; job `91816522849`; SDK `10.0.100`; 10 TRX files, 99 tests, 0 failures, 0 errors, 0 skipped; artifact `throneforge-test-results-windows-latest-30852764951`.
   - `ubuntu-latest`: PASS; job `91816522702`; SDK `10.0.100`; 10 TRX files, 99 tests, 0 failures, 0 errors, 0 skipped; artifact `throneforge-test-results-ubuntu-latest-30852764951`.
   - Both artifacts were downloaded and independently parsed. No `Overwriting results file` warning appeared in either hosted log.
-- Task 3 remains unstarted; no loader has been installed or executed.
+- Task 3 private result: the exact official BepInEx `5.4.23.5` Windows x64 asset was verified from GitHub with asset ID `352395699`, size `639118`, and observed SHA-256 `82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4`. The disposable copy launched before and after installation; preloader and chainloader initialized, 0 custom plugins were loaded, and no warnings/errors were observed.
+- The loader transaction was rolled back in the disposable copy. The copied fingerprint after rollback and the original fingerprint after the experiment matched `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`; original readiness returned to `ReadyForReversibleTest` and original loader indicators remained absent.
+- No BepInEx, game binary, raw log, archive, or experiment manifest was committed. The sanitized report is `docs/discovery/1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-loader-smoke-test.md`.
 - The fingerprint-specific report now records `netstandard2.1 candidate`, confidence `Medium`, basis `netstandard compatibility surface plus Unity 2022.3 evidence`, `ReadyForReversibleTest`, and the bounded `globalgamemanagers` note under `Inspection limitations`.
+
+## M1 task 3 validation status
+
+- PR #2 is merged into protected `main` at `d3f1bb4fde9f77efbb84349f440385cc89002c86`.
+- Main validation run `30853440786` passed on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 10 TRX files representing 99 tests, with 0 failures and 0 skips.
+- The active branch is `agent/m1-loader-smoke-test`, created from that merged baseline.
+- The provisional candidate was official BepInEx 5 Unity Mono x64 `5.4.23.5` for the documented fingerprint only. The experiment used an external disposable copy and left the original installation untouched.
+- Private outcome is `Passed`; the original installation fingerprint was unchanged before and after the experiment, and the disposable copy fingerprint was restored after rollback.
+- Final hosted validation passed in run [30857539959](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30857539959) for commit `634d3e97552d4f9ea619a2b7d9359ffc8bb1cb68`:
+  - `windows-latest`: PASS; SDK `10.0.100`; 11 TRX files, 130 tests, 0 failures, 0 errors, 0 skipped.
+  - `ubuntu-latest`: PASS; SDK `10.0.100`; 11 TRX files, 130 tests, 0 failures, 0 errors, 0 skipped.
+  - Both artifacts were downloaded and independently parsed. No `Overwriting results file` warning appeared in either hosted log.
+- The focused Loader-Smoke-Test suite represented 31 tests in the final hosted total. No hosted job ran the real game or loader experiment.
+
+### M1 task 3 review follow-up status
+
+- Original-installation report claims are derived from structured post-check state: pending after preflight, passed only after a complete successful post-check, failed with sanitized categories, or deferred during manual closure.
+- `Baseline`, `Install`, `Launch`, `Verify`, and `Rollback` require an existing schema/task-versioned baseline; only `Prepare` and a fresh `Full` run may create one. Post-install modes additionally require an existing transaction plan.
+- Recovery-marker persistence is explicit. Active profiles are never modified when marker writing fails; the result, report, and CLI expose `marker unavailable` and the redacted manual rollback instruction.
+- Local Task 3 hardening validation with the installed parent-directory SDK `10.0.110`: locked restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 154 tests (55 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and Contracts tests PASS with 1 test. Focused review-follow-up tests pass 24/24. `dotnet format --verify-no-changes --no-restore` remains blocked locally because SDK `10.0.100` is not installed; hosted exact-SDK validation is recorded below.
+- Final hosted review-follow-up validation passed in run [30864308531](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30864308531) for implementation commit `de3159e85c177526c2dafc6b5a60fa80e38c0bc9`: Windows and Ubuntu each used SDK `10.0.100`, uploaded 11 TRX files representing 154 tests, and reported 0 failures, 0 errors, and 0 not-executed tests. Both artifacts were downloaded and parsed independently; no `Overwriting results file` warning occurred.
 
 ## Next task
 
-Open/merge the reviewed hardening PR into protected `main`. Only after that merge, begin M1 task 3 on a new branch for the reversible clean-profile loader smoke test of the provisional BepInEx 5 candidate; do not start it in this branch.
+### M1 Task 3 earlier hardening evidence
+
+- Earlier hardening baseline: branch `agent/m1-loader-smoke-test-hardening`, based on pre-hardening head `697419a2adba75933f02b4009a16cddf3ff4b0b6`.
+- Historical private bootstrap result: `Passed` for the documented fingerprint, with BepInEx `5.4.23.5` preloader/chainloader evidence and zero custom plugins. The historical run retained compatibility-fingerprint and loader-indicator post-checks, but did not retain complete original/disposable manifests; the report now says so explicitly.
+- Harness hardening now requires complete original and disposable manifest equality, fresh-copy or manifest-backed resume validation, real post-runtime/readiness checks, guarded post-apply rollback, manual-closure recovery state, and a repository-derived committed report path.
+- Local hardening validation with the installed parent-directory SDK `10.0.110`: locked restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 146 tests (including 47 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and Contracts tests PASS with 1 test. The repository-pinned `dotnet format` command remains locally blocked because SDK `10.0.100` is not installed; hosted CI is required for exact-toolchain format verification.
+- The private experiment was not rerun. No loader, game binary, archive, raw log, recovery marker, or private path was committed.
+- Hosted hardening validation passed in run [30860012681](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30860012681) for implementation commit `1643cdb4e26f3e5d0890b7b203df8904ec77795c`: Windows PASS with SDK `10.0.100`, 11 TRX files, 146 tests, 0 failures/errors/skips; Ubuntu PASS with SDK `10.0.100`, 11 TRX files, 146 tests, 0 failures/errors/skips. Both artifacts were downloaded and parsed independently; no `Overwriting results file` warning occurred.
+- Final documentation follow-up head `bc1f400231ab4b1b825fdc21af438520ac5a6af6` was independently validated by run [30860399073](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30860399073) with the same Windows/Linux result: 11 TRX files and 146 tests per runner, 0 failures/errors/skips, exact SDK `10.0.100`, and no overwrite warning. This follow-up changed documentation only.
+
+### M1 Task 3 final transaction-state correction status
+
+- The persisted loader state is now schema- and task-versioned, atomically written, and bound to the expected fingerprint, baseline manifest identity, exact archive name, and observed archive SHA-256.
+- `Applied` and `LaunchObserved` are accepted only after full applied-profile verification. `FailedAndRolledBack` and empty/stale/mismatched states cannot be used by staged `Launch` or `Verify`.
+- Every persisted destination and backup path is revalidated for normalized containment before staged operations and rollback. Staged `Verify` requires recorded BepInEx 5.4.23.5, preloader, chainloader, zero custom plugins, and zero fatal loader errors.
+- Local synthetic validation of the correction passed with SDK `10.0.110` from the parent directory: locked restore PASS, Release build PASS with 0 warnings/errors, full-solution tests PASS with 165 tests (66 LoaderSmokeTest, 80 Discovery, and 11 Architecture tests), and focused LoaderSmokeTest tests PASS with 66 tests. Local format verification remains blocked because SDK `10.0.100` is not installed; hosted exact-SDK formatting passed.
+- Final hosted validation for implementation commit `08940f274d00d6c681c08d36364deedb04474a3d` passed in run [30866207996](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30866207996): Windows and Ubuntu each used SDK `10.0.100`, uploaded 11 TRX files representing 165 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were downloaded and independently parsed; no `Overwriting results file` warning occurred.
+- The private loader experiment was not rerun. No loader/game binary, archive, raw log, transaction state, recovery marker, private path, or other prohibited artifact was committed.
+
+## Handoff
+
+After this branch is reviewed and merged, M1 Task 4 may address the plugin/runtime boundary only. Do not add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves in this branch.

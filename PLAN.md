@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Thronefall discovery spike, task 2 hardening on `agent/m1-runtime-compatibility-hardening`.
+M1 - Task 3 loader bootstrap smoke-test hardening complete on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
 
 ## Milestones
 
@@ -127,15 +127,64 @@ This task starts from merged `main@e0c46a16fde527dd3a0f99cd5e30f8d5baba571a` on 
 - [x] Run synthetic tests before private inspection; generate and manually sanitize the fingerprint-specific runtime report only after tests pass.
 - [x] Update discovery documentation, ADR-0002 with a provisional evidence-based recommendation, `STATUS.md`, and `CHANGELOG.md`; keep M1 incomplete.
 - [x] Run baseline exact-SDK hosted Windows/Linux CI and inspect both TRX artifacts. Reviewed head `9511e99` passed in run `30849281168`: Windows and Ubuntu each produced 10 TRX files representing 70 tests, including 51 focused Discovery tests, with 0 failures/errors and no overwrite warnings.
-- [ ] Run the new hardening branch-head Windows/Linux matrix and inspect every TRX artifact before closing Task 2.
+- [x] Run the hardening branch-head Windows/Linux matrix and inspect every TRX artifact before closing Task 2; merged result is recorded in main run `30853440786`.
 
-## Next executable task after M1 discovery task 2
+## M1 Task 3: reversible clean-profile loader bootstrap smoke test
 
-M1 Task 3 is a reversible clean-profile loader smoke test for the selected official candidate. It must be planned only after Task 2 evidence is complete, and it must not be started in the Task-2 branch.
+Task 2 is complete and merged by PR #2 into protected `main` at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. This task is deliberately separate from the Task-2 branch and evaluates only BepInEx bootstrap initialization for the fingerprint-bound disposable copy. The complete execution plan is [`docs/superpowers/plans/2026-08-03-m1-loader-smoke-test.md`](docs/superpowers/plans/2026-08-03-m1-loader-smoke-test.md).
 
-## M1 discovery task 2 hardening
+- [x] Recompute the original installation fingerprint and runtime readiness before preparation.
+- [x] Copy the installation without following reparse points and verify the copied fingerprint.
+- [x] Run the bounded copied baseline launch before any loader installation.
+- [x] Verify and securely extract only the official `BepInEx_win_x64_5.4.23.5.zip` asset.
+- [x] Apply the loader transaction only to the disposable copy and retain rollback metadata.
+- [x] Launch the copied loader profile, parse sanitized bootstrap evidence, and load no plugin.
+- [x] Roll back the disposable copy and verify both original and copied fingerprints/readiness.
+- [x] Commit only a sanitized outcome report; do not claim plugin, Harmony, lifecycle, or game API compatibility.
+- [x] Run the final hosted Windows/Linux matrix and independently inspect every TRX artifact.
 
-This follow-up closes review findings without installing or executing a loader. It keeps Task 3 out of scope and preserves the existing fingerprint-v1 inputs.
+Task-3 historical outcome: BepInEx `5.4.23.5` reported preloader and chainloader initialization with zero plugins and no warnings/errors for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`. The historical run restored the compatibility fingerprint, but did not retain complete original/disposable manifests; the sanitized report records that limitation. Pre-hardening hosted run `30857962381` on commit `697419a2adba75933f02b4009a16cddf3ff4b0b6` passed on both runners with 11 TRX files and 130 tests per runner using SDK `10.0.100`. M1 remains incomplete.
+
+## M1 Task 3 hardening: fail-closed verification and rollback
+
+- [x] Capture and compare complete original-installation manifests before and after the experiment.
+- [x] Re-run original runtime compatibility, readiness, and loader-indicator checks after rollback and feed the structured results into the report.
+- [x] Capture and compare complete disposable-copy manifests before launch and after rollback, with fingerprint v1 as an additional check.
+- [x] Reject existing `clean-game` directories for fresh `Full` runs and add manifest-backed explicit resume validation.
+- [x] Guard every post-apply failure path with deterministic rollback or an explicit manual-closure recovery state.
+- [x] Derive and validate the committed report path below `docs/discovery`; remove arbitrary direct CLI report destinations.
+- [x] Add regression tests for manifest verification, resume safety, post-apply rollback, recovery markers, and report-path containment.
+- [x] Update the Task 3 report and project documentation without fabricating complete historical manifest evidence.
+- [x] Run local and hosted validation; do not begin M1 Task 4 until this branch is reviewed and merged.
+
+Task-3 hardening validation: implementation commit `1643cdb4e26f3e5d0890b7b203df8904ec77795c` passed hosted run `30860012681` on Windows and Ubuntu. Each runner used SDK `10.0.100`, uploaded 11 TRX files representing 146 tests, and reported 0 failures, errors, or skips; no TRX overwrite warning occurred. The private experiment was not rerun.
+
+### M1 Task 3 hardening review follow-up
+
+- [x] Derive the original-installation verification report claim from structured pending, passed, failed, and manual-closure states, including failed check categories.
+- [x] Require a schema-valid saved baseline for `Baseline`, `Install`, `Launch`, `Verify`, and `Rollback`; only `Prepare` and fresh `Full` may create a baseline.
+- [x] Preserve recovery-marker persistence success or failure in guard results, reports, and CLI output without touching an active profile.
+- [x] Add regression tests for report evidence states, staged-mode baseline gates, baseline immutability, marker-write failure, and sanitized CLI/report messaging.
+- [x] Run the new local validation and hosted Windows/Linux matrix; record the final current-head run before requesting merge.
+
+The review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`, whose pre-fix hosted run was `30860548085` with 11 TRX files and 146 tests per runner. Implementation commit `de3159e85c177526c2dafc6b5a60fa80e38c0bc9` passed hosted run `30864308531` on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, 154 tests, and 0 failures/errors/skips per runner; no overwrite warnings occurred. M1 Task 4 remains unstarted and the private loader experiment is not rerun.
+
+### M1 Task 3 final transaction-state correction
+
+- [x] Replace the unversioned transaction plan with an atomic, schema- and task-versioned transaction state.
+- [x] Validate every persisted transaction entry, destination, and backup path again before staged launch, verification, and rollback.
+- [x] Verify the complete expected applied profile, replacement hashes, baseline identity, and bounded generated BepInEx evidence before accepting `Applied` or `LaunchObserved`.
+- [x] Make staged `Verify` require `LaunchObserved`, expected BepInEx 5.4.23.5 evidence, preloader and chainloader initialization, zero custom plugins, and no fatal loader errors.
+- [x] Ensure failed or rolled-back transaction states cannot be used as proof of installation and cannot produce a false-positive staged verification.
+- [x] Correct staged launch failure state persistence and the remaining no-transaction report wording.
+- [x] Add regression coverage for empty/stale/mismatched transaction state, applied-profile drift, unsafe persisted paths, and bootstrap evidence requirements.
+- [x] Run and independently inspect the final hosted Windows/Linux matrix before requesting merge; do not rerun the private experiment.
+
+This correction continues from reviewed head `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Implementation commit `08940f274d00d6c681c08d36364deedb04474a3d` passed hosted run `30866207996` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 11 TRX files representing 165 tests with 0 failures, errors, and skips, and no overwrite warning occurred. M1 Task 4 remains unstarted.
+
+## M1 discovery task 2 hardening (completed and merged)
+
+This completed follow-up closed review findings without installing or executing a loader. It preserved the existing fingerprint-v1 inputs.
 
 - [x] Refactor Task 1 and Task 2 to consume one non-writing installation snapshot and fingerprint service.
 - [x] Recompute fingerprint v1 before runtime report generation and reject mismatched supplied fingerprints without creating output.
@@ -148,6 +197,8 @@ This follow-up closes review findings without installing or executing a loader. 
 - [x] Inspect every hosted TRX artifact and record the exact current-head evidence; leave M1 Task 3 unstarted.
 
 Final hardening validation: run `30852340193` tested commit `09850c955eff216264ad23a84b035c1057e8bcca`. Windows and Ubuntu each passed with SDK `10.0.100`, 10 TRX files, 99 represented tests, 0 failures/errors, and 0 skipped tests. No overwrite warning occurred.
+
+Task-2 merge evidence: PR #2 merged into `main` at `d3f1bb4fde9f77efbb84349f440385cc89002c86`; main run `30853440786` passed on Windows and Ubuntu with 10 TRX files and 99 tests per runner.
 
 ## M1 discovery task 1 hardening checklist
 

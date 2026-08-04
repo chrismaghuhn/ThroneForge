@@ -77,3 +77,24 @@ The fingerprint is a lowercase SHA-256 digest of UTF-8, LF-separated, invariant-
 Unity version is reported only when stable local evidence is readable. PE architecture supports x86, x64, and Arm64; malformed or unsupported headers produce `Unknown`. A classification does not establish loader compatibility, lifecycle behavior, game API bindings, or a target framework. Those questions require later, evidence-backed discovery tasks and must not be inferred from this report.
 
 Selected compatibility files are opened once for length validation and SHA-256 hashing, with a 64 MiB per-file limit. Path, permission, and filesystem failures are returned as sanitized discovery errors without absolute paths or stack traces in normal CLI output.
+
+## M1 task 3: reversible loader bootstrap smoke test
+
+The loader smoke-test harness is local-only and accepts an explicit original game path, an explicit external experiment root, the expected fingerprint, and optionally the exact official archive:
+
+```powershell
+./tools/loader-smoke-test/Invoke-ThroneForgeLoaderSmokeTest.ps1 `
+  -Mode Full `
+  -GamePath "C:\Path\To\Thronefall" `
+  -ExperimentRoot "D:\ThroneForgeExperiments\<fingerprint>" `
+  -ExpectedFingerprint "<fingerprint>" `
+  -AllowDownload
+```
+
+`-AllowDownload` is required for the harness to query the official GitHub release. It accepts only `BepInEx/BepInEx`, tag `v5.4.23.5`, and asset `BepInEx_win_x64_5.4.23.5.zip`. An explicit local archive is accepted only when its filename matches and its observed SHA-256 is recorded. `Plan`, `Prepare`, `Baseline`, `Install`, `Launch`, `Verify`, `Rollback`, `Full`, explicit manifest-backed `Resume`, and the separate `Cleanup` mode are available; the experiment root must remain outside the repository and original installation.
+
+The harness first recomputes fingerprint v1, captures a complete original manifest, and verifies runtime readiness. A fresh `Full` run rejects any existing `clean-game` directory. The explicit `Resume` mode accepts an existing copy only with a schema- and task-versioned baseline manifest, complete manifest equality, current readiness, and absent loader indicators. Fresh preparation copies the complete installation without following reparse points and requires the copied fingerprint to match. It launches only the copied executable for a bounded baseline observation, securely validates archive paths and sizes before extraction, applies the loader transactionally, and rolls back the copy after evidence collection. After rollback it compares the complete disposable manifest and repeats the original fingerprint, runtime/readiness, loader-indicator, and complete-manifest checks. It never launches or writes to the original installation, never adds a plugin, and never executes Harmony or game-internal code.
+
+The committed report destination is derived internally as `<repository-root>/docs/discovery/<fingerprint>-loader-smoke-test.md`; the CLI does not accept an arbitrary report path. A manual-closure state writes only a local recovery marker under the external experiment root and reports the redacted `Rollback` command needed after graceful closure. No automatic cleanup is performed while a copied process is active.
+
+The bootstrap result is classified as `Passed`, `PassedWithWarnings`, `Failed`, or `Inconclusive`. Preloader/chainloader log evidence can satisfy the initialization-evidence requirement when a separate configuration file is not generated. A pass proves only loader bootstrap for the exact fingerprint; it does not prove plugin target-framework compatibility, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, or custom waves. Raw logs, archives, manifests, and copied files remain in the external experiment root and are never committed.
