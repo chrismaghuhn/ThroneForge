@@ -206,7 +206,9 @@ This follow-up starts from reviewed head `18f7b1135b6aaba04290198f355e6e9ac6a97b
 - [x] Enforce deterministic fail-closed gate precedence and stable reason-code constants without assembly loading, reflection, process launch, or game access.
 - [x] Add regression tests for identity canonicalization, cross-record mismatches, digest changes, unknown states, path-free records, and existing architecture boundaries.
 - [x] Update ADR-0005, ADR-0006, README, STATUS, CHANGELOG, and the detailed Task-4 plan to describe evidence binding as trusted input rather than a cryptographic signature or OS sandbox.
-- [ ] Run local validation and exact-SDK hosted Windows/Linux validation; inspect every TRX artifact before requesting merge. M1 remains incomplete.
+- [x] Run local validation and exact-SDK hosted Windows/Linux validation; inspect every TRX artifact before requesting merge. M1 remains incomplete.
+
+Implementation validation: commit `382fe877f5685bb71d77ee6b5cf04afc8a57a7bf` passed hosted run `30878049044` on Windows and Ubuntu with SDK `10.0.100`. Each runner uploaded 11 TRX files representing 212 tests with 0 failures, errors, or skips; no TRX overwrite warning occurred. Both artifacts were downloaded and parsed independently.
 
 ## M1 discovery task 2 hardening (completed and merged)
 
