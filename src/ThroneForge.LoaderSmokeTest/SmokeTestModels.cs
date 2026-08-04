@@ -41,6 +41,7 @@ public enum SmokeTestRollbackState
 public enum OriginalInstallationVerificationState
 {
     PreflightPassedPostCheckPending,
+    NoTransactionApplied,
     CompletePostCheckPassed,
     CompletePostCheckFailed,
     ManualClosureDeferred
@@ -55,6 +56,8 @@ public sealed record OriginalInstallationVerificationEvidence(
         {
             OriginalInstallationVerificationState.PreflightPassedPostCheckPending
                 => "Preflight passed; complete original post-verification is pending.",
+            OriginalInstallationVerificationState.NoTransactionApplied
+                => "Preflight passed; complete post-verification was not required because no loader transaction was applied.",
             OriginalInstallationVerificationState.CompletePostCheckPassed
                 => "Preflight and complete original post-verification passed; all required compatibility and integrity checks matched.",
             OriginalInstallationVerificationState.CompletePostCheckFailed
@@ -72,6 +75,16 @@ public enum TransactionChangeKind
     Overwrite,
     Unchanged,
     CreatedDirectory
+}
+
+public enum LoaderTransactionStatus
+{
+    Prepared,
+    Applied,
+    LaunchObserved,
+    RollbackRequired,
+    RolledBack,
+    FailedAndRolledBack
 }
 
 public sealed class SmokeTestException : Exception
@@ -159,6 +172,37 @@ public sealed record TransactionEntry(
 public sealed record TransactionPlan(
     string ExtractionRoot,
     IReadOnlyList<TransactionEntry> Entries);
+
+public sealed record LoaderBootstrapEvidence(
+    string? BepInExVersion,
+    bool PreloaderInitialized,
+    bool ChainloaderInitialized,
+    int PluginsDiscovered,
+    int WarningCount,
+    int ErrorCount,
+    int FatalErrorCount)
+{
+    public bool MeetsBootstrapCriteria
+        => string.Equals(BepInExVersion, "5.4.23.5", StringComparison.Ordinal)
+            && PreloaderInitialized
+            && ChainloaderInitialized
+            && PluginsDiscovered == 0
+            && FatalErrorCount == 0;
+}
+
+public sealed record LoaderTransactionState(
+    string SchemaVersion,
+    string TaskVersion,
+    string ExpectedFingerprint,
+    string BaselineManifestIdentity,
+    string ArchiveName,
+    string ObservedArchiveSha256,
+    LoaderTransactionStatus Status,
+    CopyManifest ExpectedAppliedManifest,
+    IReadOnlyList<TransactionEntry> Entries,
+    IReadOnlyList<FileManifestEntry> GeneratedEvidenceFiles,
+    IReadOnlyList<string>? GeneratedEvidenceDirectories = null,
+    LoaderBootstrapEvidence? LaunchEvidence = null);
 
 public sealed record LaunchObservationResult(
     bool Started,

@@ -2,13 +2,13 @@
 
 ## Current milestone
 
-M1 - Task 3 loader bootstrap smoke-test hardening review follow-up in progress on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
+M1 - Task 3 final transaction-state correction in progress on `agent/m1-loader-smoke-test-hardening`; Task 4 remains unstarted.
 
 ## State
 
 M0 and M1 discovery task 1 are complete and merged into protected `main`. M1 task 2 and its hardening are complete and were merged by PR #2 at `d3f1bb4fde9f77efbb84349f440385cc89002c86`. M1 task 3 has a credible historical private bootstrap result, but this branch is hardening the reusable harness before merge. M1 overall remains incomplete.
 
-The current review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`. Its pre-fix hosted run was `30860548085`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 146 tests, and had 0 failures, errors, or skips. Final hosted validation for the evidence-derived report, staged-baseline, and recovery-marker corrections is recorded below.
+The current final correction started from `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Its pre-fix hosted run was `30864571605`: Windows and Ubuntu each used SDK `10.0.100`, produced 11 TRX files representing 154 tests, and had 0 failures, errors, or skips. Final hosted validation for the versioned transaction-state, persisted-path, applied-profile, staged-Verify, and report-wording corrections is pending and will be recorded only after the new branch head completes CI.
 
 ## Completed
 
@@ -169,6 +169,14 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - The private experiment was not rerun. No loader, game binary, archive, raw log, recovery marker, or private path was committed.
 - Hosted hardening validation passed in run [30860012681](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30860012681) for implementation commit `1643cdb4e26f3e5d0890b7b203df8904ec77795c`: Windows PASS with SDK `10.0.100`, 11 TRX files, 146 tests, 0 failures/errors/skips; Ubuntu PASS with SDK `10.0.100`, 11 TRX files, 146 tests, 0 failures/errors/skips. Both artifacts were downloaded and parsed independently; no `Overwriting results file` warning occurred.
 - Final documentation follow-up head `bc1f400231ab4b1b825fdc21af438520ac5a6af6` was independently validated by run [30860399073](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30860399073) with the same Windows/Linux result: 11 TRX files and 146 tests per runner, 0 failures/errors/skips, exact SDK `10.0.100`, and no overwrite warning. This follow-up changed documentation only.
+
+### M1 Task 3 final transaction-state correction status
+
+- The persisted loader state is now schema- and task-versioned, atomically written, and bound to the expected fingerprint, baseline manifest identity, exact archive name, and observed archive SHA-256.
+- `Applied` and `LaunchObserved` are accepted only after full applied-profile verification. `FailedAndRolledBack` and empty/stale/mismatched states cannot be used by staged `Launch` or `Verify`.
+- Every persisted destination and backup path is revalidated for normalized containment before staged operations and rollback. Staged `Verify` requires recorded BepInEx 5.4.23.5, preloader, chainloader, zero custom plugins, and zero fatal loader errors.
+- Local synthetic validation of the correction passed with SDK `10.0.110` from the parent directory: Release build PASS with 0 warnings/errors; focused LoaderSmokeTest tests PASS with 66 tests. Full-solution and hosted final validation are pending.
+- The private loader experiment was not rerun. No loader/game binary, archive, raw log, transaction state, recovery marker, private path, or other prohibited artifact was committed.
 
 ## Next task
 

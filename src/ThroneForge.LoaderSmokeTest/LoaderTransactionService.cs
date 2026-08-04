@@ -2,6 +2,47 @@ namespace ThroneForge.LoaderSmokeTest;
 
 public static class LoaderTransactionService
 {
+    public static void ValidatePersistedEntries(
+        SmokeTestRoots roots,
+        IReadOnlyList<TransactionEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        ArgumentNullException.ThrowIfNull(entries);
+        var comparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        var destinations = new HashSet<string>(comparer);
+        var backups = new HashSet<string>(comparer);
+        foreach (var entry in entries)
+        {
+            if (entry is null)
+            {
+                throw new SmokeTestException("The persisted loader transaction contains a null entry.");
+            }
+
+            ValidateRelativePath(roots.CleanGameRoot, entry.RelativePath);
+            if (!destinations.Add(entry.RelativePath))
+            {
+                throw new SmokeTestException("The persisted loader transaction contains duplicate normalized destinations.");
+            }
+
+            _ = entry.Change switch
+            {
+                TransactionChangeKind.NewFile when entry.OriginalSha256 is null
+                    && IsSha256(entry.ReplacementSha256)
+                    && entry.BackupRelativePath is null => true,
+                TransactionChangeKind.Overwrite when IsSha256(entry.OriginalSha256)
+                    && IsSha256(entry.ReplacementSha256)
+                    && !string.IsNullOrWhiteSpace(entry.BackupRelativePath) => ValidateBackupPath(roots, entry.BackupRelativePath, backups),
+                TransactionChangeKind.Unchanged when IsSha256(entry.OriginalSha256)
+                    && string.Equals(entry.OriginalSha256, entry.ReplacementSha256, StringComparison.OrdinalIgnoreCase)
+                    && entry.BackupRelativePath is null => true,
+                TransactionChangeKind.CreatedDirectory when entry.OriginalSha256 is null
+                    && entry.ReplacementSha256 is null
+                    && entry.BackupRelativePath is null => true,
+                _ => throw new SmokeTestException("The persisted loader transaction contains inconsistent hashes or change metadata.")
+            };
+        }
+    }
+
     public static TransactionPlan Prepare(SmokeTestRoots roots, ArchiveInspectionResult archive)
     {
         ArgumentNullException.ThrowIfNull(roots);
@@ -64,6 +105,7 @@ public static class LoaderTransactionService
         ArgumentNullException.ThrowIfNull(roots);
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(archive);
+        ValidatePersistedEntries(roots, plan.Entries);
         var archiveFiles = archive.Manifest
             .Where(item => !item.IsDirectory)
             .ToDictionary(item => item.RelativePath, StringComparer.Ordinal);
@@ -92,7 +134,8 @@ public static class LoaderTransactionService
                     Directory.CreateDirectory(parent);
                     if (transaction.Change == TransactionChangeKind.Overwrite)
                     {
-                        var backup = Path.Combine(roots.ExperimentRoot, transaction.BackupRelativePath!.Replace('/', Path.DirectorySeparatorChar));
+                        var backup = Path.Combine(roots.ManifestsRoot, transaction.BackupRelativePath!.Replace('/', Path.DirectorySeparatorChar));
+                        SmokeTestPathValidator.EnsureWithin(roots.BackupRoot, Path.Combine(roots.BackupRoot, transaction.BackupRelativePath["backup/".Length..].Replace('/', Path.DirectorySeparatorChar)));
                         var backupParent = Path.GetDirectoryName(backup)!;
                         Directory.CreateDirectory(backupParent);
                         File.Copy(destination, backup, overwrite: false);
@@ -103,7 +146,9 @@ public static class LoaderTransactionService
                         throw new SmokeTestException("The loader transaction requires an extracted archive root.");
                     }
 
-                    var source = Path.Combine(archive.ExtractionRoot, transaction.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+                    var source = SmokeTestPathValidator.EnsureWithin(
+                        archive.ExtractionRoot,
+                        Path.Combine(archive.ExtractionRoot, transaction.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
                     if (!archiveFiles.ContainsKey(transaction.RelativePath) || !File.Exists(source))
                     {
                         throw new SmokeTestException("The loader transaction source is missing from the validated extraction.");
@@ -138,6 +183,7 @@ public static class LoaderTransactionService
 
     public static bool Verify(SmokeTestRoots roots, TransactionPlan plan, ArchiveInspectionResult archive)
     {
+        ValidatePersistedEntries(roots, plan.Entries);
         var expected = archive.Manifest
             .Where(item => !item.IsDirectory)
             .ToDictionary(item => item.RelativePath, StringComparer.Ordinal);
@@ -157,6 +203,24 @@ public static class LoaderTransactionService
             }
         }
 
+        foreach (var entry in plan.Entries.Where(item => item.Change == TransactionChangeKind.Unchanged))
+        {
+            var destination = Path.Combine(roots.CleanGameRoot, entry.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(destination)
+                || !string.Equals(FileManifestHasher.HashFile(roots.CleanGameRoot, destination).Sha256, entry.OriginalSha256, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        foreach (var entry in plan.Entries.Where(item => item.Change == TransactionChangeKind.CreatedDirectory))
+        {
+            if (!Directory.Exists(Path.Combine(roots.CleanGameRoot, entry.RelativePath.Replace('/', Path.DirectorySeparatorChar))))
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -164,6 +228,12 @@ public static class LoaderTransactionService
     {
         ArgumentNullException.ThrowIfNull(roots);
         ArgumentNullException.ThrowIfNull(plan);
+        ValidatePersistedEntries(roots, plan.Entries);
+        SmokeTestPathValidator.EnsureExistingTreeHasNoReparsePoints(roots.CleanGameRoot);
+        if (Directory.Exists(roots.BackupRoot))
+        {
+            SmokeTestPathValidator.EnsureExistingTreeHasNoReparsePoints(roots.BackupRoot);
+        }
         foreach (var entry in plan.Entries.Reverse())
         {
             var destination = Path.Combine(roots.CleanGameRoot, entry.RelativePath.Replace('/', Path.DirectorySeparatorChar));
@@ -179,7 +249,7 @@ public static class LoaderTransactionService
 
                         break;
                     case TransactionChangeKind.Overwrite:
-                        var backup = Path.Combine(roots.ExperimentRoot, entry.BackupRelativePath!.Replace('/', Path.DirectorySeparatorChar));
+                        var backup = Path.Combine(roots.ManifestsRoot, entry.BackupRelativePath!.Replace('/', Path.DirectorySeparatorChar));
                         if (File.Exists(backup))
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
@@ -203,6 +273,80 @@ public static class LoaderTransactionService
             }
         }
     }
+
+    public static CopyManifest BuildExpectedAppliedManifest(
+        CopyManifest baseline,
+        ArchiveInspectionResult archive)
+    {
+        ArgumentNullException.ThrowIfNull(baseline);
+        ArgumentNullException.ThrowIfNull(archive);
+        var files = baseline.Files.ToDictionary(item => item.RelativePath, StringComparer.Ordinal);
+        var directories = (baseline.Directories ?? []).ToHashSet(StringComparer.Ordinal);
+        foreach (var item in archive.Manifest)
+        {
+            AddParentDirectories(directories, item.RelativePath, item.IsDirectory);
+            if (item.IsDirectory)
+            {
+                directories.Add(item.RelativePath);
+            }
+            else
+            {
+                files[item.RelativePath] = new FileManifestEntry(item.RelativePath, item.Size, item.Sha256);
+            }
+        }
+
+        return new CopyManifest(
+            files.Values.OrderBy(item => item.RelativePath, StringComparer.Ordinal).ToArray(),
+            directories.Order(StringComparer.Ordinal).ToArray());
+    }
+
+    private static void AddParentDirectories(HashSet<string> directories, string path, bool isDirectory)
+    {
+        var parts = path.Split('/');
+        var count = isDirectory ? parts.Length - 1 : parts.Length - 1;
+        for (var index = 1; index <= count; index++)
+        {
+            directories.Add(string.Join('/', parts[..index]));
+        }
+    }
+
+    private static void ValidateRelativePath(string root, string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)
+            || path.Contains('\\', StringComparison.Ordinal)
+            || path.Contains('\0', StringComparison.Ordinal)
+            || path.Contains(':', StringComparison.Ordinal)
+            || path.StartsWith('/')
+            || path.StartsWith("//", StringComparison.Ordinal)
+            || path.Split('/').Any(part => part is "" or "." or ".."))
+        {
+            throw new SmokeTestException("The persisted loader transaction contains an unsafe relative path.");
+        }
+
+        SmokeTestPathValidator.EnsureWithin(root, Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar)));
+    }
+
+    private static bool ValidateBackupPath(SmokeTestRoots roots, string path, HashSet<string> backups)
+    {
+        if (!path.StartsWith("backup/", StringComparison.Ordinal))
+        {
+            throw new SmokeTestException("The persisted loader backup path is outside the validated backup root.");
+        }
+
+        var relative = path["backup/".Length..];
+        ValidateRelativePath(roots.BackupRoot, relative);
+        if (!backups.Add(path))
+        {
+            throw new SmokeTestException("The persisted loader transaction contains duplicate backup destinations.");
+        }
+
+        return true;
+    }
+
+    private static bool IsSha256(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+            && value.Length == 64
+            && value.All(Uri.IsHexDigit);
 
     private static void CopyFile(string source, string destination)
     {

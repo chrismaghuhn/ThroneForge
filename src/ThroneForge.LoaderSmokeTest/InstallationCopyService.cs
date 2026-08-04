@@ -2,6 +2,27 @@ namespace ThroneForge.LoaderSmokeTest;
 
 public static class InstallationCopyService
 {
+    public static string ComputeManifestIdentity(CopyManifest manifest)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        var canonical = new System.Text.StringBuilder("throneforge-copy-manifest-v1\n");
+        foreach (var directory in (manifest.Directories ?? []).Order(StringComparer.Ordinal))
+        {
+            canonical.Append("D|").Append(directory).Append('\n');
+        }
+
+        foreach (var file in manifest.Files.OrderBy(item => item.RelativePath, StringComparer.Ordinal))
+        {
+            canonical.Append("F|")
+                .Append(file.RelativePath).Append('|')
+                .Append(file.Size.ToString(System.Globalization.CultureInfo.InvariantCulture)).Append('|')
+                .Append(file.Sha256.ToLowerInvariant()).Append('\n');
+        }
+
+        return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(canonical.ToString()))).ToLowerInvariant();
+    }
+
     public static CopyManifest Copy(SmokeTestRoots roots)
     {
         ArgumentNullException.ThrowIfNull(roots);

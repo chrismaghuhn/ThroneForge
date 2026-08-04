@@ -32,6 +32,7 @@ public sealed record SmokeTestExecutionResult(
 public static class SmokeTestOrchestrator
 {
     private const string ExpectedArchiveName = "BepInEx_win_x64_5.4.23.5.zip";
+    private const string TransactionStateFileName = "transaction-state.json";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public static SmokeTestExecutionResult Run(
@@ -147,7 +148,7 @@ public static class SmokeTestOrchestrator
     {
         var baseline = RequireCleanStagedBaseline(request, roots, preflight);
         EnsureCopiedProfile(roots, request, preflight, baseline.DisposableManifest);
-        var plan = InstallArchive(request, roots);
+        _ = InstallArchive(request, roots, baseline.DisposableManifest);
         return new SmokeTestExecutionResult(
             SmokeTestOutcome.Inconclusive,
             "The official archive was applied to the disposable profile; launch and verification remain separate modes.",
@@ -163,17 +164,69 @@ public static class SmokeTestOrchestrator
         SmokeTestRoots roots,
         Preflight preflight)
     {
-        RequireInstalledStagedProfile(request, roots, preflight);
-        var launch = LaunchCopiedExecutable(roots, preflight.Snapshot.SelectedExecutableRelativePath);
-        var summary = LoaderLogParser.Parse(ReadKnownLoaderLog(roots.CleanGameRoot));
-        return new SmokeTestExecutionResult(
-            SmokeTestOutcomeClassifier.Classify(true, launch.Started && launch.StableInitialized, summary),
-            launch.FailureCategory,
-            null,
-            preflight.Snapshot.Fingerprint,
-            InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint,
-            true,
-            false);
+        var state = RequireInstalledStagedProfile(
+            request,
+            roots,
+            preflight,
+            [LoaderTransactionStatus.Applied]);
+        LaunchObservationResult? launch = null;
+        LoaderLogSummary? summary = null;
+        try
+        {
+            launch = LaunchCopiedExecutable(roots, preflight.Snapshot.SelectedExecutableRelativePath);
+            summary = LoaderLogParser.Parse(ReadKnownLoaderLog(roots.CleanGameRoot));
+            var status = launch.Started && launch.StableInitialized && !launch.RequiresManualClosure
+                ? LoaderTransactionStatus.LaunchObserved
+                : LoaderTransactionStatus.RollbackRequired;
+            var generatedFiles = LoaderTransactionStateService.CaptureGeneratedEvidence(
+                state.ExpectedAppliedManifest,
+                InstallationCopyService.CaptureManifest(roots.CleanGameRoot),
+                out var generatedDirectories);
+
+            LoaderTransactionStateService.SaveAtomic(
+                TransactionStatePath(roots),
+                state with
+                {
+                    Status = status,
+                    GeneratedEvidenceFiles = generatedFiles,
+                    GeneratedEvidenceDirectories = generatedDirectories,
+                    LaunchEvidence = ToBootstrapEvidence(summary)
+                });
+
+            return new SmokeTestExecutionResult(
+                SmokeTestOutcomeClassifier.Classify(true, launch.Started && launch.StableInitialized, summary),
+                launch.FailureCategory,
+                null,
+                preflight.Snapshot.Fingerprint,
+                InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint,
+                true,
+                false);
+        }
+        catch (Exception exception)
+        {
+            try
+            {
+                LoaderTransactionStateService.SaveAtomic(
+                    TransactionStatePath(roots),
+                    state with
+                    {
+                        Status = LoaderTransactionStatus.RollbackRequired,
+                        GeneratedEvidenceFiles = [],
+                        GeneratedEvidenceDirectories = [],
+                        LaunchEvidence = summary is null ? null : ToBootstrapEvidence(summary)
+                    });
+            }
+            catch (Exception stateException)
+            {
+                throw new SmokeTestException(
+                    "The staged loader launch failed and its transaction could not be marked for rollback.",
+                    stateException);
+            }
+
+            throw exception is SmokeTestException smokeTestException
+                ? new SmokeTestException("The staged loader launch failed; rollback is required.", smokeTestException)
+                : new SmokeTestException("The staged loader launch failed; rollback is required.", exception);
+        }
     }
 
     private static SmokeTestExecutionResult Verify(
@@ -181,19 +234,26 @@ public static class SmokeTestOrchestrator
         SmokeTestRoots roots,
         Preflight preflight)
     {
-        RequireInstalledStagedProfile(request, roots, preflight);
-        var copied = Directory.Exists(roots.CleanGameRoot)
-            ? InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint
-            : null;
+        var state = RequireInstalledStagedProfile(
+            request,
+            roots,
+            preflight,
+            [LoaderTransactionStatus.LaunchObserved]);
+        LoaderTransactionStateService.VerifyAppliedProfile(roots, state);
+        var copied = InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint;
         var original = InstallationFingerprintService.Capture(roots.OriginalGameRoot).Fingerprint;
         if (!string.Equals(original, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase))
         {
             throw new SmokeTestException("The original installation changed during the experiment.");
         }
 
+        var loaderVerified = state.LaunchEvidence?.MeetsBootstrapCriteria == true;
+
         return new SmokeTestExecutionResult(
-            copied == request.ExpectedFingerprint ? SmokeTestOutcome.Passed : SmokeTestOutcome.Failed,
-            copied == request.ExpectedFingerprint ? "Original and copied fingerprint verification succeeded." : "The disposable profile fingerprint differs.",
+            copied == request.ExpectedFingerprint && loaderVerified ? SmokeTestOutcome.Passed : SmokeTestOutcome.Failed,
+            copied == request.ExpectedFingerprint && loaderVerified
+                ? "Original preflight, applied transaction state, loader evidence, and copied profile verification succeeded."
+                : "The staged loader transaction or required BepInEx bootstrap evidence could not be verified.",
             null,
             original,
             copied,
@@ -206,7 +266,16 @@ public static class SmokeTestOrchestrator
         SmokeTestRoots roots,
         Preflight preflight)
     {
-        var plan = RequireInstalledStagedProfile(request, roots, preflight);
+        var state = RequireInstalledStagedProfile(
+            request,
+            roots,
+            preflight,
+            [
+                LoaderTransactionStatus.Applied,
+                LoaderTransactionStatus.LaunchObserved,
+                LoaderTransactionStatus.RollbackRequired
+            ]);
+        var plan = new TransactionPlan(roots.ExtractedLoaderRoot, state.Entries);
         LoaderTransactionService.Rollback(roots, plan);
         var baseline = LoadBaseline(roots);
         var manifestResult = InstallationCopyService.RestoreFilesToManifest(
@@ -214,10 +283,20 @@ public static class SmokeTestOrchestrator
             baseline.DisposableManifest);
         var copied = InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint;
         var succeeded = manifestResult.Matches
-            && string.Equals(copied, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase);
+            && string.Equals(copied, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase)
+            && VerifyCopiedReadinessAfterRollback(request, roots);
         if (succeeded)
         {
             SmokeTestRecoveryMarkerService.Clear(Path.Combine(roots.ManifestsRoot, "recovery-marker.json"));
+            LoaderTransactionStateService.SaveAtomic(
+                TransactionStatePath(roots),
+                state with
+                {
+                    Status = LoaderTransactionStatus.RolledBack,
+                    GeneratedEvidenceFiles = [],
+                    GeneratedEvidenceDirectories = [],
+                    LaunchEvidence = null
+                });
         }
         return new SmokeTestExecutionResult(
             succeeded ? SmokeTestOutcome.Passed : SmokeTestOutcome.Failed,
@@ -282,7 +361,7 @@ public static class SmokeTestOrchestrator
                 SmokeTestRollbackState.NotApplied);
         }
 
-        var plan = InstallArchive(request, roots);
+        var transaction = InstallArchive(request, roots, copyManifest);
         var guard = SmokeTestPostApplyGuard.Execute(
             launch: () => hooks.Launch is null
                 ? LaunchCopiedExecutable(roots, copiedSnapshot.SelectedExecutableRelativePath)
@@ -290,7 +369,7 @@ public static class SmokeTestOrchestrator
             readLog: () => hooks.ReadLoaderLog is null ? ReadKnownLoaderLog(roots.CleanGameRoot) : hooks.ReadLoaderLog(roots.CleanGameRoot),
             parseLog: text => hooks.ParseLoaderLog is null ? LoaderLogParser.Parse(text) : hooks.ParseLoaderLog(text),
             classify: summary => SmokeTestOutcomeClassifier.Classify(true, true, summary),
-            rollback: () => RollbackAppliedProfile(roots, plan, copyManifest),
+            rollback: () => RollbackAppliedProfile(roots, transaction.State, copyManifest),
             writeRecoveryMarker: () => SaveRecoveryMarker(roots));
 
         var loaderLaunch = guard.Launch ?? new LaunchObservationResult(false, false, true, null, true, false, TimeSpan.Zero, guard.FailureCategory);
@@ -354,7 +433,10 @@ public static class SmokeTestOrchestrator
             guard.RollbackState);
     }
 
-    private static TransactionPlan InstallArchive(LoaderSmokeTestRequest request, SmokeTestRoots roots)
+    private static (TransactionPlan Plan, LoaderTransactionState State) InstallArchive(
+        LoaderSmokeTestRequest request,
+        SmokeTestRoots roots,
+        CopyManifest baselineManifest)
     {
         if (string.IsNullOrWhiteSpace(request.BepInExArchivePath))
         {
@@ -374,22 +456,90 @@ public static class SmokeTestOrchestrator
             throw new SmokeTestException("The downloaded archive digest does not match the supplied official digest.");
         }
 
+        EnsureTransactionCanBeReplaced(request, roots, baselineManifest);
         var extracted = ArchiveSafetyService.Extract(archivePath, roots.ExtractedLoaderRoot);
         var plan = LoaderTransactionService.Prepare(roots, extracted);
-        SaveJson(Path.Combine(roots.ManifestsRoot, "transaction-plan.json"), plan);
-        LoaderTransactionService.Apply(roots, plan, extracted);
-        return plan;
+        var prepared = new LoaderTransactionState(
+            LoaderTransactionStateService.SchemaVersion,
+            LoaderTransactionStateService.TaskVersion,
+            request.ExpectedFingerprint.ToLowerInvariant(),
+            InstallationCopyService.ComputeManifestIdentity(baselineManifest),
+            ExpectedArchiveName,
+            observedHash,
+            LoaderTransactionStatus.Prepared,
+            LoaderTransactionService.BuildExpectedAppliedManifest(baselineManifest, extracted),
+            plan.Entries,
+            []);
+        LoaderTransactionStateService.SaveAtomic(TransactionStatePath(roots), prepared);
+        try
+        {
+            LoaderTransactionService.Apply(roots, plan, extracted);
+            LoaderTransactionStateService.VerifyAppliedProfile(roots, prepared);
+            var applied = prepared with { Status = LoaderTransactionStatus.Applied };
+            LoaderTransactionStateService.SaveAtomic(TransactionStatePath(roots), applied);
+            return (plan, applied);
+        }
+        catch (Exception exception)
+        {
+            var rollbackSucceeded = false;
+            try
+            {
+                LoaderTransactionService.Rollback(roots, plan);
+                rollbackSucceeded = true;
+            }
+            catch (SmokeTestException)
+            {
+            }
+
+            if (rollbackSucceeded)
+            {
+                LoaderTransactionStateService.SaveAtomic(
+                    TransactionStatePath(roots),
+                    prepared with { Status = LoaderTransactionStatus.FailedAndRolledBack });
+            }
+
+            if (exception is SmokeTestException smokeTestException)
+            {
+                throw new SmokeTestException(
+                    rollbackSucceeded
+                        ? "The loader transaction failed and was rolled back; the persisted state is not launchable."
+                        : "The loader transaction failed and rollback could not be verified.",
+                    smokeTestException);
+            }
+
+            throw new SmokeTestException(
+                rollbackSucceeded
+                    ? "The loader transaction failed and was rolled back; the persisted state is not launchable."
+                    : "The loader transaction failed and rollback could not be verified.",
+                exception);
+        }
     }
 
     private static bool RollbackAppliedProfile(
         SmokeTestRoots roots,
-        TransactionPlan plan,
+        LoaderTransactionState state,
         CopyManifest baseline)
     {
         try
         {
+            LoaderTransactionService.ValidatePersistedEntries(roots, state.Entries);
+            var plan = new TransactionPlan(roots.ExtractedLoaderRoot, state.Entries);
             LoaderTransactionService.Rollback(roots, plan);
-            return InstallationCopyService.RestoreFilesToManifest(roots.CleanGameRoot, baseline).Matches;
+            var restored = InstallationCopyService.RestoreFilesToManifest(roots.CleanGameRoot, baseline).Matches;
+            if (restored)
+            {
+                LoaderTransactionStateService.SaveAtomic(
+                    TransactionStatePath(roots),
+                    state with
+                    {
+                        Status = LoaderTransactionStatus.RolledBack,
+                        GeneratedEvidenceFiles = [],
+                        GeneratedEvidenceDirectories = [],
+                        LaunchEvidence = null
+                    });
+            }
+
+            return restored;
         }
         catch (SmokeTestException)
         {
@@ -465,6 +615,9 @@ public static class SmokeTestOrchestrator
     private static string BaselinePath(SmokeTestRoots roots)
         => Path.Combine(roots.ManifestsRoot, "baseline-copy-manifest.json");
 
+    private static string TransactionStatePath(SmokeTestRoots roots)
+        => Path.Combine(roots.ManifestsRoot, TransactionStateFileName);
+
     private static void SaveBaseline(
         SmokeTestRoots roots,
         string expectedFingerprint,
@@ -481,6 +634,58 @@ public static class SmokeTestOrchestrator
 
     private static DisposableProfileBaseline LoadBaseline(SmokeTestRoots roots)
         => LoadJson<DisposableProfileBaseline>(BaselinePath(roots));
+
+    private static void EnsureTransactionCanBeReplaced(
+        LoaderSmokeTestRequest request,
+        SmokeTestRoots roots,
+        CopyManifest baselineManifest)
+    {
+        var legacyPlanPath = Path.Combine(roots.ManifestsRoot, "transaction-plan.json");
+        if (File.Exists(legacyPlanPath))
+        {
+            throw new SmokeTestException("An unversioned loader transaction plan exists; it must be explicitly removed or rolled back before installation.");
+        }
+
+        if (!File.Exists(TransactionStatePath(roots)))
+        {
+            return;
+        }
+
+        var existing = LoaderTransactionStateService.LoadAndValidate(
+            TransactionStatePath(roots),
+            roots,
+            request.ExpectedFingerprint,
+            baselineManifest,
+            Enum.GetValues<LoaderTransactionStatus>());
+        if (existing.Status is not (LoaderTransactionStatus.RolledBack or LoaderTransactionStatus.FailedAndRolledBack))
+        {
+            throw new SmokeTestException("An active or stale loader transaction exists; run Rollback successfully before installing again.");
+        }
+    }
+
+    private static bool VerifyCopiedReadinessAfterRollback(
+        LoaderSmokeTestRequest request,
+        SmokeTestRoots roots)
+    {
+        var runtimeRoot = Path.Combine(roots.ExperimentRoot, "evidence", "copied-post-rollback-runtime");
+        var runtime = new RuntimeCompatibilityEngine().Inspect(new RuntimeCompatibilityRequest(
+            roots.CleanGameRoot,
+            request.ExpectedFingerprint,
+            runtimeRoot,
+            OverwriteExisting: true));
+        return runtime.SmokeTestReadiness.Status == SmokeTestReadiness.ReadyForReversibleTest
+            && runtime.LoaderIndicators.All(item => item.Status == LoaderIndicatorStatus.Absent);
+    }
+
+    private static LoaderBootstrapEvidence ToBootstrapEvidence(LoaderLogSummary summary)
+        => new(
+            summary.BepInExVersion,
+            summary.PreloaderInitialized,
+            summary.ChainloaderInitialized,
+            summary.PluginsDiscovered,
+            summary.WarningCount,
+            summary.ErrorCount,
+            summary.FatalErrorCount);
 
     private static DisposableProfileBaseline RequireCleanStagedBaseline(
         LoaderSmokeTestRequest request,
@@ -513,10 +718,11 @@ public static class SmokeTestOrchestrator
             runtime.LoaderIndicators);
     }
 
-    private static TransactionPlan RequireInstalledStagedProfile(
+    private static LoaderTransactionState RequireInstalledStagedProfile(
         LoaderSmokeTestRequest request,
         SmokeTestRoots roots,
-        Preflight preflight)
+        Preflight preflight,
+        IEnumerable<LoaderTransactionStatus> allowedStatuses)
     {
         var baselinePath = BaselinePath(roots);
         if (!File.Exists(baselinePath))
@@ -534,13 +740,23 @@ public static class SmokeTestOrchestrator
             request.ExpectedFingerprint,
             preflight.OriginalManifest);
 
-        var planPath = Path.Combine(roots.ManifestsRoot, "transaction-plan.json");
-        if (!File.Exists(planPath))
+        if (!File.Exists(TransactionStatePath(roots)))
         {
             throw new SmokeTestException("No verified loader transaction exists for this staged mode.");
         }
 
-        return LoadJson<TransactionPlan>(planPath);
+        var state = LoaderTransactionStateService.LoadAndValidate(
+            TransactionStatePath(roots),
+            roots,
+            request.ExpectedFingerprint,
+            preflight.OriginalManifest,
+            allowedStatuses);
+        if (state.Status is LoaderTransactionStatus.Applied or LoaderTransactionStatus.LaunchObserved)
+        {
+            LoaderTransactionStateService.VerifyAppliedProfile(roots, state);
+        }
+
+        return state;
     }
 
     private static InstallationDiscoverySnapshot EnsureCopiedProfile(
@@ -642,21 +858,30 @@ public static class SmokeTestOrchestrator
         var archivePath = request.BepInExArchivePath;
         var archiveName = archivePath is null ? "Unknown" : Path.GetFileName(archivePath);
         var observedHash = archivePath is null || !File.Exists(archivePath) ? "Unknown" : ComputeHash(archivePath);
+        var manualClosureDeferred = rollbackState == SmokeTestRollbackState.ManualClosureRequired;
         var originalManifestText = postVerification is null
-            ? "Historical Task-3 evidence did not retain a complete original manifest for this state."
+            ? manualClosureDeferred
+                ? "Complete original-manifest comparison is deferred until the copied process is closed and rollback completes."
+                : "Complete original-manifest comparison was not required because no loader transaction was applied."
             : postVerification.Original.ManifestComparison.Matches
                 ? "Matches the complete original pre-experiment manifest (relative paths, sizes, and SHA-256 values)."
                 : "Does not match the complete original pre-experiment manifest.";
         var originalRuntimeText = postVerification is null
-            ? "Post-experiment runtime/readiness inspection was not performed while manual closure was required."
+            ? manualClosureDeferred
+                ? "Complete original runtime/readiness inspection is deferred until the copied process is closed and rollback completes."
+                : "Complete original runtime/readiness inspection was not required because no loader transaction was applied."
             : $"Readiness={postVerification.Original.Runtime.SmokeTestReadiness.Status}; backend={postVerification.Original.Runtime.ManagedRuntimeProfile}; architecture={postVerification.Original.Runtime.ExecutableArchitecture}; Unity={postVerification.Original.Runtime.UnityVersion}; TFM={postVerification.Original.Runtime.TargetFrameworkRecommendation}; confidence={postVerification.Original.Runtime.TargetFrameworkAssessment.Confidence}.";
         var indicatorText = postVerification is null
-            ? "Post-experiment loader-indicator inspection was deferred because the copied process remained active."
+            ? manualClosureDeferred
+                ? "Original-installation loader-indicator inspection is deferred until the copied process is closed and rollback completes."
+                : "Original-installation loader-indicator inspection was not required because no loader transaction was applied."
             : postVerification.Original.IndicatorsAbsent
                 ? "All inspected original-installation loader indicators were Absent."
                 : "One or more original-installation loader indicators were non-absent.";
         var disposableText = postVerification is null
-            ? "Complete disposable-manifest rollback comparison was deferred because manual closure is required."
+            ? manualClosureDeferred
+                ? "Complete disposable-manifest rollback comparison is deferred until the copied process is closed."
+                : "Complete disposable-manifest rollback comparison was not required because no loader transaction was applied."
             : postVerification.DisposableManifestMatches
                 ? "Matches the complete disposable pre-installation manifest (relative paths, sizes, directories, and SHA-256 values), plus fingerprint v1."
                 : "Does not match the complete disposable pre-installation manifest.";
@@ -666,7 +891,7 @@ public static class SmokeTestOrchestrator
                     OriginalInstallationVerificationState.ManualClosureDeferred,
                     [])
                 : new OriginalInstallationVerificationEvidence(
-                    OriginalInstallationVerificationState.PreflightPassedPostCheckPending,
+                    OriginalInstallationVerificationState.NoTransactionApplied,
                     [])
             : postVerification.Original.Passed
                 ? new OriginalInstallationVerificationEvidence(
@@ -708,7 +933,9 @@ public static class SmokeTestOrchestrator
             summary,
             rollbackResult,
             postVerification is null
-                ? "Post-experiment original verification was deferred; compatibility fingerprint was unchanged before manual closure."
+                ? manualClosureDeferred
+                    ? "Preflight passed; complete post-verification is deferred until the copied process is closed and rollback completes."
+                    : "Preflight passed; complete post-verification was not required because no loader transaction was applied."
                 : postVerification.Original.Passed
                     ? "Complete original manifest, compatibility fingerprint, runtime readiness, and expected compatibility evidence matched."
                     : "One or more original post-verification checks failed.",

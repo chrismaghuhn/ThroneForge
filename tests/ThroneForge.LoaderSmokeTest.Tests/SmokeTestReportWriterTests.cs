@@ -74,4 +74,39 @@ public sealed class SmokeTestReportWriterTests
         Assert.Contains("## Recovery or rollback state", report, StringComparison.Ordinal);
         Assert.DoesNotContain("Original absolute path", report, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void BaselineFailureReportDoesNotClaimManualClosure()
+    {
+        var noTransaction = "Preflight passed; complete post-verification was not required because no loader transaction was applied.";
+        var report = SmokeTestReportWriter.BuildReport(new SmokeTestDetailedReport(
+            "a".PadLeft(64, 'a'),
+            "m1-loader-smoke-test-v3",
+            DateTimeOffset.UtcNow,
+            SmokeTestOutcome.Inconclusive,
+            noTransaction,
+            "Copied profile was not created.",
+            "Baseline launch was inconclusive; no loader transaction was applied.",
+            "Not attempted.",
+            "Unknown",
+            "Unknown",
+            "Unknown",
+            "Unknown",
+            "Unknown",
+            "Not extracted.",
+            "No transaction was applied.",
+            "Not attempted.",
+            "No loader evidence.",
+            new LoaderLogSummary(null, false, false, false, 0, 0, 0, 0, [], false),
+            "Not required because no loader transaction was applied.",
+            noTransaction,
+            [],
+            [],
+            "No loader transaction was applied.",
+            "M1 task 4."));
+
+        Assert.Contains(noTransaction, report, StringComparison.Ordinal);
+        Assert.DoesNotContain("manual closure", report, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("historical evidence", report, StringComparison.OrdinalIgnoreCase);
+    }
 }

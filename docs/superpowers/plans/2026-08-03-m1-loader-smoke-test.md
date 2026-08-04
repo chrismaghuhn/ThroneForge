@@ -227,3 +227,28 @@ Push `agent/m1-loader-smoke-test`, wait for Windows and Ubuntu jobs using SDK `1
 Final hosted evidence: run `30857539959`, commit `634d3e97552d4f9ea619a2b7d9359ffc8bb1cb68`; Windows and Ubuntu each passed with SDK `10.0.100`, 11 TRX files, and 130 tests, with no overwrite warnings. Local format verification was blocked only by the absent exact SDK `10.0.100`; the hosted format checks passed.
 
 Confirm no loader/game binary, archive, raw log, proprietary file, private absolute path, plugin, Harmony reference, game API, lifecycle binding, catalog extraction, or custom-wave code is tracked. Stop with the next task limited to the next evidence-backed M1 investigation.
+
+### Task 10: Final persisted transaction-state correction
+
+**Files:**
+- Modify: `src/ThroneForge.LoaderSmokeTest/SmokeTestModels.cs`
+- Modify: `src/ThroneForge.LoaderSmokeTest/LoaderTransactionService.cs`
+- Create: `src/ThroneForge.LoaderSmokeTest/LoaderTransactionStateService.cs`
+- Modify: `src/ThroneForge.LoaderSmokeTest/SmokeTestOrchestrator.cs`
+- Modify: `tests/ThroneForge.LoaderSmokeTest.Tests/LoaderTransactionServiceTests.cs`
+- Modify: `tests/ThroneForge.LoaderSmokeTest.Tests/SmokeTestReportWriterTests.cs`
+- Modify: `PLAN.md`
+- Modify: `STATUS.md`
+- Modify: `README.md`
+- Modify: `CHANGELOG.md`
+
+- [x] Replace the unversioned persisted transaction plan with an atomic schema/task-versioned state and explicit status transitions.
+- [x] Revalidate all persisted transaction destinations and backup paths on load and again before rollback.
+- [x] Verify the complete applied manifest, replacement hashes, baseline identity, and bounded generated BepInEx evidence before staged verification.
+- [x] Make staged `Verify` require `LaunchObserved` plus exact BepInEx version, preloader, chainloader, zero custom plugins, and no fatal errors.
+- [x] Reject empty, stale, failed-and-rolled-back, fingerprint-mismatched, baseline-mismatched, and drifted transaction state.
+- [x] Derive no-transaction report wording from the actual post-verification state.
+- [x] Run synthetic local checks without rerunning the private loader experiment.
+- [ ] Run and inspect the final hosted Windows/Linux checks before merge.
+
+The correction continues from reviewed head `c98c35bd333f5a82dd008ede7f02ae9217c4140d`; pre-fix hosted run `30864571605` recorded 11 TRX files and 154 tests per runner. M1 Task 4 remains unstarted.

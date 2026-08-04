@@ -169,6 +169,19 @@ Task-3 hardening validation: implementation commit `1643cdb4e26f3e5d0890b7b203df
 
 The review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`, whose pre-fix hosted run was `30860548085` with 11 TRX files and 146 tests per runner. Implementation commit `de3159e85c177526c2dafc6b5a60fa80e38c0bc9` passed hosted run `30864308531` on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, 154 tests, and 0 failures/errors/skips per runner; no overwrite warnings occurred. M1 Task 4 remains unstarted and the private loader experiment is not rerun.
 
+### M1 Task 3 final transaction-state correction
+
+- [x] Replace the unversioned transaction plan with an atomic, schema- and task-versioned transaction state.
+- [x] Validate every persisted transaction entry, destination, and backup path again before staged launch, verification, and rollback.
+- [x] Verify the complete expected applied profile, replacement hashes, baseline identity, and bounded generated BepInEx evidence before accepting `Applied` or `LaunchObserved`.
+- [x] Make staged `Verify` require `LaunchObserved`, expected BepInEx 5.4.23.5 evidence, preloader and chainloader initialization, zero custom plugins, and no fatal loader errors.
+- [x] Ensure failed or rolled-back transaction states cannot be used as proof of installation and cannot produce a false-positive staged verification.
+- [x] Correct staged launch failure state persistence and the remaining no-transaction report wording.
+- [x] Add regression coverage for empty/stale/mismatched transaction state, applied-profile drift, unsafe persisted paths, and bootstrap evidence requirements.
+- [ ] Run and independently inspect the final hosted Windows/Linux matrix before requesting merge; do not rerun the private experiment.
+
+This correction continues from reviewed head `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Its pre-fix hosted validation was run `30864571605` with 11 TRX files and 154 tests per runner. M1 Task 4 remains unstarted.
+
 ## M1 discovery task 2 hardening (completed and merged)
 
 This completed follow-up closed review findings without installing or executing a loader. It preserved the existing fingerprint-v1 inputs.
