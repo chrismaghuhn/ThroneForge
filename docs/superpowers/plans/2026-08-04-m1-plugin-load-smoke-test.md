@@ -22,15 +22,15 @@
 - Create: `docs/superpowers/specs/2026-08-04-m1-plugin-load-smoke-test-design.md`
 - Create: `docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test.md`
 
-- [ ] **Step 1: Mark Task 4 complete on merged `main`.**
+- [x] **Step 1: Mark Task 4 complete on merged `main`.**
 
 Replace stale “in progress” wording with `main@5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`, record PR #4 merge, hosted run `30878236039`, 11 TRX files and 212 tests per runner, and state that no plugin has been loaded.
 
-- [ ] **Step 2: Define the next task as repository-only.**
+- [x] **Step 2: Define the next task as repository-only.**
 
 Add a new `M1 Task 5` section stating that the probe loads only the synthetic fixture, re-runs the gate immediately before loading, never invokes it, and does not run the private game experiment.
 
-- [ ] **Step 3: Review the docs for contradictions.**
+- [x] **Step 3: Review the docs for contradictions.**
 
 Run:
 
@@ -40,7 +40,7 @@ rg -n -i "in progress|hardening branch|Task 4 remains|plugin load|plugin is load
 
 Expected: Task 4 is complete on `main`; Task 5 is started only on the new branch; no document claims a functioning game plugin.
 
-- [ ] **Step 4: Commit the design and task-boundary documentation.**
+- [x] **Step 4: Commit the design and task-boundary documentation.**
 
 ```powershell
 git add PLAN.md STATUS.md README.md CHANGELOG.md docs/adr/ADR-0005-data-only-and-full-trust-code-mods.md docs/adr/ADR-0006-full-trust-code-mod-boundary.md docs/superpowers/specs/2026-08-04-m1-plugin-load-smoke-test-design.md docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test.md
@@ -59,11 +59,11 @@ git commit -m "docs: start M1 plugin load probe"
 - Modify: `ThroneForge.slnx`
 - Modify: `Directory.Build.props` only if an existing project convention requires an explicit marker
 
-- [ ] **Step 1: Write the failing project-discovery test.**
+- [x] **Step 1: Write the failing project-discovery test.**
 
 Add a skeleton test asserting that `PluginLoadProbe` can be constructed with a fixture assembly path and returns a `Loaded` result containing the fixture assembly identity. Run the focused test project and confirm it fails because the production project/types are absent.
 
-- [ ] **Step 2: Define the minimal immutable result model.**
+- [x] **Step 2: Define the minimal immutable result model.**
 
 Use these exact public shapes in `PluginLoadModels.cs`:
 
@@ -86,23 +86,23 @@ public sealed record PluginLoadResult(
 
 The result may contain only normalized assembly/type identities and sanitized categories; it must not contain paths, loaded objects, stack traces, or personal data.
 
-- [ ] **Step 3: Implement the bounded artifact hash and gate sequence.**
+- [x] **Step 3: Implement the bounded artifact hash and gate sequence.**
 
-`PluginLoadProbe.Load` must open `ArtifactPath` once, reject missing/non-regular/oversized files, calculate SHA-256, compare it with `Descriptor.PackageSha256`, construct verified `CodeModIntegrityEvidence` with method `sha256-file`, and call `CodeModAdmissionGate.Evaluate` immediately before `AssemblyLoadContext.LoadFromAssemblyPath`. Any non-Approved decision returns without calling the load context.
+`PluginLoadProbe.Load` must open `ArtifactPath` once, reject missing/non-regular/oversized files, buffer only the bounded bytes, calculate SHA-256 from those bytes, compare it with `Descriptor.PackageSha256`, construct verified `CodeModIntegrityEvidence` with method `sha256-file`, and call `CodeModAdmissionGate.Evaluate` immediately before `AssemblyLoadContext.LoadFromStream` on those exact bytes. Any non-Approved decision returns without calling the load context.
 
-- [ ] **Step 4: Implement collectible loading without invocation.**
+- [x] **Step 4: Implement collectible loading without invocation.**
 
 Load the exact artifact into a private collectible `AssemblyLoadContext`, inspect only assembly name and types assignable to `IThroneForgeMod`, require exactly one contract implementation, record its full type name, then unload the context. Do not call constructors or interface methods. Convert loader exceptions into `Failed` with a stable reason code and no raw path.
 
-- [ ] **Step 5: Make the fixture minimal and game-free.**
+- [x] **Step 5: Make the fixture minimal and game-free.**
 
 The fixture must implement `IThroneForgeMod` using only the existing API types. It must not reference Contracts, Runtime, Discovery, LoaderSmokeTest, BepInEx, Harmony, Unity, adapter, or game assemblies. Do not commit its build output.
 
-- [ ] **Step 6: Add projects to the solution and deliberate architecture allowlists.**
+- [x] **Step 6: Add projects to the solution and deliberate architecture allowlists.**
 
 Add source and test projects to `ThroneForge.slnx`; update the explicit project-reference allowlist only for the new intended edges. Keep the external probe outside the concrete game-facing adapter and keep the fixture test-only.
 
-- [ ] **Step 7: Run the focused test until green.**
+- [x] **Step 7: Run the focused test until green.**
 
 ```powershell
 dotnet test tests/ThroneForge.PluginLoadTest.Tests -c Release
@@ -116,23 +116,23 @@ Expected: all focused tests pass with zero failures; no new package restore is r
 - Modify: `tests/ThroneForge.PluginLoadTest.Tests/PluginLoadProbeTests.cs`
 - Modify: `tests/ThroneForge.ArchitectureTests/*` only where the existing scanner requires explicit new project entries
 
-- [ ] **Step 1: Add artifact-binding tests.**
+- [x] **Step 1: Add artifact-binding tests.**
 
 Cover matching hash success, changed artifact rejection, wrong package hash rejection, uppercase digest normalization, and no load on integrity failure.
 
-- [ ] **Step 2: Add approval and compatibility-binding tests.**
+- [x] **Step 2: Add approval and compatibility-binding tests.**
 
 Cover missing approval, approval for another identity/hash/fingerprint, denied approval, compatibility fingerprint mismatch, warning/unknown compatibility, and preservation of the exact admission binding digest in a successful result.
 
-- [ ] **Step 3: Add assembly-shape tests.**
+- [x] **Step 3: Add assembly-shape tests.**
 
 Cover missing contract implementation, duplicate contract implementations, malformed/non-assembly input, exact assembly identity capture, and no constructor/lifecycle invocation. Use fixture source variants or temporary fixture files; never use a game or loader binary.
 
-- [ ] **Step 4: Add unload and sanitization tests.**
+- [x] **Step 4: Add unload and sanitization tests.**
 
 Verify collectible-context unload after success, deterministic result fields, absence of absolute artifact paths and stack traces, and stable failure reason codes.
 
-- [ ] **Step 5: Run the focused test suite and architecture tests.**
+- [x] **Step 5: Run the focused test suite and architecture tests.**
 
 ```powershell
 dotnet test tests/ThroneForge.PluginLoadTest.Tests -c Release
@@ -161,7 +161,7 @@ dotnet test -c Release --no-build
 git status --short
 ```
 
-Expected hosted toolchain: SDK `10.0.100`, all tests green, no tracked binaries/private paths. If local SDK `10.0.100` is unavailable, record local compile/test with `10.0.110` separately and do not claim exact local format verification.
+Expected hosted toolchain: SDK `10.0.100`, all tests green, no tracked binaries/private paths. Local compile/test with `10.0.110` passed; exact local format verification remains pending because SDK `10.0.100` is not installed.
 
 - [ ] **Step 2: Run hygiene checks.**
 

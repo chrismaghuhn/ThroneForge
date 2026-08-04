@@ -19,9 +19,9 @@ The probe loads only a synthetic assembly that implements the existing portable 
 ## Trust and data flow
 
 1. The caller supplies a canonical descriptor, exact game fingerprint, adapter evidence, and approval record.
-2. The probe hashes the exact assembly artifact once with a bounded stream and requires the descriptor hash to match.
+2. The probe reads the exact assembly artifact once with a bounded stream, hashes those exact bytes, and requires the descriptor hash to match.
 3. The probe creates verified integrity evidence for that same identity/hash.
-4. Immediately before `AssemblyLoadContext.LoadFromAssemblyPath`, it evaluates the existing admission gate.
+4. Immediately before `AssemblyLoadContext.LoadFromStream` of those already-hashed bytes, it evaluates the existing admission gate.
 5. Only `Approved` proceeds. The returned binding digest is retained in the result.
 6. The collectible context loads the exact artifact, verifies that exactly one public type implements `IThroneForgeMod`, records only assembly/type identity, and is unloaded. No constructor or lifecycle method is called.
 

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ThroneForge.PluginLoadDuplicateFixture</AssemblyName>
+    <RootNamespace>ThroneForge.PluginLoadDuplicateFixture</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/ThroneForge.API/ThroneForge.API.csproj" />
+  </ItemGroup>
+</Project>

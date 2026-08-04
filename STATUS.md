@@ -175,6 +175,7 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Scope: a synthetic, repository-only assembly-load probe that re-runs the existing admission gate immediately before loading one test fixture into a collectible context.
 - Explicitly out of scope: BepInEx installation, Thronefall launch, private game inspection, plugin invocation, lifecycle binding, Unity/Harmony/game references, game API inspection, catalog extraction, and custom waves.
 - The exact SDK `10.0.100` is not installed on this workstation; local validation must distinguish SDK `10.0.110` compile/test feedback from hosted exact-SDK evidence.
+- Local Task-5 validation with SDK `10.0.110` from the parent directory: restore PASS, Release build PASS with 0 warnings/errors, full solution tests PASS with 227 tests (14 PluginLoadTest, 12 Architecture, 27 Contracts, 21 Runtime, 80 Discovery, 66 LoaderSmokeTest, and remaining skeleton tests), focused PluginLoadTest tests PASS with 14, and architecture tests PASS with 12. `dotnet format --verify-no-changes --no-restore` was attempted but is blocked because the repository-pinned SDK `10.0.100` is not installed locally.
 
 ## Next task
 
