@@ -13,6 +13,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="ThroneForgeLifecyclePlugin.cs" />
+    <Compile Include="LifecycleHost.cs" />
     <Reference Include="BepInEx" HintPath="__BEPINEX_CORE__" Private="false" />
     <Reference Include="UnityEngine" HintPath="__UNITY_ENGINE__" Private="false" />
     <Reference Include="UnityEngine.CoreModule" HintPath="__UNITY_CORE_MODULE__" Private="false" />

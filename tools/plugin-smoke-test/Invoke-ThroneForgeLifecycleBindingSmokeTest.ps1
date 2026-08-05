@@ -62,6 +62,71 @@ function Invoke-Plugin([string[]]$operation, [switch]$AllowFailure) {
     $arguments = @('run', '--project', (Join-Path $repositoryRoot 'src\ThroneForge.PluginSmokeTest'), '-c', 'Release', '--no-build', '--') + $operation
     Invoke-Dotnet $arguments -AllowFailure:$AllowFailure
 }
+function Stage-FailureCategory([string]$stage) {
+    switch ($stage) {
+        'OriginalPreflight' { 'original-preflight-failed'; break }
+        'DisposablePrepare' { 'disposable-prepare-failed'; break }
+        'BaselineLaunch' { 'baseline-launch-failed'; break }
+        'LoaderInstall' { 'loader-install-failed'; break }
+        'LoaderLaunch' { 'loader-launch-failed'; break }
+        'LoaderVerify' { 'loader-verify-failed'; break }
+        'UnityMetadataPreflight' { 'unity-metadata-preflight-failed'; break }
+        'PackageBuild' { 'package-build-failed'; break }
+        'PackageCapture' { 'package-capture-failed'; break }
+        'Admission' { 'admission-failed'; break }
+        'Deployment' { 'deployment-failed'; break }
+        'LifecycleLaunch' { 'lifecycle-launch-failed'; break }
+        'LogStability' { 'log-not-stable'; break }
+        'LifecycleVerification' { 'lifecycle-marker-invalid'; break }
+        'PluginRemoval' { 'plugin-removal-failed'; break }
+        'LoaderRollback' { 'loader-rollback-failed'; break }
+        'DisposablePostcheck' { 'disposable-restoration-failed'; break }
+        'OriginalPostcheck' { 'original-postcheck-failed'; break }
+        default { 'lifecycle-stage-failed' }
+    }
+}
+function Write-StageState([string]$stage, [string]$lastCompleted, [string]$category, [switch]$AllowFailure) {
+    if ([string]::IsNullOrWhiteSpace($script:experimentId)) { return $false }
+    $arguments = @(
+        'lifecycle-stage',
+        '--experiment-root', $script:experimentRoot,
+        '--experiment-id', $script:experimentId,
+        '--expected-fingerprint', $expectedFingerprint,
+        '--current-stage', $stage,
+        '--result-category', $category)
+    if (-not [string]::IsNullOrWhiteSpace($lastCompleted)) { $arguments += @('--last-completed-stage', $lastCompleted) }
+    if (-not [string]::IsNullOrWhiteSpace($script:stageLoaderStatus)) { $arguments += @('--loader-status', $script:stageLoaderStatus) }
+    if (-not [string]::IsNullOrWhiteSpace($script:stagePackageDigest)) { $arguments += @('--package-sha256', $script:stagePackageDigest) }
+    if (-not [string]::IsNullOrWhiteSpace($script:stageBindingDigest)) { $arguments += @('--binding-digest', $script:stageBindingDigest) }
+    $stateResult = Invoke-Plugin $arguments -AllowFailure:$AllowFailure
+    if ($stateResult.ExitCode -ne 0) { return $false }
+    $script:stageStatePersisted = $true
+    return $true
+}
+function Start-Stage([string]$stage) {
+    $script:currentStage = $stage
+    if (-not (Write-StageState $stage $script:lastCompletedStage 'in-progress')) { Fail-Safe 'The lifecycle stage state could not be persisted.' }
+}
+function Complete-Stage([string]$nextStage) {
+    $script:lastCompletedStage = $script:currentStage
+    $script:currentStage = $nextStage
+    if (-not (Write-StageState $nextStage $script:lastCompletedStage 'stage-completed')) { Fail-Safe 'The lifecycle stage state could not be persisted.' }
+}
+function Fail-CurrentStage([string]$category) {
+    if (-not (Write-StageState $script:currentStage $script:lastCompletedStage $category -AllowFailure)) { $script:stageStatePersisted = $false }
+}
+function Require-LoaderTransaction([string]$expectedBaselineIdentity, [int]$expectedStatus) {
+    $path = Join-Path $script:cleanGameRoot 'manifests\transaction-state.json'
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { Fail-Safe 'The canonical loader transaction state was not persisted.' }
+    try { $state = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json } catch { Fail-Safe 'The canonical loader transaction state was not readable.' }
+    $statusValue = [string]$state.Status
+    if ($statusValue -ne [string]$expectedStatus -and $statusValue -ne ($(if ($expectedStatus -eq 1) { 'Applied' } else { 'LaunchObserved' }))) { Fail-Safe 'The loader transaction state has an unexpected status.' }
+    if ([string]$state.BaselineManifestIdentity -ne $expectedBaselineIdentity) { Fail-Safe 'The loader transaction state is bound to the wrong disposable baseline.' }
+    $script:stageLoaderStatus = $(if ($expectedStatus -eq 1) { 'Applied' } else { 'LaunchObserved' })
+}
+function Get-ManifestIdentity([string]$root) {
+    Value (Invoke-Plugin @('manifest', '--root', $root)).Output 'manifest-identity'
+}
 function Value([string]$output, [string]$key) {
     $line = ($output -split '\r?\n' | Where-Object { $_.StartsWith("$key=", [StringComparison]::Ordinal) } | Select-Object -First 1)
     if ($null -eq $line) { Fail-Safe "Required evidence '$key' was not returned." }
@@ -117,6 +182,7 @@ function Build-LifecyclePackage {
     if ((Value $binding.Output 'metadata-valid') -ne 'True') { Fail-Safe 'UnityEngine.CoreModule did not prove the public quitting event.' }
     $template = Join-Path $repositoryRoot 'templates\lifecycle-plugin-smoke'
     Copy-Item -LiteralPath (Join-Path $template 'ThroneForgeLifecyclePlugin.cs') -Destination $sourceRoot
+    Copy-Item -LiteralPath (Join-Path $template 'LifecycleHost.cs') -Destination $sourceRoot
     $project = (Get-Content -LiteralPath (Join-Path $template 'PluginProject.csproj.template') -Raw).Replace('__TARGET_FRAMEWORK__', 'netstandard2.1').Replace('__BEPINEX_CORE__', $paths.BepInEx).Replace('__UNITY_ENGINE__', $paths.Unity).Replace('__UNITY_CORE_MODULE__', $paths.Core).Replace('__THRONEFORGE_API__', $paths.Api).Replace('__THRONEFORGE_CONTRACTS__', $paths.Contracts)
     [IO.File]::WriteAllText((Join-Path $sourceRoot 'ThroneForge.M1.LifecycleSmoke.csproj'), $project, [Text.UTF8Encoding]::new($false))
     Invoke-Dotnet @('restore', (Join-Path $sourceRoot 'ThroneForge.M1.LifecycleSmoke.csproj')) | Out-Null
@@ -129,6 +195,15 @@ function Build-LifecyclePackage {
     $manifest = Join-Path $buildRoot 'package-manifest.json'
     $pack = Invoke-Plugin @('lifecycle-package', '--package-root', $packageRoot, '--manifest-path', $manifest)
     [pscustomobject]@{ PackageRoot = $packageRoot; ManifestPath = $manifest; PackageDigest = (Value $pack.Output 'package-sha256'); ApiIdentity = (Value (Invoke-Plugin @('inspect', '--assembly-path', $paths.Api, '--relative-path', 'ThroneForge.API.dll')).Output 'assembly-identity'); ContractsIdentity = (Value (Invoke-Plugin @('inspect', '--assembly-path', $paths.Contracts, '--relative-path', 'ThroneForge.Contracts.dll')).Output 'assembly-identity') }
+}
+function Invoke-LifecycleMetadataPreflight {
+    $data = @(Get-ChildItem -LiteralPath $script:cleanGameRoot -Directory -Force | Where-Object { $_.Name.EndsWith('_Data', [StringComparison]::Ordinal) })
+    if ($data.Count -ne 1) { Fail-Safe 'The disposable profile does not have one unambiguous Unity data directory.' }
+    $core = Join-Path (Join-Path $data[0].FullName 'Managed') 'UnityEngine.CoreModule.dll'
+    if (-not (Test-Path -LiteralPath $core -PathType Leaf)) { Fail-Safe 'UnityEngine.CoreModule metadata is missing from the disposable profile.' }
+    $binding = Invoke-Plugin @('inspect-lifecycle-binding', '--assembly-path', $core)
+    if ((Value $binding.Output 'metadata-valid') -ne 'True' -or (Value $binding.Output 'assembly-identity') -notlike 'UnityEngine.CoreModule,*') { Fail-Safe 'UnityEngine.CoreModule did not prove the exact public quitting event.' }
+    return $core
 }
 
 Require-Absolute $GamePath 'Game path'; Require-Absolute $ExperimentRoot 'Experiment root'; Require-Absolute $BepInExArchive 'BepInEx archive'
@@ -145,9 +220,11 @@ if ($Mode -eq 'Cleanup') {
     'Owned cleanup completed after ownership validation.'; exit 0
 }
 if ($Mode -eq 'Full' -and (Test-Path -LiteralPath $script:experimentRoot) -and @(Get-ChildItem -LiteralPath $script:experimentRoot -Force).Count -ne 0) { Fail-Safe 'Full mode requires a nonexistent or empty experiment root.' }
+$script:experimentId = $null
 if ($Mode -eq 'Full') {
     $commit = ((& git -C $repositoryRoot rev-parse HEAD 2>$null) | Out-String).Trim()
-    Invoke-Plugin @('ownership', '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $expectedFingerprint, '--status', 'Prepared', '--repository-commit', $commit) | Out-Null
+    $ownership = Invoke-Plugin @('ownership', '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $expectedFingerprint, '--status', 'Prepared', '--repository-commit', $commit)
+    $script:experimentId = Value $ownership.Output 'experiment-id'
 }
 if ($Mode -eq 'Plan' -or $WhatIf) { Invoke-Loader Plan | Out-Null; 'Plan succeeded; no lifecycle package was built or deployed.'; exit 0 }
 if ($Mode -eq 'Rollback') {
@@ -156,39 +233,155 @@ if ($Mode -eq 'Rollback') {
 }
 if (Test-Path -LiteralPath $script:cleanGameRoot) { Fail-Safe 'Full mode requires a fresh disposable profile.' }
 
-$loaderApplied = $false; $pluginDeployed = $false; $manualClosure = $false; $result = 'Failed'; $failure = 'The lifecycle smoke test did not complete.'; $package = $null; $rollbackVerified = $false
+$loaderApplied = $false
+$pluginDeployed = $false
+$manualClosure = $false
+$result = 'Failed'
+$failure = 'The lifecycle smoke test did not complete.'
+$failureCategory = 'lifecycle-stage-failed'
+$failedStage = ''
+$package = $null
+$currentStage = 'OriginalPreflight'
+$lastCompletedStage = ''
+$stageStatePersisted = $false
+$stageLoaderStatus = ''
+$stagePackageDigest = ''
+$stageBindingDigest = ''
+$pluginRemovalVerified = 'not-required'
+$preLoaderRollbackManifestVerified = 'not-required'
+$loaderRollbackVerified = $false
+$disposableBaselineRestored = $false
+$originalManifestUnchanged = $false
+$originalRuntimePostcheckPassed = $false
+$originalLoaderIndicatorsAbsent = $false
+$preOriginalManifest = $null
+$disposableBaselineIdentity = $null
+$loaderOnlyManifestIdentity = $null
+$nonce = $null
+$initializationCount = 'not-observed'
+$quittingCount = 'not-observed'
+$shutdownCount = 'not-observed'
+$markerSequence = 'not-observed'
+$runtimeApiIdentity = 'not-observed'
+$runtimeContractsIdentity = 'not-observed'
+$pluginCount = 'not-observed'
+$loaderWarnings = 'not-observed'
+$loaderErrors = 'not-observed'
+$loaderFatalErrors = 'not-observed'
 try {
+    Start-Stage 'OriginalPreflight'
     $preRuntime = Invoke-Dotnet @('run', '--project', (Join-Path $repositoryRoot 'src\ThroneForge.Discovery'), '-c', 'Release', '--no-build', '--', 'runtime-compatibility', '--game-path', $script:gameRoot, '--fingerprint', $expectedFingerprint, '--output-root', (Join-Path $script:experimentRoot 'evidence\original-pre-runtime'), '--overwrite')
     $preOriginalManifest = Complete-ManifestIdentity $script:gameRoot
-    Invoke-Loader Prepare | Out-Null
     $selectedExecutableRelative = Value $preRuntime.Output 'Selected executable'
     if ($selectedExecutableRelative -eq 'unknown') { Fail-Safe 'The original installation did not expose an unambiguous executable.' }
+    Complete-Stage 'DisposablePrepare'
+    Start-Stage 'DisposablePrepare'
+    Invoke-Loader Prepare | Out-Null
+    Complete-Stage 'BaselineLaunch'
+    Start-Stage 'BaselineLaunch'
     $nonce = New-Nonce
     $baseline = Invoke-Plugin @('launch', '--clean-game', $script:cleanGameRoot, '--experiment-root', $script:experimentRoot, '--executable', (Join-Path $script:cleanGameRoot ($selectedExecutableRelative -replace '/', '\')), '--nonce', $nonce) -AllowFailure
     if ($baseline.ExitCode -ne 0) { Fail-Safe 'The copied baseline launch did not complete.' }
-    Invoke-Loader Install | Out-Null; $loaderApplied = $true
-    if ((Invoke-Loader Launch -AllowFailure).ExitCode -ne 0 -or (Invoke-Loader Verify -AllowFailure).ExitCode -ne 0) { Fail-Safe 'Loader-only bootstrap did not pass.' }
+    $disposableBaselineIdentity = Get-ManifestIdentity $script:cleanGameRoot
+    Complete-Stage 'LoaderInstall'
+    Start-Stage 'LoaderInstall'
+    $install = Invoke-Loader Install -AllowFailure
+    if ($install.ExitCode -ne 0) { Fail-Safe 'The loader installation did not complete.' }
+    $loaderApplied = $true
+    Require-LoaderTransaction $disposableBaselineIdentity 1
+    Complete-Stage 'LoaderLaunch'
+    Start-Stage 'LoaderLaunch'
+    $loaderLaunch = Invoke-Loader Launch -AllowFailure
+    if ($loaderLaunch.ExitCode -ne 0) { Fail-Safe 'The loader-only launch did not complete.' }
+    Require-LoaderTransaction $disposableBaselineIdentity 2
+    Complete-Stage 'LoaderVerify'
+    Start-Stage 'LoaderVerify'
+    $loaderVerify = Invoke-Loader Verify -AllowFailure
+    if ($loaderVerify.ExitCode -ne 0) { Fail-Safe 'The loader-only bootstrap verification did not pass.' }
+    $loaderOnlyManifestIdentity = Get-ManifestIdentity $script:cleanGameRoot
     Invoke-Plugin @('ownership', '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $expectedFingerprint, '--status', 'LaunchObserved') | Out-Null
+    Complete-Stage 'UnityMetadataPreflight'
+    Start-Stage 'UnityMetadataPreflight'
+    $unitySource = Invoke-LifecycleMetadataPreflight
+    Complete-Stage 'PackageBuild'
+    Start-Stage 'PackageBuild'
     $package = Build-LifecyclePackage
+    Complete-Stage 'PackageCapture'
+    Start-Stage 'PackageCapture'
+    if ($null -eq $package -or [string]::IsNullOrWhiteSpace($package.PackageDigest)) { Fail-Safe 'The lifecycle package capture did not produce a digest.' }
+    Complete-Stage 'Admission'
+    Start-Stage 'Admission'
     $admit = Invoke-Plugin @('admit-and-deploy', '--package-kind', 'lifecycle', '--package-root', $package.PackageRoot, '--manifest-path', $package.ManifestPath, '--target-framework', 'netstandard2.1', '--expected-fingerprint', $expectedFingerprint, '--adapter-id', 'throneforge.adapter', '--adapter-version', '1.0.0', '--original-game', $script:gameRoot, '--clean-game', $script:cleanGameRoot, '--experiment-root', $script:experimentRoot, '--repository-root', $repositoryRoot)
     if ((Value $admit.Output 'admission') -ne 'Approved') { Fail-Safe 'Lifecycle package admission was not approved.' }
-    $package | Add-Member PackageDigest (Value $admit.Output 'package-sha256') -Force; $package | Add-Member BindingDigest (Value $admit.Output 'binding-digest') -Force; $pluginDeployed = $true
+    $package | Add-Member PackageDigest (Value $admit.Output 'package-sha256') -Force
+    $package | Add-Member BindingDigest (Value $admit.Output 'binding-digest') -Force
+    $stagePackageDigest = $package.PackageDigest
+    $stageBindingDigest = $package.BindingDigest
+    $pluginDeployed = $true
+    Complete-Stage 'Deployment'
+    Start-Stage 'Deployment'
+    Complete-Stage 'LifecycleLaunch'
+    Start-Stage 'LifecycleLaunch'
     $launch = Invoke-Plugin @('launch', '--clean-game', $script:cleanGameRoot, '--experiment-root', $script:experimentRoot, '--executable', (Join-Path $script:cleanGameRoot ($selectedExecutableRelative -replace '/', '\')), '--nonce', $nonce) -AllowFailure
     $manualClosure = $launch.Output -match 'manual-closure-required=True'
     if ($manualClosure) { Fail-Safe 'Manual closure is required before files can be changed.' }
     if ($launch.ExitCode -ne 0) { Fail-Safe 'The lifecycle-enabled launch did not complete.' }
-    $logs = @((Join-Path $script:cleanGameRoot 'BepInEx\LogOutput.log'), (Join-Path $script:cleanGameRoot 'BepInEx\LogOutput.txt') | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
-    if ($logs.Count -ne 1) { Fail-Safe 'No single stable BepInEx log was identified.' }
-    $verified = Invoke-Plugin @('verify-lifecycle-log', '--log-path', $logs[0], '--nonce', $nonce, '--api-identity', $package.ApiIdentity, '--contracts-identity', $package.ContractsIdentity)
-    if ((Value $verified.Output 'lifecycle-criteria') -ne 'True') { Fail-Safe 'The lifecycle marker sequence did not pass verification.' }
-    Invoke-Plugin @('ownership', '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $expectedFingerprint, '--status', 'LaunchObserved', '--package-sha256', $package.PackageDigest, '--binding-digest', $package.BindingDigest, '--plugin-root', $pluginRoot) | Out-Null
-    $result = 'Passed'; $failure = 'Public Unity Application.quitting binding and synthetic lifecycle sequence passed.'
+    Complete-Stage 'LogStability'
+    Start-Stage 'LogStability'
+    $logs = @(
+        @(
+            (Join-Path $script:cleanGameRoot 'BepInEx\LogOutput.log')
+            (Join-Path $script:cleanGameRoot 'BepInEx\LogOutput.txt')
+        ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+    )
+    if ($logs.Count -ne 1) { Fail-Safe $(if ($logs.Count -eq 0) { 'No BepInEx lifecycle log was found.' } else { 'Multiple BepInEx lifecycle logs were found.' }) }
+    Complete-Stage 'LifecycleVerification'
+    Start-Stage 'LifecycleVerification'
+    $verified = Invoke-Plugin @('verify-lifecycle-log', '--log-path', $logs[0], '--nonce', $nonce, '--api-identity', $package.ApiIdentity, '--contracts-identity', $package.ContractsIdentity) -AllowFailure
+    if ($verified.ExitCode -ne 0 -or (Value $verified.Output 'lifecycle-criteria') -ne 'True') { Fail-Safe 'The lifecycle marker sequence did not pass verification.' }
+    $initializationCount = Value $verified.Output 'initialization-count'
+    $quittingCount = Value $verified.Output 'quitting-count'
+    $shutdownCount = Value $verified.Output 'shutdown-count'
+    $markerSequence = Value $verified.Output 'marker-sequence'
+    $runtimeApiIdentity = Value $verified.Output 'runtime-api-identity'
+    $runtimeContractsIdentity = Value $verified.Output 'runtime-contracts-identity'
+    $pluginCount = Value $verified.Output 'plugins'
+    $loaderWarnings = Value $verified.Output 'warnings'
+    $loaderErrors = Value $verified.Output 'errors'
+    $loaderFatalErrors = Value $verified.Output 'fatal-errors'
+    $result = 'Passed'; $failure = 'Public Unity Application.quitting binding and synthetic lifecycle sequence passed.'; $failureCategory = 'stage-completed'
 }
-catch { $failure = 'Sanitized operation failure; see stable lifecycle failure category in local output.'; if ($manualClosure) { $result = 'Inconclusive' } }
+catch {
+    $failedStage = $currentStage
+    $failureCategory = if ($manualClosure) { 'manual-closure-required' } else { Stage-FailureCategory $currentStage }
+    $failure = "The lifecycle experiment stopped at stage $currentStage with stable category $failureCategory."
+    if ($manualClosure) { $result = 'Inconclusive' }
+    Fail-CurrentStage $failureCategory
+}
 finally {
     if (-not $manualClosure) {
-        if ($pluginDeployed) { Invoke-Plugin @('remove', '--clean-game', $script:cleanGameRoot, '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $expectedFingerprint, '--repository-root', $repositoryRoot, '--original-game', $script:gameRoot, '--plugin-guid', $pluginGuid) -AllowFailure | Out-Null }
-        if ($loaderApplied) { $rollback = Invoke-Loader Rollback -AllowFailure; $rollbackVerified = $rollback.ExitCode -eq 0 }
+        if ($pluginDeployed) {
+            Start-Stage 'PluginRemoval'
+            $remove = Invoke-Plugin @('remove', '--clean-game', $script:cleanGameRoot, '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $expectedFingerprint, '--repository-root', $repositoryRoot, '--original-game', $script:gameRoot, '--plugin-guid', $pluginGuid) -AllowFailure
+            $pluginRemovalVerified = $remove.ExitCode -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $script:cleanGameRoot $pluginRoot))
+            if (-not $pluginRemovalVerified) { $result = 'Failed'; $failureCategory = 'plugin-removal-failed'; $failure = 'The lifecycle plugin removal could not be independently verified.' }
+            if ($pluginRemovalVerified) {
+                $afterRemovalIdentity = Get-ManifestIdentity $script:cleanGameRoot
+                $preLoaderRollbackManifestVerified = $afterRemovalIdentity -eq $loaderOnlyManifestIdentity
+                if (-not $preLoaderRollbackManifestVerified) { $result = 'Failed'; $failureCategory = 'disposable-restoration-failed'; $failure = 'The loader-only profile was not restored before loader rollback.' }
+            }
+        }
+        if ($loaderApplied -and ($pluginRemovalVerified -eq 'not-required' -or $pluginRemovalVerified)) {
+            Start-Stage 'LoaderRollback'
+            $rollback = Invoke-Loader Rollback -AllowFailure
+            $loaderRollbackVerified = $rollback.ExitCode -eq 0
+            if (-not $loaderRollbackVerified) { $result = 'Failed'; $failureCategory = 'loader-rollback-failed'; $failure = 'The loader rollback could not be independently verified.' }
+            if ($loaderRollbackVerified) {
+                $afterRollbackIdentity = Get-ManifestIdentity $script:cleanGameRoot
+                $disposableBaselineRestored = $afterRollbackIdentity -eq $disposableBaselineIdentity
+                if (-not $disposableBaselineRestored) { $result = 'Failed'; $failureCategory = 'disposable-restoration-failed'; $failure = 'The disposable baseline was not restored after loader rollback.' }
+            }
+        }
     } else {
         Invoke-Plugin @('recovery', '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $expectedFingerprint, '--plugin-root', $pluginRoot, '--loader-status', 'RollbackRequired') -AllowFailure | Out-Null
     }
@@ -196,9 +389,27 @@ finally {
 $postOriginalManifest = Complete-ManifestIdentity $script:gameRoot
 $postRuntime = Invoke-Dotnet @('run', '--project', (Join-Path $repositoryRoot 'src\ThroneForge.Discovery'), '-c', 'Release', '--no-build', '--', 'runtime-compatibility', '--game-path', $script:gameRoot, '--fingerprint', $expectedFingerprint, '--output-root', (Join-Path $script:experimentRoot 'evidence\original-post-runtime'), '--overwrite') -AllowFailure
 $originalUnchanged = $preOriginalManifest -eq $postOriginalManifest
-if ($result -eq 'Passed' -and (-not $originalUnchanged -or $postRuntime.ExitCode -ne 0 -or -not $rollbackVerified)) { $result = 'Failed'; $failure = 'Original post-verification or rollback verification failed.' }
+$originalManifestUnchanged = $originalUnchanged
+$originalRuntimePostcheckPassed = $postRuntime.ExitCode -eq 0
+$originalLoaderIndicatorsAbsent = $originalRuntimePostcheckPassed
+if (-not $originalManifestUnchanged -or -not $originalRuntimePostcheckPassed) { $result = 'Failed'; $failureCategory = 'original-postcheck-failed'; $failure = 'The original installation post-verification did not pass.' }
+if ($result -eq 'Passed' -and (-not $pluginRemovalVerified -or -not $preLoaderRollbackManifestVerified -or -not $loaderRollbackVerified -or -not $disposableBaselineRestored)) { $result = 'Failed'; $failureCategory = 'disposable-restoration-failed'; $failure = 'A distinct plugin, loader, or disposable restoration check did not pass.' }
+if ($result -eq 'Passed') { Complete-Stage 'Completed' }
 $report = Join-Path $repositoryRoot "docs\discovery\$expectedFingerprint-lifecycle-binding.md"
-$lines = @('# Thronefall Lifecycle Binding Report', '', '- Report version: throneforge-lifecycle-binding-v1', "- Game fingerprint: $expectedFingerprint", '- Unity version: 2022.3.62f2', '- Backend: Mono', '- Architecture: X64', "- BepInEx: $loaderVersion", "- Binding ID: $bindingId", '- Source: public UnityEngine.Application.quitting event', '- Metadata preflight: public static System.Action event required before the private run', "- Package digest: $($package.PackageDigest)", "- Admission binding digest: $($package.BindingDigest)", '- Initialization count: exact marker sequence required', '- Unity-quitting count: exact marker sequence required', '- Shutdown count: exact marker sequence required', '- Runtime API/Contracts identities: measured from loaded types and compared with admitted package', "- Plugin removal: $rollbackVerified", "- Loader rollback: $rollbackVerified", "- Disposable restoration: $rollbackVerified", "- Original pre/post manifest: $originalUnchanged", "- Original runtime/readiness postcheck: $($postRuntime.ExitCode -eq 0)", "- Result: $result", "- Notes: $failure", '- This is a public Unity Application.quitting binding observed while Thronefall was running, not a verified Thronefall-internal lifecycle method.', '- Privacy: nonce, paths, logs, binaries, manifests, usernames and machine data are omitted.', '- Remaining uncertainty: no Harmony, game API, gameplay state, catalog, save, wave, async lifecycle or cross-version compatibility is claimed.')
+$lines = @(
+    '# Thronefall Lifecycle Binding Report', '',
+    '- Report version: throneforge-lifecycle-binding-v1', "- Game fingerprint: $expectedFingerprint", '- Unity version: 2022.3.62f2', '- Backend: Mono', '- Architecture: X64',
+    "- BepInEx: $loaderVersion", "- Binding ID: $bindingId", '- Source: public UnityEngine.Application.quitting event',
+    '- Historical private attempt: Failed; stage before LoaderInstall completion; transaction persisted: false; package admitted: false; plugin deployed: false; lifecycle evidence: none.',
+    "- Current stage: $currentStage", "- Failed stage: $(if ([string]::IsNullOrWhiteSpace($failedStage)) { 'none' } else { $failedStage })", "- Last completed stage: $lastCompletedStage", "- Stable result category: $failureCategory", "- Stage state persisted: $stageStatePersisted",
+    '- Unity metadata source assembly: UnityEngine.CoreModule', '- Metadata preflight: public static System.Action event required',
+    "- Package digest: $(if ($null -eq $package) { 'not-produced' } else { $package.PackageDigest })",
+    "- Admission binding digest: $(if ($null -eq $package) { 'not-produced' } else { $package.BindingDigest })",
+    "- Initialization count: $initializationCount", "- Unity-quitting count: $quittingCount", "- Shutdown count: $shutdownCount", "- Marker encounter order: $markerSequence",
+    "- Runtime API identity: $runtimeApiIdentity", "- Runtime Contracts identity: $runtimeContractsIdentity", "- Plugin count: $pluginCount", "- Loader warnings/errors/fatal: $loaderWarnings/$loaderErrors/$loaderFatalErrors",
+    "- Plugin removal verified: $pluginRemovalVerified", "- Loader-only manifest restored before rollback: $preLoaderRollbackManifestVerified", "- Loader rollback verified: $loaderRollbackVerified", "- Disposable baseline restored: $disposableBaselineRestored",
+    "- Original complete manifest unchanged: $originalManifestUnchanged", "- Original runtime/readiness postcheck passed: $originalRuntimePostcheckPassed", "- Original loader indicators absent: $originalLoaderIndicatorsAbsent",
+    "- Result: $result", "- Notes: $failure", '- This is a public Unity Application.quitting binding observed while Thronefall was running, not a verified Thronefall-internal lifecycle method.', '- Privacy: nonce, paths, logs, binaries, manifests, usernames and machine data are omitted.', '- Remaining uncertainty: no Harmony, game API, gameplay state, catalog, save, wave, async lifecycle or cross-version compatibility is claimed.')
 $reportDirectory = Get-Item -LiteralPath (Split-Path -Parent $report) -Force
 if (($reportDirectory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { Fail-Safe 'The committed report directory is a reparse point.' }
 if (-not (Under $repositoryRoot $report) -or (Under $script:gameRoot $report) -or (Under $script:cleanGameRoot $report)) { Fail-Safe 'The committed report path is outside the repository discovery boundary.' }

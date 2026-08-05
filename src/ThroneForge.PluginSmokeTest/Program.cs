@@ -14,7 +14,7 @@ public static class PluginSmokeCli
     {
         if (args.Length == 0)
         {
-            stderr.WriteLine("Usage: package|lifecycle-package|admit|admit-and-deploy|remove|parse-marker|inspect-lifecycle-binding|verify-lifecycle-log with explicit paths and evidence.");
+            stderr.WriteLine("Usage: package|lifecycle-package|admit|admit-and-deploy|remove|parse-marker|inspect-lifecycle-binding|verify-lifecycle-log|lifecycle-stage with explicit paths and evidence.");
             return 2;
         }
 
@@ -39,6 +39,7 @@ public static class PluginSmokeCli
                 "ownership" => Ownership(args, stdout),
                 "recovery" => Recovery(args, stdout),
                 "cleanup-owned" => CleanupOwned(args, stdout),
+                "lifecycle-stage" => LifecycleStage(args, stdout),
                 _ => throw new PluginSmokeException("The requested plugin smoke-test operation is unsupported.")
             };
         }
@@ -353,7 +354,7 @@ public static class PluginSmokeCli
         stdout.WriteLine($"initialization-count={marker.InitializationCount}");
         stdout.WriteLine($"quitting-count={marker.QuittingCount}");
         stdout.WriteLine($"shutdown-count={marker.ShutdownCount}");
-        stdout.WriteLine($"marker-sequence={string.Join(',', marker.Markers.OrderBy(item => item.Sequence).Select(item => item.Sequence))}");
+        stdout.WriteLine($"marker-sequence={string.Join(',', marker.Markers.Select(item => item.Sequence))}");
         stdout.WriteLine($"runtime-api-identity={firstMarker?.ApiIdentity ?? "unknown"}");
         stdout.WriteLine($"runtime-contracts-identity={firstMarker?.ContractsIdentity ?? "unknown"}");
         stdout.WriteLine($"lifecycle-criteria={meetsCriteria}");
@@ -437,6 +438,38 @@ public static class PluginSmokeCli
         SmokeTestPathValidator.EnsureExistingTreeHasNoReparsePoints(roots.ExperimentRoot);
         Directory.Delete(roots.ExperimentRoot, recursive: true);
         stdout.WriteLine("owned-cleanup=completed");
+        return 0;
+    }
+
+    private static int LifecycleStage(string[] args, TextWriter stdout)
+    {
+        var experimentRoot = Value(args, "--experiment-root");
+        var experimentId = Value(args, "--experiment-id");
+        var fingerprint = Value(args, "--expected-fingerprint");
+        var currentStage = Enum.Parse<LifecycleExperimentStage>(Value(args, "--current-stage"), ignoreCase: false);
+        var lastCompleted = OptionalValue(args, "--last-completed-stage") is { } rawLast
+            ? Enum.Parse<LifecycleExperimentStage>(rawLast, ignoreCase: false)
+            : (LifecycleExperimentStage?)null;
+        var resultCategory = OptionalValue(args, "--result-category") ?? LifecycleExperimentFailureCategories.StageCompleted;
+        var statePath = LifecycleExperimentStageStateService.GetStatePath(experimentRoot);
+        if (File.Exists(statePath))
+        {
+            _ = LifecycleExperimentStageStateService.LoadAndValidate(experimentRoot, experimentId, fingerprint);
+        }
+
+        var state = LifecycleExperimentStageStateService.Advance(
+            experimentRoot,
+            experimentId,
+            fingerprint,
+            currentStage,
+            lastCompleted,
+            resultCategory,
+            OptionalValue(args, "--loader-status"),
+            OptionalValue(args, "--package-sha256"),
+            OptionalValue(args, "--binding-digest"));
+        stdout.WriteLine($"current-stage={state.CurrentStage}");
+        stdout.WriteLine($"last-completed-stage={state.LastCompletedStage?.ToString() ?? "none"}");
+        stdout.WriteLine($"result-category={state.ResultCategory}");
         return 0;
     }
 

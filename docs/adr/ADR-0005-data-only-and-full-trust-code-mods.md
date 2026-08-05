@@ -9,7 +9,7 @@ Declarative content can be bounded and validated, but arbitrary .NET assemblies 
 
 ## Decision
 
-Task 7 remains a narrowly scoped, full-trust synthetic lifecycle experiment. It may observe only the public Unity `Application.quitting` event and must not inspect Thronefall-defined types or gameplay state. No plugin or lifecycle conclusion is generalized beyond the documented fingerprint.
+Task 7 remains a narrowly scoped, full-trust synthetic lifecycle experiment. It may observe only the public Unity `Application.quitting` event and must not inspect Thronefall-defined types or gameplay state. The correction uses one shared lifecycle host source for tests and the generated plugin, persists only sanitized stage evidence, and treats BepInEx marker parsing and cleanup/rollback checks as evidence requirements. No plugin or lifecycle conclusion is generalized beyond the documented fingerprint.
 
 Content and logic packages are data-only by default. They may contain validated manifests, portable content, approved small assets, localization, configuration, and built-in graph data; they must not contain assemblies, scripts, native libraries, executables, arbitrary expressions, or automatically invoked network endpoints. Code mods are a separate, explicitly labeled full-trust category. The manager must require explicit user approval before enabling a new code mod, bind the approval to the exact canonical mod identity, package SHA-256, and game fingerprint, and load it only after independently produced integrity and compatibility evidence. The M1 Task 4 admission boundary represents these prerequisites as portable records and returns a decision before any future loader is allowed to load or invoke code. Safe mode can disable third-party code mods.
 

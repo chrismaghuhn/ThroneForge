@@ -22,7 +22,7 @@ Task-6 completion is recorded by the sanitized report, unchanged original-instal
 
 Against an explicit local, legally obtained game path, detect executable architecture, Unity version, Mono/IL2CPP backend, loader compatibility, target framework, and a fingerprint. Document the selected BepInEx/Harmony setup, one verified lifecycle binding, the first binding report, catalog feasibility, and legal/distribution constraints. Do not implement custom waves until the M1 acceptance criteria pass.
 
-### M1 Task 7 - public Unity lifecycle binding and smoke test (implementation complete; private result failed)
+### M1 Task 7 - public Unity lifecycle binding and smoke test (correction in progress)
 
 - [x] Add metadata-only validation for the public `UnityEngine.Application.quitting` event in `UnityEngine.CoreModule`.
 - [x] Add the source-only lifecycle plugin template with exact package identity, synchronous-only lifecycle state machine, and nonce-bound markers.
@@ -33,6 +33,8 @@ Against an explicit local, legally obtained game path, detect executable archite
 - [x] Commit exactly one sanitized fingerprint-specific lifecycle binding report and run final hosted validation.
 
 Task 7 is limited to the public Unity lifecycle source `UnityEngine.Application.quitting` and does not inspect Thronefall-defined types, gameplay state, Harmony hooks, catalogs, or custom waves.
+
+Task-7 correction baseline: reviewed head `92094c4362f09f73ffdd1bc8807caaf4a904f611` passed hosted run `31005428380` with 13 TRX files and 304 tests per runner using SDK `10.0.100`. The private attempt remains `Failed` before loader transaction persistence. This correction adds structured stage/category state, a shared tested lifecycle host, strict BepInEx marker-envelope/order validation, exact Unity assembly/type validation, and independent cleanup/rollback evidence. A new private run is permitted only after the corrected synthetic branch passes hosted CI.
 
 ### M2 - Contracts, schemas, validation, and fixtures
 

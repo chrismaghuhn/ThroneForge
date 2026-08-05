@@ -30,6 +30,26 @@ public sealed class LifecycleSmokeTests
     }
 
     [Theory]
+    [InlineData("Other.Engine")]
+    public void UnityContractRequiresExactSourceAssembly(string assemblyName)
+    {
+        var result = UnityLifecycleMetadataValidator.Validate(new UnityLifecycleContractModel(
+            true, true, "System.Action", true, true, true, true, assemblyName));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void UnityContractRequiresPublicTopLevelApplicationType()
+    {
+        var result = UnityLifecycleMetadataValidator.Validate(new UnityLifecycleContractModel(
+            true, true, "System.Action", true, true, true, true,
+            ApplicationIsPublicTopLevel: false));
+
+        Assert.False(result.IsValid);
+    }
+
+    [Theory]
     [MemberData(nameof(InvalidUnityContracts))]
     public void InvalidPublicApplicationContractsAreRejected(UnityLifecycleContractModel model)
         => Assert.False(UnityLifecycleMetadataValidator.Validate(model).IsValid);
@@ -84,7 +104,8 @@ public sealed class LifecycleSmokeTests
     {
         var host = new LifecycleHost(new ThrowingMod(), new SyntheticLifecycleContext(), _ => { });
 
-        Assert.Throws<LifecycleStateException>(() => host.Initialize());
+        var exception = Assert.Throws<LifecycleStateException>(() => host.Initialize());
+        Assert.Equal(LifecycleFailureCategories.LifecycleInitializationFailed, exception.FailureCategory);
         Assert.Equal(LifecycleHostState.Faulted, host.State);
     }
 
@@ -94,7 +115,8 @@ public sealed class LifecycleSmokeTests
         var host = new LifecycleHost(new ShutdownThrowingMod(), new SyntheticLifecycleContext(), _ => { });
 
         host.Initialize();
-        Assert.Throws<LifecycleStateException>(() => host.ObserveApplicationQuitting());
+        var exception = Assert.Throws<LifecycleStateException>(() => host.ObserveApplicationQuitting());
+        Assert.Equal(LifecycleFailureCategories.LifecycleShutdownFailed, exception.FailureCategory);
         Assert.Equal(LifecycleHostState.Faulted, host.State);
     }
 
@@ -184,6 +206,169 @@ public sealed class LifecycleSmokeTests
     }
 
     [Fact]
+    public void BepInExInfoPrefixesAreAcceptedWithoutChangingEncounterOrder()
+    {
+        var text = string.Join(Environment.NewLine,
+            Prefix(Marker("THRONEFORGE_LIFECYCLE_INITIALIZED", 1), "Info   :ThroneForge M1 Lifecycle Smoke"),
+            Prefix(Marker("THRONEFORGE_UNITY_QUITTING_OBSERVED", 2), "Info   :ThroneForge M1 Lifecycle Smoke"),
+            Prefix(Marker("THRONEFORGE_LIFECYCLE_SHUTDOWN_COMPLETED", 3), "Info   :ThroneForge M1 Lifecycle Smoke"));
+
+        var result = LifecycleMarkerParser.Parse(text, Nonce, ApiIdentity, ContractsIdentity);
+
+        Assert.True(result.IsValid);
+        Assert.Equal(ExpectedSequence, result.Markers.Select(marker => marker.Sequence));
+    }
+
+    [Fact]
+    public void BepInExErrorPrefixIsRecognizedAsFailureMarker()
+    {
+        var result = LifecycleMarkerParser.Parse(
+            Prefix("THRONEFORGE_LIFECYCLE_FAILED|category=lifecycle-initialization-failed", "Error  :ThroneForge M1 Lifecycle Smoke"),
+            Nonce,
+            ApiIdentity,
+            ContractsIdentity);
+
+        Assert.False(result.IsValid);
+        Assert.True(result.FailureMarkerDetected);
+    }
+
+    [Fact]
+    public void MarkerEncounterOrderIsValidatedRatherThanSorted()
+    {
+        var text = string.Join(Environment.NewLine,
+            Marker("THRONEFORGE_UNITY_QUITTING_OBSERVED", 2),
+            Marker("THRONEFORGE_LIFECYCLE_INITIALIZED", 1),
+            Marker("THRONEFORGE_LIFECYCLE_SHUTDOWN_COMPLETED", 3));
+
+        var result = LifecycleMarkerParser.Parse(text, Nonce, ApiIdentity, ContractsIdentity);
+
+        Assert.False(result.IsValid);
+        Assert.Equal(LifecycleFailureCategories.InvalidMarkerOrder, result.FailureCategory);
+    }
+
+    [Fact]
+    public void AdditionalMarkerKeysAreRejected()
+    {
+        var result = LifecycleMarkerParser.Parse(
+            Marker("THRONEFORGE_LIFECYCLE_INITIALIZED", 1) + "|unexpected=value",
+            Nonce,
+            ApiIdentity,
+            ContractsIdentity);
+
+        Assert.False(result.IsValid);
+        Assert.Equal(LifecycleFailureCategories.InvalidMarker, result.FailureCategory);
+    }
+
+    [Fact]
+    public void MultipleMarkerTokensOnOneLineAreRejected()
+    {
+        var result = LifecycleMarkerParser.Parse(
+            Marker("THRONEFORGE_LIFECYCLE_INITIALIZED", 1) + " " + Marker("THRONEFORGE_UNITY_QUITTING_OBSERVED", 2),
+            Nonce,
+            ApiIdentity,
+            ContractsIdentity);
+
+        Assert.False(result.IsValid);
+        Assert.Equal(LifecycleFailureCategories.InvalidMarker, result.FailureCategory);
+    }
+
+    [Fact]
+    public void LifecycleStageStateIsVersionedAndAtomic()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"throneforge-stage-{Guid.NewGuid():N}");
+        var experimentId = Guid.NewGuid().ToString("N");
+        const string fingerprint = "1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d";
+        try
+        {
+            var state = LifecycleExperimentStageStateService.Advance(
+                root,
+                experimentId,
+                fingerprint,
+                LifecycleExperimentStage.OriginalPreflight,
+                null,
+                LifecycleExperimentFailureCategories.StageCompleted);
+            var completed = LifecycleExperimentStageStateService.Advance(
+                root,
+                experimentId,
+                fingerprint,
+                LifecycleExperimentStage.DisposablePrepare,
+                state.CurrentStage,
+                LifecycleExperimentFailureCategories.StageCompleted);
+            var loaded = LifecycleExperimentStageStateService.LoadAndValidate(root, experimentId, fingerprint);
+
+            Assert.Equal(LifecycleExperimentStage.DisposablePrepare, loaded.CurrentStage);
+            Assert.Equal(LifecycleExperimentStage.OriginalPreflight, loaded.LastCompletedStage);
+            Assert.Equal(LifecycleExperimentFailureCategories.StageCompleted, completed.ResultCategory);
+            var json = File.ReadAllText(LifecycleExperimentStageStateService.GetStatePath(root));
+            Assert.DoesNotContain(root, json, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("nonce", json, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void LifecycleStageCliPersistsLoaderReadyProgressionWithoutPrivateValues()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"throneforge-stage-cli-{Guid.NewGuid():N}");
+        var experimentId = Guid.NewGuid().ToString("N");
+        const string fingerprint = "1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d";
+        try
+        {
+            var stages = new[]
+            {
+                LifecycleExperimentStage.OriginalPreflight,
+                LifecycleExperimentStage.DisposablePrepare,
+                LifecycleExperimentStage.BaselineLaunch,
+                LifecycleExperimentStage.LoaderInstall,
+                LifecycleExperimentStage.LoaderLaunch,
+                LifecycleExperimentStage.LoaderVerify,
+                LifecycleExperimentStage.UnityMetadataPreflight
+            };
+            LifecycleExperimentStage? last = null;
+            foreach (var stage in stages)
+            {
+                var arguments = new List<string>
+                {
+                    "lifecycle-stage",
+                    "--experiment-root", root,
+                    "--experiment-id", experimentId,
+                    "--expected-fingerprint", fingerprint,
+                    "--current-stage", stage.ToString(),
+                    "--result-category", LifecycleExperimentFailureCategories.StageCompleted
+                };
+                if (last is not null)
+                {
+                    arguments.Add("--last-completed-stage");
+                    arguments.Add(last.Value.ToString());
+                }
+
+                using var stdout = new StringWriter();
+                using var stderr = new StringWriter();
+                Assert.Equal(0, PluginSmokeCli.Run(arguments.ToArray(), stdout, stderr));
+                Assert.DoesNotContain(root, stdout.ToString(), StringComparison.OrdinalIgnoreCase);
+                last = stage;
+            }
+
+            var loaded = LifecycleExperimentStageStateService.LoadAndValidate(root, experimentId, fingerprint);
+            Assert.Equal(LifecycleExperimentStage.UnityMetadataPreflight, loaded.CurrentStage);
+            Assert.Equal(LifecycleExperimentStage.LoaderVerify, loaded.LastCompletedStage);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void LifecyclePackageShapeIsExact()
     {
         Assert.Equal("ThroneForge.M1.LifecycleSmoke", LifecyclePluginPackageService.PrimaryAssemblyName);
@@ -238,6 +423,9 @@ public sealed class LifecycleSmokeTests
 
     private static string Marker(string name, int sequence, string? nonce = null, string? api = null, string? contracts = null)
         => $"{name}|nonce={nonce ?? Nonce}|bindingId=unity-application-quitting-v1|pluginGuid=dev.throneforge.m1.lifecycle-smoke|pluginVersion=0.0.1|modId=dev.throneforge.m1.lifecycle-smoke|modVersion=0.0.1|sequence={sequence}|apiIdentity={api ?? ApiIdentity}|contractsIdentity={contracts ?? ContractsIdentity}";
+
+    private static string Prefix(string marker, string prefix)
+        => $"[{prefix}] {marker}";
 
     private sealed class RecordingMod : IThroneForgeMod
     {

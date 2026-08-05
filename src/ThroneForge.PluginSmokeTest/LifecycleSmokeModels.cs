@@ -1,157 +1,10 @@
 using System.Diagnostics;
-using ThroneForge.API;
-using ThroneForge.Contracts;
 
 namespace ThroneForge.PluginSmokeTest;
-
-public enum LifecycleHostState
-{
-    Created = 0,
-    Initializing,
-    Initialized,
-    ShutdownRequested,
-    ShutdownCompleted,
-    Faulted
-}
 
 public static class LifecycleBindingIds
 {
     public const string ApplicationQuittingV1 = "unity-application-quitting-v1";
-}
-
-public static class LifecycleFailureCategories
-{
-    public const string InvalidState = "invalid-state";
-    public const string AsynchronousLifecycleNotSupported = "asynchronous-lifecycle-not-supported";
-    public const string LifecycleException = "lifecycle-exception";
-    public const string InvalidMarker = "invalid-marker";
-    public const string DuplicateMarker = "duplicate-marker";
-    public const string MissingMarker = "missing-marker";
-    public const string WrongNonce = "wrong-nonce";
-    public const string RuntimeIdentityMismatch = "runtime-identity-mismatch";
-}
-
-public sealed class LifecycleStateException : Exception
-{
-    public LifecycleStateException(string failureCategory, string message)
-        : base(message)
-    {
-        FailureCategory = failureCategory;
-    }
-
-    public string FailureCategory { get; }
-}
-
-public sealed class SyntheticLifecycleContext : IModContext
-{
-    public SyntheticLifecycleContext()
-    {
-        Identity = new ModIdentity("dev.throneforge.m1.lifecycle-smoke", "0.0.1");
-        Capabilities = new NoCapabilities();
-    }
-
-    public ModIdentity Identity { get; }
-
-    public ICapabilityService Capabilities { get; }
-
-    private sealed class NoCapabilities : ICapabilityService
-    {
-        public bool IsAvailable(string capabilityKey) => false;
-    }
-}
-
-public sealed class LifecycleHost
-{
-    private readonly IThroneForgeMod _mod;
-    private readonly IModContext _context;
-    private int _state = (int)LifecycleHostState.Created;
-
-    public LifecycleHost(IThroneForgeMod mod, IModContext context, Action<string>? markerSink = null)
-    {
-        _mod = mod ?? throw new ArgumentNullException(nameof(mod));
-        _context = context ?? throw new ArgumentNullException(nameof(context));
-        MarkerSink = markerSink ?? (_ => { });
-    }
-
-    public LifecycleHostState State => (LifecycleHostState)Volatile.Read(ref _state);
-
-    public Action<string> MarkerSink { get; }
-
-    public void Initialize(CancellationToken cancellationToken = default)
-    {
-        if (Interlocked.CompareExchange(ref _state, (int)LifecycleHostState.Initializing, (int)LifecycleHostState.Created)
-            != (int)LifecycleHostState.Created)
-        {
-            Volatile.Write(ref _state, (int)LifecycleHostState.Faulted);
-            Fail(LifecycleFailureCategories.InvalidState, "Lifecycle initialization was requested more than once.");
-        }
-
-        try
-        {
-            var operation = _mod.InitializeAsync(_context, cancellationToken);
-            EnsureSynchronous(operation);
-            Volatile.Write(ref _state, (int)LifecycleHostState.Initialized);
-        }
-        catch (LifecycleStateException)
-        {
-            Volatile.Write(ref _state, (int)LifecycleHostState.Faulted);
-            throw;
-        }
-        catch
-        {
-            Volatile.Write(ref _state, (int)LifecycleHostState.Faulted);
-            throw new LifecycleStateException(LifecycleFailureCategories.LifecycleException, "Synthetic lifecycle initialization failed.");
-        }
-    }
-
-    public void ObserveApplicationQuitting(CancellationToken cancellationToken = default)
-    {
-        if (Interlocked.CompareExchange(ref _state, (int)LifecycleHostState.ShutdownRequested, (int)LifecycleHostState.Initialized)
-            != (int)LifecycleHostState.Initialized)
-        {
-            Volatile.Write(ref _state, (int)LifecycleHostState.Faulted);
-            Fail(LifecycleFailureCategories.InvalidState, "Unity quitting was observed in an invalid lifecycle state.");
-        }
-
-        try
-        {
-            var operation = _mod.ShutdownAsync(cancellationToken);
-            EnsureSynchronous(operation);
-            Volatile.Write(ref _state, (int)LifecycleHostState.ShutdownCompleted);
-        }
-        catch (LifecycleStateException)
-        {
-            Volatile.Write(ref _state, (int)LifecycleHostState.Faulted);
-            throw;
-        }
-        catch
-        {
-            Volatile.Write(ref _state, (int)LifecycleHostState.Faulted);
-            throw new LifecycleStateException(LifecycleFailureCategories.LifecycleException, "Synthetic lifecycle shutdown failed.");
-        }
-    }
-
-    public void Cleanup()
-    {
-        // Event unsubscription is owned by the Unity-facing host. This method is deliberately idempotent.
-        _ = State;
-    }
-
-    private static void EnsureSynchronous(ValueTask operation)
-    {
-        var task = operation.AsTask();
-        if (!task.IsCompletedSuccessfully)
-        {
-            throw new LifecycleStateException(
-                LifecycleFailureCategories.AsynchronousLifecycleNotSupported,
-                "The synthetic lifecycle operation did not complete synchronously.");
-        }
-
-        task.GetAwaiter().GetResult();
-    }
-
-    private static void Fail(string category, string message)
-        => throw new LifecycleStateException(category, message);
 }
 
 public sealed record UnityLifecycleContractModel(
@@ -161,7 +14,9 @@ public sealed record UnityLifecycleContractModel(
     bool AddIsPublic,
     bool RemoveIsPublic,
     bool AddIsStatic,
-    bool RemoveIsStatic);
+    bool RemoveIsStatic,
+    string AssemblySimpleName = "UnityEngine.CoreModule",
+    bool ApplicationIsPublicTopLevel = true);
 
 public sealed record UnityLifecycleMetadataResult(
     bool IsValid,
@@ -181,7 +36,10 @@ public static class UnityLifecycleMetadataValidator
         const string sourceEvent = "quitting";
         const string handlerType = "System.Action";
 
-        if (!model.HasApplicationType || !model.HasQuittingEvent)
+        if (!string.Equals(model.AssemblySimpleName, "UnityEngine.CoreModule", StringComparison.Ordinal)
+            || !model.HasApplicationType
+            || !model.ApplicationIsPublicTopLevel
+            || !model.HasQuittingEvent)
         {
             return Invalid("unity-lifecycle-contract-missing", sourceType, sourceEvent, model.HandlerType);
         }
@@ -227,6 +85,19 @@ public sealed record LifecycleMarkerParseResult(
 
 public static class LifecycleMarkerParser
 {
+    private static readonly HashSet<string> ExpectedKeys =
+    [
+        "nonce",
+        "bindingId",
+        "pluginGuid",
+        "pluginVersion",
+        "modId",
+        "modVersion",
+        "sequence",
+        "apiIdentity",
+        "contractsIdentity"
+    ];
+
     private static readonly string[] ExpectedNames =
     [
         "THRONEFORGE_LIFECYCLE_INITIALIZED",
@@ -248,10 +119,21 @@ public static class LifecycleMarkerParser
         var markers = new List<LifecycleMarker>();
         foreach (var line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            var name = ExpectedNames.FirstOrDefault(candidate => line.StartsWith(candidate + "|", StringComparison.Ordinal));
+            var markerLine = ExtractMarkerLine(line, out var markerTokenCount);
+            if (markerTokenCount > 1)
+            {
+                return Invalid(LifecycleFailureCategories.InvalidMarker, markers, false);
+            }
+
+            if (markerTokenCount == 1 && markerLine.Length == 0)
+            {
+                return Invalid(LifecycleFailureCategories.InvalidMarker, markers, false);
+            }
+
+            var name = ExpectedNames.FirstOrDefault(candidate => markerLine.StartsWith(candidate + "|", StringComparison.Ordinal));
             if (name is null)
             {
-                if (line.StartsWith("THRONEFORGE_LIFECYCLE_FAILED|", StringComparison.Ordinal))
+                if (markerLine.StartsWith("THRONEFORGE_LIFECYCLE_FAILED|", StringComparison.Ordinal))
                 {
                     return Invalid(LifecycleFailureCategories.InvalidMarker, markers, true);
                 }
@@ -260,13 +142,18 @@ public static class LifecycleMarkerParser
             }
 
             var values = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var part in line.Split('|').Skip(1))
+            foreach (var part in markerLine.Split('|').Skip(1))
             {
                 var separator = part.IndexOf('=');
                 if (separator <= 0 || !values.TryAdd(part[..separator], part[(separator + 1)..]))
                 {
                     return Invalid(LifecycleFailureCategories.InvalidMarker, markers, false);
                 }
+            }
+
+            if (values.Count != ExpectedKeys.Count || values.Keys.Any(key => !ExpectedKeys.Contains(key)))
+            {
+                return Invalid(LifecycleFailureCategories.InvalidMarker, markers, false);
             }
 
             if (markers.Any(marker => marker.Name == name))
@@ -280,24 +167,38 @@ public static class LifecycleMarkerParser
                 return Invalid(LifecycleFailureCategories.WrongNonce, markers, false);
             }
 
-            if (!TryRead(values, "bindingId", out var bindingId)
-                || !string.Equals(bindingId, LifecycleBindingIds.ApplicationQuittingV1, StringComparison.Ordinal)
-                || !TryRead(values, "pluginGuid", out var pluginGuid)
-                || !string.Equals(pluginGuid, "dev.throneforge.m1.lifecycle-smoke", StringComparison.Ordinal)
-                || !TryRead(values, "pluginVersion", out var pluginVersion)
-                || !string.Equals(pluginVersion, "0.0.1", StringComparison.Ordinal)
-                || !TryRead(values, "modId", out var modId)
-                || !string.Equals(modId, "dev.throneforge.m1.lifecycle-smoke", StringComparison.Ordinal)
-                || !TryRead(values, "modVersion", out var modVersion)
-                || !string.Equals(modVersion, "0.0.1", StringComparison.Ordinal)
-                || !TryRead(values, "apiIdentity", out var apiIdentity)
-                || !string.Equals(apiIdentity, expectedApiIdentity, StringComparison.Ordinal)
-                || !TryRead(values, "contractsIdentity", out var contractsIdentity)
-                || !string.Equals(contractsIdentity, expectedContractsIdentity, StringComparison.Ordinal)
-                || !TryReadInt(values, "sequence", out var sequence)
-                || sequence != Array.IndexOf(ExpectedNames, name) + 1)
+            var bindingId = string.Empty;
+            var pluginGuid = string.Empty;
+            var pluginVersion = string.Empty;
+            var modId = string.Empty;
+            var modVersion = string.Empty;
+            var apiIdentity = string.Empty;
+            var contractsIdentity = string.Empty;
+            var bindingValid = TryRead(values, "bindingId", out bindingId)
+                && string.Equals(bindingId, LifecycleBindingIds.ApplicationQuittingV1, StringComparison.Ordinal)
+                && TryRead(values, "pluginGuid", out pluginGuid)
+                && string.Equals(pluginGuid, "dev.throneforge.m1.lifecycle-smoke", StringComparison.Ordinal)
+                && TryRead(values, "pluginVersion", out pluginVersion)
+                && string.Equals(pluginVersion, "0.0.1", StringComparison.Ordinal)
+                && TryRead(values, "modId", out modId)
+                && string.Equals(modId, "dev.throneforge.m1.lifecycle-smoke", StringComparison.Ordinal)
+                && TryRead(values, "modVersion", out modVersion)
+                && string.Equals(modVersion, "0.0.1", StringComparison.Ordinal)
+                && TryRead(values, "apiIdentity", out apiIdentity)
+                && string.Equals(apiIdentity, expectedApiIdentity, StringComparison.Ordinal)
+                && TryRead(values, "contractsIdentity", out contractsIdentity)
+                && string.Equals(contractsIdentity, expectedContractsIdentity, StringComparison.Ordinal);
+            var sequenceValid = TryReadInt(values, "sequence", out var sequence);
+            if (!bindingValid)
             {
                 return Invalid(LifecycleFailureCategories.RuntimeIdentityMismatch, markers, false);
+            }
+
+            if (!sequenceValid
+                || sequence != markers.Count + 1
+                || !string.Equals(name, ExpectedNames[markers.Count], StringComparison.Ordinal))
+            {
+                return Invalid(LifecycleFailureCategories.InvalidMarkerOrder, markers, false);
             }
 
             markers.Add(new(name, nonce, bindingId, pluginGuid, pluginVersion, modId, modVersion, sequence, apiIdentity, contractsIdentity));
@@ -308,7 +209,52 @@ public static class LifecycleMarkerParser
             return Invalid(LifecycleFailureCategories.MissingMarker, markers, false);
         }
 
-        return new(true, null, markers.OrderBy(marker => marker.Sequence).ToArray(), false);
+        return new(true, null, markers.ToArray(), false);
+    }
+
+    private static string ExtractMarkerLine(string line, out int markerTokenCount)
+    {
+        var tokens = ExpectedNames.Append("THRONEFORGE_LIFECYCLE_FAILED").ToArray();
+        markerTokenCount = tokens.Sum(token => CountToken(line, token));
+
+        if (tokens.Any(token => line.StartsWith(token + "|", StringComparison.Ordinal)))
+        {
+            return line;
+        }
+
+        if (line.Length > 0 && line[0] == '[')
+        {
+            var closingBracket = line.IndexOf(']');
+            if (closingBracket >= 0)
+            {
+                var payload = line[(closingBracket + 1)..].TrimStart();
+                if (tokens.Any(token => payload.StartsWith(token + "|", StringComparison.Ordinal)))
+                {
+                    return payload;
+                }
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static int CountToken(string line, string token)
+    {
+        var count = 0;
+        var offset = 0;
+        while (offset < line.Length)
+        {
+            var index = line.IndexOf(token + "|", offset, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                break;
+            }
+
+            count++;
+            offset = index + token.Length + 1;
+        }
+
+        return count;
     }
 
     private static bool TryRead(Dictionary<string, string> values, string key, out string value)

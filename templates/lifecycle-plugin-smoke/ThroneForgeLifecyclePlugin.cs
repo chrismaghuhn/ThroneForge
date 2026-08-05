@@ -1,11 +1,10 @@
 using System;
 using System.Reflection;
 using System.Threading;
-using System.Threading.Tasks;
 using BepInEx;
 using ThroneForge.API;
-using ThroneForge.Contracts;
 using UnityEngine;
+using ThroneForge.PluginSmokeTest;
 
 namespace ThroneForge.M1.LifecycleSmoke;
 
@@ -17,8 +16,7 @@ public sealed class ThroneForgeLifecyclePlugin : BaseUnityPlugin
     private const string PluginVersion = "0.0.1";
     private const string ModId = "dev.throneforge.m1.lifecycle-smoke";
     private const string ModVersion = "0.0.1";
-    private SyntheticMod? _mod;
-    private SyntheticLifecycleContext? _context;
+    private LifecycleHost? _host;
     private int _quittingObserved;
     private int _subscribed;
 
@@ -35,8 +33,7 @@ public sealed class ThroneForgeLifecyclePlugin : BaseUnityPlugin
 
             var apiIdentity = FormatIdentity(typeof(IThroneForgeMod).Assembly.GetName());
             var contractsIdentity = FormatIdentity(typeof(ModIdentity).Assembly.GetName());
-            _context = new SyntheticLifecycleContext();
-            _mod = new SyntheticMod();
+            _host = new LifecycleHost(new SyntheticMod(), new SyntheticLifecycleContext());
             if (Interlocked.Exchange(ref _subscribed, 1) != 0)
             {
                 Fail("duplicate-subscription");
@@ -44,10 +41,14 @@ public sealed class ThroneForgeLifecyclePlugin : BaseUnityPlugin
             }
 
             Application.quitting += OnApplicationQuitting;
-            InvokeSynchronously(_mod.InitializeAsync(_context, CancellationToken.None));
+            _host.Initialize();
             LogMarker("THRONEFORGE_LIFECYCLE_INITIALIZED", nonce, apiIdentity, contractsIdentity, 1);
         }
-        catch (Exception)
+        catch (LifecycleStateException exception)
+        {
+            Fail(exception.FailureCategory);
+        }
+        catch
         {
             Fail("lifecycle-initialization-failed");
         }
@@ -62,7 +63,7 @@ public sealed class ThroneForgeLifecyclePlugin : BaseUnityPlugin
         }
 
         var nonce = Environment.GetEnvironmentVariable("THRONEFORGE_SMOKE_NONCE");
-        if (!IsSafeNonce(nonce) || _mod is null || _context is null)
+        if (!IsSafeNonce(nonce) || _host is null)
         {
             Fail("quitting-before-initialization");
             return;
@@ -73,11 +74,15 @@ public sealed class ThroneForgeLifecyclePlugin : BaseUnityPlugin
         try
         {
             LogMarker("THRONEFORGE_UNITY_QUITTING_OBSERVED", nonce!, apiIdentity, contractsIdentity, 2);
-            InvokeSynchronously(_mod.ShutdownAsync(CancellationToken.None));
+            _host.ObserveApplicationQuitting();
             LogMarker("THRONEFORGE_LIFECYCLE_SHUTDOWN_COMPLETED", nonce, apiIdentity, contractsIdentity, 3);
             Unsubscribe();
         }
-        catch (Exception)
+        catch (LifecycleStateException exception)
+        {
+            Fail(exception.FailureCategory);
+        }
+        catch
         {
             Fail("lifecycle-shutdown-failed");
         }
@@ -86,6 +91,7 @@ public sealed class ThroneForgeLifecyclePlugin : BaseUnityPlugin
     private void OnDestroy()
     {
         Unsubscribe();
+        _host?.Cleanup();
     }
 
     private void Unsubscribe()
@@ -102,17 +108,6 @@ public sealed class ThroneForgeLifecyclePlugin : BaseUnityPlugin
     private void Fail(string category)
         => Logger.LogError($"THRONEFORGE_LIFECYCLE_FAILED|category={category}");
 
-    private static void InvokeSynchronously(ValueTask operation)
-    {
-        var task = operation.AsTask();
-        if (!task.IsCompletedSuccessfully)
-        {
-            throw new InvalidOperationException("asynchronous-lifecycle-not-supported");
-        }
-
-        task.GetAwaiter().GetResult();
-    }
-
     private static bool IsSafeNonce(string? nonce)
         => !string.IsNullOrWhiteSpace(nonce)
             && nonce.Length <= 128
@@ -120,23 +115,6 @@ public sealed class ThroneForgeLifecyclePlugin : BaseUnityPlugin
 
     private static string FormatIdentity(AssemblyName identity)
         => $"{identity.Name}, Version={identity.Version}";
-
-    private sealed class SyntheticLifecycleContext : IModContext
-    {
-        public SyntheticLifecycleContext()
-        {
-            Identity = new ModIdentity(ModId, ModVersion);
-            Capabilities = new NoCapabilities();
-        }
-
-        public ModIdentity Identity { get; }
-        public ICapabilityService Capabilities { get; }
-
-        private sealed class NoCapabilities : ICapabilityService
-        {
-            public bool IsAvailable(string capabilityKey) => false;
-        }
-    }
 
     private sealed class SyntheticMod : IThroneForgeMod
     {

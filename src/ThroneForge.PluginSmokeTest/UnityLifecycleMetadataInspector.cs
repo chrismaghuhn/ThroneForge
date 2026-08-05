@@ -56,13 +56,23 @@ public static class UnityLifecycleMetadataInspector
             }
 
             var assembly = metadata.GetAssemblyDefinition();
-            var assemblyIdentity = $"{metadata.GetString(assembly.Name)}, Version={assembly.Version}";
+            var assemblyName = metadata.GetString(assembly.Name);
+            var assemblyIdentity = $"{assemblyName}, Version={assembly.Version}";
+            if (!string.Equals(assemblyName, "UnityEngine.CoreModule", StringComparison.Ordinal))
+            {
+                return Invalid("unity-assembly-identity-mismatch", assemblyIdentity);
+            }
             var applicationTypes = metadata.TypeDefinitions
-                .Where(handle => IsApplicationType(metadata, handle))
+                .Where(handle => IsApplicationTypeName(metadata, handle))
                 .ToArray();
             if (applicationTypes.Length != 1)
             {
                 return Invalid(applicationTypes.Length == 0 ? "unity-application-type-missing" : "unity-application-type-ambiguous", assemblyIdentity);
+            }
+
+            if (!IsPublicTopLevel(metadata, applicationTypes[0]))
+            {
+                return Invalid("unity-application-type-not-public-top-level", assemblyIdentity);
             }
 
             var application = metadata.GetTypeDefinition(applicationTypes[0]);
@@ -104,12 +114,17 @@ public static class UnityLifecycleMetadataInspector
         }
     }
 
-    private static bool IsApplicationType(MetadataReader metadata, TypeDefinitionHandle handle)
+    private static bool IsApplicationTypeName(MetadataReader metadata, TypeDefinitionHandle handle)
     {
         var type = metadata.GetTypeDefinition(handle);
         return metadata.GetString(type.Namespace) == "UnityEngine"
-            && metadata.GetString(type.Name) == "Application"
-            && !type.Attributes.HasFlag(TypeAttributes.NestedPublic);
+            && metadata.GetString(type.Name) == "Application";
+    }
+
+    private static bool IsPublicTopLevel(MetadataReader metadata, TypeDefinitionHandle handle)
+    {
+        var type = metadata.GetTypeDefinition(handle);
+        return (type.Attributes & TypeAttributes.VisibilityMask) == TypeAttributes.Public;
     }
 
     private static bool IsPublicStatic(MethodAttributes attributes)
