@@ -70,7 +70,7 @@ Current correction implementation adds a real C#-owned package-build boundary, T
 - [x] Bind the discovered selected executable to the explicitly supplied executable-relative path and derive the repository baseline commit from `git rev-parse HEAD`.
 - [x] Run the repository validation and exact-SDK hosted matrix, inspect every TRX artifact, and report readiness for one separately authorized private verification.
 
-This correction performs repository-only work. Head `2139d41812b5da09c620a1685a217de1caa3510e` passed hosted run `31025440280` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 13 TRX files representing 350 tests, all passed, with zero errors, skips, aborted, inconclusive or not-executed results and no TRX overwrite warning. Every downloaded TRX artifact was parsed independently. No private lifecycle run was authorized or performed here; the two historical failed attempts remain unchanged. The branch is ready for one separately authorized final private verification.
+This correction performs repository-only work. Head `2139d41812b5da09c620a1685a217de1caa3510e` passed hosted run `31025440280` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 13 TRX files representing 350 tests, all passed, with zero errors, skips, aborted, inconclusive or not-executed results and no TRX overwrite warning. Every downloaded TRX artifact was parsed independently. The one separately authorized final private run was subsequently performed once and failed at `LoaderLaunch` with `loader-launch-failed`; no lifecycle binding conclusion is claimed and no retry is authorized.
 
 ### M2 - Contracts, schemas, validation, and fixtures
 
