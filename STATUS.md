@@ -207,7 +207,8 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Package: exactly three files (synthetic plugin, `ThroneForge.API`, `ThroneForge.Contracts`); package SHA-256 `54ced96a142040cc96374bbb86d28f5a0e2735271102aff2cf4486a40d549020`; archive digest matched the fixed official SHA-256.
 - Bootstrap evidence: preloader and chainloader initialized, exactly one synthetic plugin was observed, the nonce-bound readiness marker matched, API/Contracts identities matched, and no lifecycle marker, fatal error, or error evidence was present.
 - Safety evidence: original complete manifest unchanged; original runtime/readiness post-verification passed; disposable rollback was verified; no private process remained active; no loader/plugin artifact was committed.
-- The sanitized report is `docs/discovery/1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-synthetic-plugin-smoke-test.md`. Current-head hosted CI evidence is pending and must be added after the push.
+- The sanitized report is `docs/discovery/1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-synthetic-plugin-smoke-test.md`.
+- Hosted validation for head `99f3d68a12f992cc59a3511ce56c08721c004667` passed in run [30990572415](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30990572415). Windows and Ubuntu each used SDK `10.0.100`, uploaded 13 TRX files representing 265 tests, and reported 0 failures, 0 errors, and 0 skips. Both artifacts were independently parsed; no `Overwriting results file` warning occurred.
 
 ## Next task
 

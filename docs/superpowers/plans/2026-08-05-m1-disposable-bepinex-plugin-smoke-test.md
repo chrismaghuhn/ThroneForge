@@ -37,3 +37,5 @@ No private experiment starts until source-only tests, required local checks, and
 ## Recorded private result
 
 The one authorized private run passed for the fixed fingerprint using official BepInEx `5.4.23.5` and the evidence-selected `netstandard2.1` target. Exactly one synthetic plugin was observed with the nonce-bound marker, preloader and chainloader evidence, matching API/Contracts identities, and no lifecycle marker. The plugin was removed, the loader transaction was rolled back, the copied profile was restored, and the original installation's complete manifest and runtime-readiness post-checks matched. M1 Task 7 remains unstarted.
+
+Hosted validation for head `99f3d68a12f992cc59a3511ce56c08721c004667` passed in run `30990572415` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 13 TRX files representing 265 tests with zero failures, errors, or skips.
