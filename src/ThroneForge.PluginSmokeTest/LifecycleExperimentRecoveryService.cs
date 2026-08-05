@@ -19,7 +19,8 @@ public sealed record LifecycleExperimentRollbackResult(
     bool OriginalVerified,
     string? FailureCategory = null,
     CleanupOperationStatus PluginRemovalStatus = CleanupOperationStatus.NotRequired,
-    CleanupOperationStatus LoaderRollbackStatus = CleanupOperationStatus.NotAttempted);
+    CleanupOperationStatus LoaderRollbackStatus = CleanupOperationStatus.NotAttempted,
+    RollbackDriftEvidence? DriftEvidence = null);
 
 /// <summary>
 /// Performs the explicit, post-manual-closure recovery path. It never mutates an active profile.
@@ -131,9 +132,21 @@ public static class LifecycleExperimentRecoveryService
 
             try
             {
+                var currentManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+                var driftEvidence = LoaderTransactionStateService.ClassifyRollbackDrift(
+                    transaction.ExpectedAppliedManifest,
+                    currentManifest);
+                if (driftEvidence.HasUnapprovedDifferences)
+                {
+                    return Failed(
+                        LifecycleExperimentFailureCategories.RecoveryRuntimeDrift,
+                        pluginRemovalStatus,
+                        driftEvidence: driftEvidence);
+                }
+
                 _ = LoaderTransactionStateService.CaptureRollbackGeneratedEvidence(
                     transaction.ExpectedAppliedManifest,
-                    InstallationCopyService.CaptureManifest(roots.CleanGameRoot),
+                    currentManifest,
                     out _);
             }
             catch (Exception exception) when (exception is PluginSmokeException or SmokeTestException or IOException)
@@ -206,8 +219,9 @@ public static class LifecycleExperimentRecoveryService
         CleanupOperationStatus pluginRemovalStatus = CleanupOperationStatus.NotRequired,
         CleanupOperationStatus loaderRollbackStatus = CleanupOperationStatus.NotAttempted,
         bool loaderRollbackVerified = false,
-        bool disposableRestored = false)
-        => new("Failed", loaderRollbackVerified, disposableRestored, false, category, pluginRemovalStatus, loaderRollbackStatus);
+        bool disposableRestored = false,
+        RollbackDriftEvidence? driftEvidence = null)
+        => new("Failed", loaderRollbackVerified, disposableRestored, false, category, pluginRemovalStatus, loaderRollbackStatus, driftEvidence);
 
     private static bool VerifyProfile(SmokeTestRoots roots, CopyManifest expectedManifest, string expectedFingerprint, string evidenceName)
     {

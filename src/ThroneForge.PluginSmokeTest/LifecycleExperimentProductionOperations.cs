@@ -734,7 +734,8 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
                     false,
                     LifecycleExperimentFailureCategories.ManualClosureRequired,
                     ActiveProcess: true,
-                    RequiresManualClosure: true);
+                    RequiresManualClosure: true,
+                    LoaderLaunchDiagnostic: result.LoaderLaunchDiagnostic);
             }
 
             var succeeded = mode is SmokeTestMode.Prepare or SmokeTestMode.Install
@@ -744,10 +745,15 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
                     : result.Outcome is SmokeTestOutcome.Passed or SmokeTestOutcome.PassedWithWarnings;
             if (!succeeded)
             {
-                return new LoaderModeExecutionEvidence(false, failureCategory);
+                return new LoaderModeExecutionEvidence(
+                    false,
+                    failureCategory,
+                    LoaderLaunchDiagnostic: result.LoaderLaunchDiagnostic);
             }
 
-            return new LoaderModeExecutionEvidence(true);
+            return new LoaderModeExecutionEvidence(
+                true,
+                LoaderLaunchDiagnostic: result.LoaderLaunchDiagnostic);
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {

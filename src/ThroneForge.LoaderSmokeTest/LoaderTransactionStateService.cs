@@ -203,6 +203,66 @@ public static class LoaderTransactionStateService
             .ToArray();
     }
 
+    public static RollbackDriftEvidence ClassifyRollbackDrift(
+        CopyManifest appliedManifest,
+        CopyManifest currentManifest,
+        int maximumDifferences = 32)
+    {
+        ArgumentNullException.ThrowIfNull(appliedManifest);
+        ArgumentNullException.ThrowIfNull(currentManifest);
+        if (maximumDifferences < 1)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(maximumDifferences, 1, nameof(maximumDifferences));
+        }
+
+        var comparison = InstallationCopyService.CompareManifests(appliedManifest, currentManifest);
+        var differences = new List<RollbackDriftDifference>();
+        var total = 0;
+        var unapprovedDifferenceFound = false;
+
+        void Add(string kind, string relativePath, bool approved)
+        {
+            total++;
+            unapprovedDifferenceFound |= !approved;
+            if (differences.Count < maximumDifferences)
+            {
+                differences.Add(new(kind, SanitizeDiagnosticPath(relativePath), approved));
+            }
+        }
+
+        foreach (var item in comparison.AddedFiles)
+        {
+            Add("added-file", item.RelativePath, IsAllowedGeneratedPath(item.RelativePath));
+        }
+
+        foreach (var item in comparison.RemovedFiles)
+        {
+            Add("removed-file", item.RelativePath, false);
+        }
+
+        foreach (var item in comparison.ChangedFiles)
+        {
+            Add("changed-file", item.RelativePath, IsAllowedGeneratedPath(item.RelativePath));
+        }
+
+        foreach (var path in comparison.UnexpectedDirectories)
+        {
+            Add("added-directory", path, IsAllowedGeneratedPath(path));
+        }
+
+        foreach (var path in comparison.MissingDirectories)
+        {
+            Add("removed-directory", path, false);
+        }
+
+        var status = total == 0
+            ? RollbackDriftStatus.Matches
+            : unapprovedDifferenceFound
+                ? RollbackDriftStatus.UnapprovedDifferences
+                : RollbackDriftStatus.ApprovedGeneratedDifferencesOnly;
+        return new(status, differences, total, total > differences.Count);
+    }
+
     private static void ValidateStateMetadata(
         LoaderTransactionState state,
         string expectedFingerprint,
@@ -400,6 +460,16 @@ public static class LoaderTransactionStateService
             || string.Equals(path, "BepInEx/cache", StringComparison.Ordinal)
             || string.Equals(path, "BepInEx/plugins", StringComparison.Ordinal)
             || string.Equals(path, "BepInEx/patchers", StringComparison.Ordinal);
+
+    private static string SanitizeDiagnosticPath(string path)
+        => string.IsNullOrWhiteSpace(path)
+            || Path.IsPathRooted(path)
+            || path.Contains('\\', StringComparison.Ordinal)
+            || path.Contains(':', StringComparison.Ordinal)
+            || path.Contains('\0', StringComparison.Ordinal)
+            || path.Split('/').Any(part => part is "" or "." or "..")
+            ? "<unsafe-relative-path>"
+            : path;
 
     private static bool IsSha256(string? value)
         => !string.IsNullOrWhiteSpace(value)

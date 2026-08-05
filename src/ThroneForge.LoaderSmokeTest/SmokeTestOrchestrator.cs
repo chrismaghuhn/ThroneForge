@@ -28,7 +28,8 @@ public sealed record SmokeTestExecutionResult(
     bool RollbackVerified,
     bool RecoveryMarkerPersisted = false,
     string? RecoveryMarkerFailureCategory = null,
-    LaunchObservationResult? LaunchObservation = null);
+    LaunchObservationResult? LaunchObservation = null,
+    LoaderLaunchDiagnosticEvidence? LoaderLaunchDiagnostic = null);
 
 public static class SmokeTestOrchestrator
 {
@@ -172,6 +173,8 @@ public static class SmokeTestOrchestrator
             [LoaderTransactionStatus.Applied]);
         LaunchObservationResult? launch = null;
         LoaderLogSummary? summary = null;
+        LoaderLogReadEvidence? logEvidence = null;
+        LoaderLaunchDiagnosticEvidence? diagnostic = null;
         try
         {
             launch = LaunchCopiedExecutable(
@@ -198,11 +201,19 @@ public static class SmokeTestOrchestrator
                     InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint,
                     true,
                     false,
-                    LaunchObservation: launch);
+                    LaunchObservation: launch,
+                    LoaderLaunchDiagnostic: LoaderLaunchDiagnosticEvidence.Create(
+                        launch,
+                        new LoaderLogReadEvidence(false, false, "manual-closure-required"),
+                        null,
+                        bootstrapObserved: false));
             }
 
-            summary = LoaderLogParser.Parse(ReadKnownLoaderLog(roots.CleanGameRoot));
+            var logText = string.Empty;
+            logEvidence = ReadKnownLoaderLogEvidence(roots.CleanGameRoot, out logText);
+            summary = LoaderLogParser.Parse(logText);
             var bootstrapObserved = LoaderBootstrapLaunchCriteria.IsObserved(launch, summary);
+            diagnostic = LoaderLaunchDiagnosticEvidence.Create(launch, logEvidence, summary, bootstrapObserved);
             var status = bootstrapObserved
                 ? LoaderTransactionStatus.LaunchObserved
                 : LoaderTransactionStatus.RollbackRequired;
@@ -229,10 +240,18 @@ public static class SmokeTestOrchestrator
                 InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint,
                 true,
                 false,
-                LaunchObservation: launch);
+                LaunchObservation: launch,
+                LoaderLaunchDiagnostic: diagnostic);
         }
         catch (Exception exception)
         {
+            diagnostic = launch is null
+                ? null
+                : LoaderLaunchDiagnosticEvidence.Create(
+                    launch,
+                    logEvidence ?? new LoaderLogReadEvidence(false, false),
+                    summary,
+                    bootstrapObserved: false);
             try
             {
                 LoaderTransactionStateService.SaveAtomic(
@@ -250,6 +269,20 @@ public static class SmokeTestOrchestrator
                 throw new SmokeTestException(
                     "The staged loader launch failed and its transaction could not be marked for rollback.",
                     stateException);
+            }
+
+            if (launch is not null)
+            {
+                return new SmokeTestExecutionResult(
+                    SmokeTestOutcome.Failed,
+                    "The staged loader launch failed; rollback is required.",
+                    null,
+                    preflight.Snapshot.Fingerprint,
+                    null,
+                    true,
+                    false,
+                    LaunchObservation: launch,
+                    LoaderLaunchDiagnostic: diagnostic);
             }
 
             throw exception is SmokeTestException smokeTestException
@@ -853,23 +886,38 @@ public static class SmokeTestOrchestrator
 
     private static string ReadKnownLoaderLog(string cleanGameRoot)
     {
-        try
+        var evidence = ReadKnownLoaderLogEvidence(cleanGameRoot, out var text);
+        if (!evidence.Readable)
         {
-            foreach (var relative in new[] { "BepInEx/LogOutput.log", "BepInEx/LogOutput.txt" })
+            throw new SmokeTestException("The disposable loader log could not be read safely.");
+        }
+
+        return text;
+    }
+
+    private static LoaderLogReadEvidence ReadKnownLoaderLogEvidence(string cleanGameRoot, out string text)
+    {
+        text = string.Empty;
+        foreach (var relative in new[] { "BepInEx/LogOutput.log", "BepInEx/LogOutput.txt" })
+        {
+            var path = Path.Combine(cleanGameRoot, relative.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(path))
             {
-                var path = Path.Combine(cleanGameRoot, relative.Replace('/', Path.DirectorySeparatorChar));
-                if (File.Exists(path))
-                {
-                    return File.ReadAllText(path);
-                }
+                continue;
             }
 
-            return string.Empty;
+            try
+            {
+                text = File.ReadAllText(path);
+                return new LoaderLogReadEvidence(true, true);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                return new LoaderLogReadEvidence(true, false, "log-not-readable");
+            }
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            throw new SmokeTestException("The disposable loader log could not be read safely.", exception);
-        }
+
+        return new LoaderLogReadEvidence(false, false, "log-missing");
     }
 
     private static SmokeTestExecutionResult WriteOutcomeReport(

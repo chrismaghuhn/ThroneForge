@@ -238,6 +238,81 @@ public sealed class LifecycleRecoveryTests
         }
     }
 
+    [Fact]
+    public void RecoveryRuntimeDriftRetainsSanitizedRelativeDifferenceEvidence()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var roots = CreateRoots(root);
+            Directory.CreateDirectory(roots.RepositoryRoot);
+            Directory.CreateDirectory(roots.OriginalGameRoot);
+            Directory.CreateDirectory(roots.CleanGameRoot);
+            File.WriteAllText(Path.Combine(roots.OriginalGameRoot, "game.dat"), "baseline");
+            File.WriteAllText(Path.Combine(roots.CleanGameRoot, "game.dat"), "baseline");
+            Directory.CreateDirectory(Path.Combine(roots.CleanGameRoot, "BepInEx"));
+            File.WriteAllText(Path.Combine(roots.CleanGameRoot, "BepInEx", "core.dll"), "loader");
+
+            var original = InstallationCopyService.CaptureManifest(roots.OriginalGameRoot);
+            var disposable = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+            DisposableProfileBaselineService.Save(
+                LoaderSmokeTestStatePaths.GetBaselinePath(roots),
+                new DisposableProfileBaseline(
+                    DisposableProfileBaselineService.SchemaVersion,
+                    DisposableProfileBaselineService.TaskVersion,
+                    Fingerprint,
+                    original,
+                    original));
+            var applied = disposable;
+            var corePath = Path.Combine(roots.CleanGameRoot, "BepInEx", "core.dll");
+            File.WriteAllText(corePath, "changed");
+            var current = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+            var transaction = new LoaderTransactionState(
+                LoaderTransactionStateService.SchemaVersion,
+                LoaderTransactionStateService.TaskVersion,
+                Fingerprint,
+                InstallationCopyService.ComputeManifestIdentity(original),
+                "BepInEx_win_x64_5.4.23.5.zip",
+                new string('a', 64),
+                LoaderTransactionStatus.RollbackRequired,
+                applied,
+                [new TransactionEntry("BepInEx/core.dll", TransactionChangeKind.NewFile, null, current.Files.Single(item => item.RelativePath == "BepInEx/core.dll").Sha256, null)],
+                []);
+            LoaderTransactionStateService.SaveAtomic(LoaderSmokeTestStatePaths.GetTransactionStatePath(roots), transaction);
+            Task6ExperimentStateService.SaveAtomic(
+                roots.ExperimentRoot,
+                new Task6ExperimentState(
+                    Task6ExperimentStateService.SchemaVersion,
+                    Task6ExperimentStateService.TaskVersion,
+                    Fingerprint,
+                    Guid.NewGuid().ToString("N"),
+                    RepositoryCommit,
+                    Task6ExperimentStateService.CleanGameRelativePath,
+                    Task6ExperimentStatus.Failed,
+                    LoaderTransactionStatus: LoaderTransactionStatus.RollbackRequired.ToString()));
+
+            var result = LifecycleExperimentRecoveryService.Rollback(new LifecycleExperimentRecoveryOptions(
+                roots.RepositoryRoot,
+                roots.OriginalGameRoot,
+                roots.ExperimentRoot,
+                Fingerprint,
+                Path.Combine(root, "missing-BepInEx.zip"),
+                new string('a', 64)));
+
+            Assert.Equal(LifecycleExperimentFailureCategories.RecoveryRuntimeDrift, result.FailureCategory);
+            Assert.NotNull(result.DriftEvidence);
+            Assert.Contains(result.DriftEvidence!.Differences, item => item.RelativePath == "BepInEx/core.dll");
+            Assert.DoesNotContain(root, result.DriftEvidence.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private static string CreateRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "throneforge-task7-recovery", Guid.NewGuid().ToString("N"));

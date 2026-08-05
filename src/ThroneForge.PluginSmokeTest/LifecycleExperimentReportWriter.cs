@@ -48,6 +48,12 @@ public sealed class LifecycleExperimentReportWriter
         Append(builder, "Original verification", recovery.OriginalVerified.ToString());
         Append(builder, "Recovery result", recovery.OverallResult);
         Append(builder, "Recovery category", SafeToken(recovery.FailureCategory));
+        Append(builder, "Recovery drift status", recovery.DriftEvidence?.Status.ToString() ?? "not-observed");
+        Append(builder, "Recovery drift difference count", recovery.DriftEvidence?.TotalDifferenceCount.ToString(CultureInfo.InvariantCulture) ?? "not-observed");
+        Append(builder, "Recovery drift differences", FormatDriftDifferences(recovery.DriftEvidence));
+        Append(builder, "Recovery historical drift limitation", recovery.DriftEvidence is null
+            ? "Exact file-level drift was not retained for the historical private run."
+            : "Current recovery evidence contains only bounded relative paths and difference kinds.");
         return WriteAtomic(reportPath, builder.ToString(), null);
     }
 
@@ -100,6 +106,21 @@ public sealed class LifecycleExperimentReportWriter
         Append(builder, "Loader applied", result.LoaderApplied.ToString());
         Append(builder, "Plugin deployed", result.PluginDeployed.ToString());
         Append(builder, "Process active", result.ProcessActive.ToString());
+        Append(builder, "Loader launch category", result.LoaderLaunchDiagnostic?.LaunchCategory ?? "not-observed");
+        Append(builder, "Loader diagnostic category", result.LoaderLaunchDiagnostic?.DiagnosticCategory ?? "not-observed");
+        Append(builder, "Loader process exited/exit code", result.LoaderLaunchDiagnostic is null
+            ? "not-observed"
+            : $"{result.LoaderLaunchDiagnostic.ProcessExited}/{result.LoaderLaunchDiagnostic.ExitCode?.ToString(CultureInfo.InvariantCulture) ?? "none"}");
+        Append(builder, "Loader log present/readable", result.LoaderLaunchDiagnostic is null
+            ? "not-observed"
+            : $"{result.LoaderLaunchDiagnostic.LogPresent}/{result.LoaderLaunchDiagnostic.LogReadable}");
+        Append(builder, "Loader preloader/chainloader", result.LoaderLaunchDiagnostic is null
+            ? "not-observed"
+            : $"{result.LoaderLaunchDiagnostic.PreloaderInitialized}/{result.LoaderLaunchDiagnostic.ChainloaderInitialized}");
+        Append(builder, "Loader diagnostic plugin count", result.LoaderLaunchDiagnostic?.PluginsDiscovered.ToString(CultureInfo.InvariantCulture) ?? "not-observed");
+        Append(builder, "Loader diagnostic warnings/errors/fatal", result.LoaderLaunchDiagnostic is null
+            ? "not-observed"
+            : $"{result.LoaderLaunchDiagnostic.WarningCount}/{result.LoaderLaunchDiagnostic.ErrorCount}/{result.LoaderLaunchDiagnostic.FatalErrorCount}");
         Append(builder, "Selected executable relative path", SafeRelative(result.SelectedExecutableRelativePath));
         Append(builder, "Unity source assembly identity", SafeToken(result.UnitySourceAssemblyIdentity));
         Append(builder, "Package SHA-256", SafeToken(result.PackageSha256));
@@ -158,6 +179,20 @@ public sealed class LifecycleExperimentReportWriter
             || value.Any(character => char.IsControl(character) || character is '\\' or '/' or ':')
             ? "not-observed"
             : value;
+
+    private static string FormatDriftDifferences(RollbackDriftEvidence? evidence)
+    {
+        if (evidence is null || evidence.Differences.Count == 0)
+        {
+            return "not-observed";
+        }
+
+        var values = evidence.Differences
+            .Select(item => $"{SafeToken(item.Kind)}:{SafeRelative(item.RelativePath)}")
+            .ToArray();
+        var suffix = evidence.Truncated ? ";truncated" : string.Empty;
+        return string.Join(',', values) + suffix;
+    }
 
     private static void Append(StringBuilder builder, string name, string value)
     {

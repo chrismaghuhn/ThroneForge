@@ -214,6 +214,123 @@ public sealed record LaunchObservationResult(
     TimeSpan Elapsed,
     string FailureCategory);
 
+public sealed record LoaderLogReadEvidence(
+    bool Present,
+    bool Readable,
+    string? FailureCategory = null);
+
+public static class LoaderLaunchDiagnosticCategories
+{
+    public const string Unknown = "unknown";
+    public const string BootstrapObserved = "bootstrap-observed";
+    public const string BootstrapEvidenceInvalid = "bootstrap-evidence-invalid";
+    public const string LogMissing = "log-missing";
+    public const string LogNotReadable = "log-not-readable";
+    public const string ManualClosureRequired = "manual-closure-required";
+    public const string PreloaderNotInitialized = "preloader-not-initialized";
+    public const string ChainloaderNotInitialized = "chainloader-not-initialized";
+    public const string BepInExVersionMismatch = "bepinex-version-mismatch";
+    public const string UnexpectedPluginCount = "unexpected-plugin-count";
+    public const string FatalLoaderError = "fatal-loader-error";
+}
+
+public sealed record LoaderLaunchDiagnosticEvidence(
+    bool ProcessStarted,
+    bool ProcessExited,
+    bool ExecutableInsideExperiment,
+    bool RequiresManualClosure,
+    int? ExitCode,
+    string LaunchCategory,
+    bool LogPresent,
+    bool LogReadable,
+    string? BepInExVersion,
+    bool PreloaderInitialized,
+    bool ChainloaderInitialized,
+    int PluginsDiscovered,
+    int WarningCount,
+    int ErrorCount,
+    int FatalErrorCount,
+    string DiagnosticCategory,
+    bool BootstrapObserved)
+{
+    public static LoaderLaunchDiagnosticEvidence Create(
+        LaunchObservationResult launch,
+        LoaderLogReadEvidence log,
+        LoaderLogSummary? summary,
+        bool bootstrapObserved)
+    {
+        ArgumentNullException.ThrowIfNull(launch);
+        ArgumentNullException.ThrowIfNull(log);
+        var safeLaunchCategory = SafeCategory(launch.FailureCategory);
+        var diagnosticCategory = launch.RequiresManualClosure
+            ? LoaderLaunchDiagnosticCategories.ManualClosureRequired
+            : !launch.Started
+                ? safeLaunchCategory
+                : !log.Present
+                    ? LoaderLaunchDiagnosticCategories.LogMissing
+                    : !log.Readable
+                        ? LoaderLaunchDiagnosticCategories.LogNotReadable
+                        : summary is not null && !summary.PreloaderInitialized
+                            ? LoaderLaunchDiagnosticCategories.PreloaderNotInitialized
+                            : summary is not null && !summary.ChainloaderInitialized
+                                ? LoaderLaunchDiagnosticCategories.ChainloaderNotInitialized
+                                : summary is not null && !string.Equals(summary.BepInExVersion, "5.4.23.5", StringComparison.Ordinal)
+                                    ? LoaderLaunchDiagnosticCategories.BepInExVersionMismatch
+                                    : summary is not null && summary.PluginsDiscovered != 0
+                                        ? LoaderLaunchDiagnosticCategories.UnexpectedPluginCount
+                                        : summary is not null && summary.FatalErrorCount != 0
+                                            ? LoaderLaunchDiagnosticCategories.FatalLoaderError
+                                            : !bootstrapObserved
+                                                ? LoaderLaunchDiagnosticCategories.BootstrapEvidenceInvalid
+                                                : LoaderLaunchDiagnosticCategories.BootstrapObserved;
+        return new(
+            launch.Started,
+            launch.Exited,
+            launch.ExecutableWasInsideExperiment,
+            launch.RequiresManualClosure,
+            launch.ExitCode,
+            safeLaunchCategory,
+            log.Present,
+            log.Readable,
+            summary?.BepInExVersion,
+            summary?.PreloaderInitialized == true,
+            summary?.ChainloaderInitialized == true,
+            summary?.PluginsDiscovered ?? 0,
+            summary?.WarningCount ?? 0,
+            summary?.ErrorCount ?? 0,
+            summary?.FatalErrorCount ?? 0,
+            diagnosticCategory,
+            bootstrapObserved);
+    }
+
+    private static string SafeCategory(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            || value.Any(character => char.IsControl(character) || char.IsWhiteSpace(character) || character is '\\' or '/' or ':')
+            ? LoaderLaunchDiagnosticCategories.Unknown
+            : value;
+}
+
+public enum RollbackDriftStatus
+{
+    Matches,
+    ApprovedGeneratedDifferencesOnly,
+    UnapprovedDifferences
+}
+
+public sealed record RollbackDriftDifference(
+    string Kind,
+    string RelativePath,
+    bool IsApprovedGeneratedEvidence);
+
+public sealed record RollbackDriftEvidence(
+    RollbackDriftStatus Status,
+    IReadOnlyList<RollbackDriftDifference> Differences,
+    int TotalDifferenceCount,
+    bool Truncated)
+{
+    public bool HasUnapprovedDifferences => Status == RollbackDriftStatus.UnapprovedDifferences;
+}
+
 public sealed record LoaderLogSummary(
     string? BepInExVersion,
     bool ConfigurationGenerated,

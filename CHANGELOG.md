@@ -1,5 +1,7 @@
 # Changelog
 
+- Started repository-only M1 Task 7 LoaderLaunch investigation on `agent/m1-task7-loader-launch-investigation`. Future runs now retain bounded process/log/BepInEx bootstrap diagnostics and recovery retains sanitized relative manifest-difference evidence. The historical final private run remains `Failed` at `LoaderLaunch` and its exact preloader cause and drift file are explicitly unavailable because raw logs and file-level drift evidence were not retained. No private or recovery execution was performed; Task 8 remains blocked.
+
 ## Unreleased
 
 - PR #7 review correction: recovery removes an ownership-bound deployed lifecycle plugin before runtime-drift validation and preserves cleanup status when later rollback fails. BaselineLaunch and LoaderLaunch now propagate typed `manual-closure-required`/`ProcessActive` evidence so active profiles do not enter cleanup. Repository-only tests cover both manual-closure paths and plugin-deployed recovery; no private run was performed. Head `1cd903c0aa1942d793409893d458939660e40c9d` passed hosted run `31039015040` on Windows and Ubuntu with 13 TRX files and 360 passing tests per runner using SDK `10.0.100`.

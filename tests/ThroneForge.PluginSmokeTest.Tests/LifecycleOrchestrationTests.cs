@@ -39,6 +39,41 @@ public sealed class LifecycleOrchestrationTests
     }
 
     [Fact]
+    public void TypedLoaderLaunchDiagnosticReachesFinalResult()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var launch = new LaunchObservationResult(true, false, true, 3, true, false, TimeSpan.Zero, "process-exited-during-observation");
+            var diagnostic = LoaderLaunchDiagnosticEvidence.Create(
+                launch,
+                new LoaderLogReadEvidence(true, true),
+                LoaderLogParser.Parse("BepInEx 5.4.23.5\nPreloader started"),
+                bootstrapObserved: false);
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                Guid.NewGuid().ToString("N"),
+                Fingerprint,
+                new SuccessfulLifecycleOperations
+                {
+                    LoaderLaunchResult = new LoaderModeExecutionEvidence(
+                        true,
+                        LoaderTransactionStatus: "LaunchObserved",
+                        LoaderApplied: true,
+                        LoaderLaunchDiagnostic: diagnostic)
+                }).Run();
+
+            Assert.Equal(LoaderLaunchDiagnosticCategories.PreloaderNotInitialized, result.LoaderLaunchDiagnostic!.DiagnosticCategory);
+            Assert.Equal("process-exited-during-observation", result.LoaderLaunchDiagnostic.LaunchCategory);
+            Assert.Equal(3, result.LoaderLaunchDiagnostic.ExitCode);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void MissingRequiredEvidenceCannotProducePassed()
     {
         var root = CreateRoot();
@@ -379,6 +414,46 @@ public sealed class LifecycleOrchestrationTests
             Assert.Contains("Recovery result: Passed", report, StringComparison.Ordinal);
             Assert.Contains("Plugin removal: NotRequired", report, StringComparison.Ordinal);
             Assert.DoesNotContain("Application.quitting event observed while Thronefall was running", report, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RecoveryReportIncludesOnlySanitizedDriftEvidence()
+    {
+        var root = CreateRoot();
+        Directory.CreateDirectory(Path.Combine(root, "docs", "discovery"));
+        try
+        {
+            var writer = new LifecycleExperimentReportWriter(root, Fingerprint);
+            writer.Write(new LifecycleExperimentResult(
+                "Failed",
+                LifecycleExperimentStage.LoaderLaunch,
+                LifecycleExperimentStage.LoaderLaunch,
+                LifecycleExperimentStage.LoaderInstall,
+                LifecycleExperimentFailureCategories.LoaderLaunchFailed,
+                true));
+
+            var evidence = new RollbackDriftEvidence(
+                RollbackDriftStatus.UnapprovedDifferences,
+                [new RollbackDriftDifference("changed-file", "BepInEx/core.dll", false)],
+                1,
+                false);
+            var report = File.ReadAllText(writer.AppendRecovery(new LifecycleExperimentRollbackResult(
+                "Failed",
+                false,
+                false,
+                false,
+                LifecycleExperimentFailureCategories.RecoveryRuntimeDrift,
+                DriftEvidence: evidence)));
+
+            Assert.Contains("Recovery drift status: UnapprovedDifferences", report, StringComparison.Ordinal);
+            Assert.Contains("Recovery drift differences: changed-file:BepInEx/core.dll", report, StringComparison.Ordinal);
+            Assert.DoesNotContain(root, report, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(new string('a', 64), report, StringComparison.Ordinal);
         }
         finally
         {

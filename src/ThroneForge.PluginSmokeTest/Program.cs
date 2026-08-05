@@ -296,6 +296,10 @@ public static class PluginSmokeCli
         stdout.WriteLine($"stage-state-persisted={result.StageStatePersisted}");
         stdout.WriteLine($"package-sha256={result.PackageSha256 ?? "not-observed"}");
         stdout.WriteLine($"binding-digest={result.AdmissionBindingDigest ?? "not-observed"}");
+        stdout.WriteLine($"loader-launch-diagnostic={result.LoaderLaunchDiagnostic?.DiagnosticCategory ?? "not-observed"}");
+        stdout.WriteLine($"loader-launch-category={result.LoaderLaunchDiagnostic?.LaunchCategory ?? "not-observed"}");
+        stdout.WriteLine($"loader-preloader-initialized={result.LoaderLaunchDiagnostic?.PreloaderInitialized.ToString() ?? "not-observed"}");
+        stdout.WriteLine($"loader-chainloader-initialized={result.LoaderLaunchDiagnostic?.ChainloaderInitialized.ToString() ?? "not-observed"}");
         stdout.WriteLine($"recovery-marker-persisted={result.RecoveryMarkerPersisted?.ToString() ?? "not-observed"}");
         stdout.WriteLine($"rollback-operation={result.RollbackCommand ?? "not-observed"}");
         stdout.WriteLine($"recovery-action={result.RecoveryAction ?? "not-observed"}");
@@ -319,6 +323,11 @@ public static class PluginSmokeCli
         stdout.WriteLine($"plugin-removal-status={result.PluginRemovalStatus}");
         stdout.WriteLine($"loader-rollback-status={result.LoaderRollbackStatus}");
         stdout.WriteLine($"failure-category={result.FailureCategory ?? "none"}");
+        stdout.WriteLine($"drift-status={result.DriftEvidence?.Status.ToString() ?? "not-observed"}");
+        var driftDifferences = result.DriftEvidence is null
+            ? "not-observed"
+            : string.Join(',', result.DriftEvidence.Differences.Select(item => $"{item.Kind}:{item.RelativePath}"));
+        stdout.WriteLine($"drift-differences={driftDifferences}");
         var reportPath = new LifecycleExperimentReportWriter(
             Value(args, "--repository-root"),
             Value(args, "--expected-fingerprint")).AppendRecovery(result);

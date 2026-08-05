@@ -1,3 +1,5 @@
+using ThroneForge.LoaderSmokeTest;
+
 namespace ThroneForge.PluginSmokeTest;
 
 public sealed record LifecycleExperimentContext(
@@ -21,7 +23,8 @@ public sealed record LoaderModeExecutionEvidence(
     bool? LoaderApplied = null,
     string? LoaderTransactionStatus = null,
     bool ActiveProcess = false,
-    bool RequiresManualClosure = false)
+    bool RequiresManualClosure = false,
+    LoaderLaunchDiagnosticEvidence? LoaderLaunchDiagnostic = null)
     : LifecycleStageEvidence(
         Succeeded,
         FailureCategory,
@@ -191,7 +194,8 @@ public sealed record LifecycleExperimentResult(
     bool ProcessActive = false,
     CleanupOperationStatus? PluginRemovalStatus = null,
     CleanupOperationStatus? LoaderRollbackStatus = null,
-    string? RecoveryAction = null);
+    string? RecoveryAction = null,
+    LoaderLaunchDiagnosticEvidence? LoaderLaunchDiagnostic = null);
 
 /// <summary>
 /// The single repository and private-experiment owner of Task 7 stage execution.
@@ -627,6 +631,7 @@ public sealed class LifecycleExperimentOrchestrator
         public bool LoaderApplied { get; private set; }
         public bool PluginDeployed { get; private set; }
         public bool ProcessActive { get; private set; }
+        public LoaderLaunchDiagnosticEvidence? LoaderLaunchDiagnostic { get; private set; }
 
         public bool HasCompleteSuccessEvidence
             => PluginRemovalStatus == CleanupOperationStatus.Passed
@@ -644,6 +649,10 @@ public sealed class LifecycleExperimentOrchestrator
             LoaderApplied |= evidence.LoaderApplied == true;
             PluginDeployed |= evidence.PluginDeployed == true;
             ProcessActive |= evidence.ProcessActive == true;
+            if (evidence is LoaderModeExecutionEvidence loaderMode && loaderMode.LoaderLaunchDiagnostic is not null)
+            {
+                LoaderLaunchDiagnostic = loaderMode.LoaderLaunchDiagnostic;
+            }
             if (evidence is OriginalPreflightEvidence preflight)
             {
                 SelectedExecutableRelativePath = preflight.SelectedExecutableRelativePath;
@@ -762,7 +771,8 @@ public sealed class LifecycleExperimentOrchestrator
                 ProcessActive,
                 PluginRemovalStatus,
                 LoaderRollbackStatus,
-                RecoveryAction);
+                RecoveryAction,
+                LoaderLaunchDiagnostic);
     }
 
     private static bool RelativePathsEqual(string left, string right)

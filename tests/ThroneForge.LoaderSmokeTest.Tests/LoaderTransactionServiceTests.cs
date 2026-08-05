@@ -156,6 +156,70 @@ public sealed class LoaderTransactionServiceTests
     }
 
     [Fact]
+    public void RollbackDriftEvidenceIdentifiesChangedAndAddedRelativeFiles()
+    {
+        var expected = new CopyManifest(
+            [new FileManifestEntry("BepInEx/core.dll", 3, new string('a', 64))],
+            ["BepInEx"]);
+        var actual = new CopyManifest(
+            [
+                new FileManifestEntry("BepInEx/core.dll", 3, new string('b', 64)),
+                new FileManifestEntry("unexpected.bin", 1, new string('c', 64))
+            ],
+            ["BepInEx"]);
+
+        var evidence = LoaderTransactionStateService.ClassifyRollbackDrift(expected, actual);
+
+        Assert.Equal(RollbackDriftStatus.UnapprovedDifferences, evidence.Status);
+        Assert.Contains(evidence.Differences, item => item.RelativePath == "BepInEx/core.dll" && item.Kind == "changed-file");
+        Assert.Contains(evidence.Differences, item => item.RelativePath == "unexpected.bin" && item.Kind == "added-file");
+        Assert.All(evidence.Differences, item =>
+        {
+            Assert.False(Path.IsPathRooted(item.RelativePath));
+            Assert.DoesNotContain('\\', item.RelativePath);
+        });
+    }
+
+    [Fact]
+    public void RollbackDriftEvidenceAllowsOnlyApprovedGeneratedDifferences()
+    {
+        var expected = new CopyManifest(
+            [new FileManifestEntry("BepInEx/core.dll", 3, new string('a', 64))],
+            ["BepInEx"]);
+        var actual = new CopyManifest(
+            [
+                new FileManifestEntry("BepInEx/core.dll", 3, new string('a', 64)),
+                new FileManifestEntry("BepInEx/LogOutput.log", 2, new string('b', 64)),
+                new FileManifestEntry("BepInEx/config/generated.cfg", 2, new string('c', 64))
+            ],
+            ["BepInEx", "BepInEx/config"]);
+
+        var evidence = LoaderTransactionStateService.ClassifyRollbackDrift(expected, actual);
+
+        Assert.Equal(RollbackDriftStatus.ApprovedGeneratedDifferencesOnly, evidence.Status);
+        Assert.All(evidence.Differences, item => Assert.True(item.IsApprovedGeneratedEvidence));
+    }
+
+    [Fact]
+    public void RollbackDriftEvidenceRetainsUnapprovedStatusWhenDifferencesAreTruncated()
+    {
+        var expected = new CopyManifest([], ["BepInEx"]);
+        var actual = new CopyManifest(
+            [
+                new FileManifestEntry("BepInEx/LogOutput.log", 2, new string('a', 64)),
+                new FileManifestEntry("unexpected.bin", 1, new string('b', 64))
+            ],
+            ["BepInEx"]);
+
+        var evidence = LoaderTransactionStateService.ClassifyRollbackDrift(expected, actual, maximumDifferences: 1);
+
+        Assert.Equal(RollbackDriftStatus.UnapprovedDifferences, evidence.Status);
+        Assert.Equal(2, evidence.TotalDifferenceCount);
+        Assert.True(evidence.Truncated);
+        Assert.Single(evidence.Differences);
+    }
+
+    [Fact]
     public void ValidLaunchObservedStateRequiresAndRetainsBootstrapEvidence()
     {
         using var fixture = new SmokeTestFixture();

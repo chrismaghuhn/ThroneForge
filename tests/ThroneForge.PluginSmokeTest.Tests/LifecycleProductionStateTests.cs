@@ -162,6 +162,57 @@ public sealed class LifecycleProductionStateTests
     }
 
     [Fact]
+    public void ProductionLoaderLaunchPreservesSanitizedDiagnosticEvidence()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "throneforge-task7-production-diagnostic", Guid.NewGuid().ToString("N"));
+        var repository = Path.Combine(root, "repository");
+        var original = Path.Combine(root, "original");
+        var experiment = Path.Combine(root, "experiment");
+        Directory.CreateDirectory(repository);
+        Directory.CreateDirectory(original);
+        var unity = Path.Combine(original, "Thronefall_Data", "Managed", "UnityEngine.CoreModule.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(unity)!);
+        File.WriteAllBytes(unity, [0]);
+        var launch = new LaunchObservationResult(true, false, true, 3, true, false, TimeSpan.Zero, "process-exited-during-observation");
+        var diagnostic = LoaderLaunchDiagnosticEvidence.Create(
+            launch,
+            new LoaderLogReadEvidence(true, true),
+            LoaderLogParser.Parse("BepInEx 5.4.23.5\nPreloader started"),
+            bootstrapObserved: false);
+        var options = CreateOptions(repository, original, experiment, unity, mode =>
+            new SmokeTestExecutionResult(
+                SmokeTestOutcome.Failed,
+                "loader-launch-failed",
+                null,
+                Fingerprint,
+                null,
+                true,
+                false,
+                LaunchObservation: launch,
+                LoaderLaunchDiagnostic: diagnostic),
+            (_, status) => new LoaderStageVerificationEvidence(status.ToString(), new string('a', 64), true, true, true, true));
+
+        try
+        {
+            var operations = new LifecycleExperimentProductionOperations(options);
+            var evidence = operations.LoaderLaunch(new LifecycleExperimentContext(experiment, Guid.NewGuid().ToString("N"), Fingerprint, RepositoryCommit));
+
+            var typed = Assert.IsType<LoaderModeExecutionEvidence>(evidence);
+            Assert.False(typed.Succeeded);
+            Assert.NotNull(typed.LoaderLaunchDiagnostic);
+            Assert.Equal(LoaderLaunchDiagnosticCategories.PreloaderNotInitialized, typed.LoaderLaunchDiagnostic!.DiagnosticCategory);
+            Assert.DoesNotContain(root, typed.LoaderLaunchDiagnostic.ToString(), StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void ProductionBaselineManualClosureRequiresNoLoaderCleanupRoute()
     {
         var root = Path.Combine(Path.GetTempPath(), "throneforge-task7-production-baseline-recovery", Guid.NewGuid().ToString("N"));
