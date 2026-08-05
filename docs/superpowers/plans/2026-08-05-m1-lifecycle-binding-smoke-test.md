@@ -21,6 +21,8 @@
 
 The current correction does not permit another private run. It replaces human CLI parsing with `throneforge-runtime-compatibility-evidence-v1`, verifies Task-3 loader state through shared C# services and the saved disposable baseline, represents package admission and deployment as one `AdmitAndDeploy` stage with internal phase categories, and moves stage progression/result modeling into `LifecycleExperimentOrchestrator`. `LogStability`, `PluginRemoval`, `LoaderRollback`, `DisposablePostcheck` and `OriginalPostcheck` own their respective evidence. A separate private attempt may be considered only after this correction receives a fresh hosted green run and code review.
 
+Validation of the correction passed on head `dbbcc3a` in hosted run `31012843103`: Windows and Ubuntu each used SDK `10.0.100`, uploaded 13 TRX files and reported 327 tests with zero failures, errors, skips or not-executed tests. The private experiment was not rerun.
+
 ## Correction outcome
 
 Correction head `bdd871fa263d5b97fc4a20160ee110d32f406c99` passed hosted run `31008620029` with 13 TRX files and 313 tests per runner on SDK `10.0.100`. The single permitted corrective private run stopped at `OriginalPreflight` with stable category `original-preflight-failed`: the discovery CLI emitted `Selected executable: ...`, while the harness expected an equals-delimited value. No loader transaction, package admission, deployment, or lifecycle evidence was produced. No further private run is permitted for this correction.

@@ -36,6 +36,8 @@ Task 7 is limited to the public Unity lifecycle source `UnityEngine.Application.
 
 The correction consumes only `throneforge-runtime-compatibility-evidence-v1`, verifies canonical Task-3/Task-6 state through shared C# services using the saved disposable baseline, reports package capture/admission/deployment as one `AdmitAndDeploy` stage with bounded phase categories, and exercises stage progression and postchecks in repository tests. No private game or BepInEx run is authorized in this correction.
 
+Repository-only correction head `dbbcc3a` passed hosted run `31012843103` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 13 TRX files representing 327 tests with zero failures, errors, skips or not-executed tests. No private run was performed.
+
 Task-7 correction baseline: reviewed head `92094c4362f09f73ffdd1bc8807caaf4a904f611` passed hosted run `31005428380` with 13 TRX files and 304 tests per runner using SDK `10.0.100`. Correction head `bdd871fa263d5b97fc4a20160ee110d32f406c99` passed hosted run `31008620029` with 13 TRX files and 313 tests per runner using SDK `10.0.100`; all test counters were zero for failures, errors, skips, not-executed and aborted tests. The single corrective private run stopped at `OriginalPreflight` because the harness expected `Selected executable=...` while the discovery CLI emitted `Selected executable: ...`. No loader transaction, package, deployment or lifecycle marker was produced. The report records the failed result and no further private run is permitted for this correction.
 
 ### M2 - Contracts, schemas, validation, and fixtures
