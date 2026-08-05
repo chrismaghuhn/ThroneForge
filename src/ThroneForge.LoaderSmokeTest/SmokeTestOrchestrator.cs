@@ -175,7 +175,8 @@ public static class SmokeTestOrchestrator
         {
             launch = LaunchCopiedExecutable(roots, preflight.Snapshot.SelectedExecutableRelativePath);
             summary = LoaderLogParser.Parse(ReadKnownLoaderLog(roots.CleanGameRoot));
-            var status = launch.Started && launch.StableInitialized && !launch.RequiresManualClosure
+            var bootstrapObserved = LoaderBootstrapLaunchCriteria.IsObserved(launch, summary);
+            var status = bootstrapObserved
                 ? LoaderTransactionStatus.LaunchObserved
                 : LoaderTransactionStatus.RollbackRequired;
             var generatedFiles = LoaderTransactionStateService.CaptureGeneratedEvidence(
@@ -194,7 +195,7 @@ public static class SmokeTestOrchestrator
                 });
 
             return new SmokeTestExecutionResult(
-                SmokeTestOutcomeClassifier.Classify(true, launch.Started && launch.StableInitialized, summary),
+                SmokeTestOutcomeClassifier.Classify(true, bootstrapObserved, summary),
                 launch.FailureCategory,
                 null,
                 preflight.Snapshot.Fingerprint,
@@ -403,7 +404,7 @@ public static class SmokeTestOrchestrator
             && InstallationCopyService.CompareManifests(copyManifest, copiedAfterRollback).Matches
             && string.Equals(InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint, request.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase);
         var outcome = guard.Outcome;
-        if (guard.Launch is not null && (!guard.Launch.Started || !guard.Launch.StableInitialized))
+        if (guard.Launch is not null && !LoaderBootstrapLaunchCriteria.IsObserved(guard.Launch, summary))
         {
             outcome = SmokeTestOutcome.Failed;
         }
