@@ -2,9 +2,9 @@
 
 ## Current milestone
 
-M1 - Task 7 public Unity lifecycle binding and synthetic lifecycle smoke test remains incomplete on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. This correction is repository-only and does not authorize another private run. The C# `LifecycleExperimentOrchestrator` now owns the real CLI operation, typed stage evidence, immutable primary failure state, cleanup/postchecks, disposable runtime/readiness/indicator checks, and report generation. PowerShell is only an explicit-input wrapper. Hosted validation for this new correction is pending; the prior hosted baseline `31013133447` passed with 13 TRX files and 327 tests per runner using SDK `10.0.100`. The two permitted private attempts remain historical `Failed` evidence.
+M1 - Task 7 public Unity lifecycle binding and synthetic lifecycle smoke test remains incomplete on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. This correction is repository-only and does not authorize another private run. The C# `LifecycleExperimentOrchestrator` now owns the real CLI operation, typed stage evidence, immutable primary failure state, cleanup/postchecks, disposable runtime/readiness/indicator checks, and report generation. PowerShell is only an explicit-input wrapper. Current head `1207546c1f7885eb4cb43fa70fa70c62051a7145` passed hosted run `31016602789` on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files and 333 tests per runner; all failure, error, skip, not-executed and aborted counters were zero. The two permitted private attempts remain historical `Failed` evidence.
 
-Task-7 orchestration correction head `dbbcc3a` passed hosted run `31012843103`: Windows and Ubuntu each uploaded 13 TRX files representing 327 tests with zero failures, errors, skips or not-executed tests under SDK `10.0.100`. This newer ownership correction has not yet been hosted-validated. No private run was performed.
+The earlier orchestration correction head `dbbcc3a` passed hosted run `31012843103` with 327 tests per runner; the current ownership correction supersedes it and is validated by run `31016602789`. No private run was performed for this correction.
 
 ## State
 

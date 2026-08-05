@@ -42,11 +42,13 @@ Task-7 correction baseline: reviewed head `92094c4362f09f73ffdd1bc8807caaf4a904f
 
 ### Task-7 orchestration ownership correction
 
-- [ ] Replace the PowerShell stage machine with the real `run-lifecycle-experiment` C# CLI operation.
-- [ ] Use `ILifecycleExperimentOperations` and stage-specific evidence; missing evidence must fail closed.
-- [ ] Persist immutable primary failure stage/category and separate cleanup failures.
-- [ ] Run cleanup, disposable runtime/readiness/indicator verification, original postchecks, and sanitized report generation in C#.
-- [ ] Validate the full repository-only implementation and hosted Windows/Linux CI; do not run another private experiment in this slice.
+- [x] Replace the PowerShell stage machine with the real `run-lifecycle-experiment` C# CLI operation.
+- [x] Use `ILifecycleExperimentOperations` and stage-specific evidence; missing evidence must fail closed.
+- [x] Persist immutable primary failure stage/category and separate cleanup failures.
+- [x] Run cleanup, disposable runtime/readiness/indicator verification, original postchecks, and sanitized report generation in C#.
+- [x] Validate the full repository-only implementation and hosted Windows/Linux CI; do not run another private experiment in this slice.
+
+The final repository-only correction head `1207546c1f7885eb4cb43fa70fa70c62051a7145` passed hosted run `31016602789` with 13 TRX files and 333 tests per runner on SDK `10.0.100`; all failure, error, skip, not-executed and aborted counters were zero. No private run was performed, and a separately authorized private attempt remains the next possible verification step.
 
 ### M2 - Contracts, schemas, validation, and fixtures
 
