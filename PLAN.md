@@ -10,6 +10,8 @@ PR #7 review correction is active on the same branch. No private lifecycle or re
 
 The correction also preserves cleanup side-effect results when later rollback work fails and reuses the existing Task-6 state services for recovery. A recovery with no deployed package reports plugin removal as `NotRequired`; a manual-closure result remains `ProcessActive=true` and is persisted for recovery rather than entering cleanup.
 
+The correction head `1cd903c0aa1942d793409893d458939660e40c9d` passed hosted run `31039015040` on Windows and Ubuntu with SDK `10.0.100`; each runner produced 13 TRX files and 360 passing tests with no failure, error, timeout, abort, inconclusive, not-executed or skipped result.
+
 ## Milestones
 
 ### M0 - Repository bootstrap and architecture skeleton
