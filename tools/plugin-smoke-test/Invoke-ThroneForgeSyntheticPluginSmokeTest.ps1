@@ -154,9 +154,10 @@ function Invoke-PrivatePluginBuild {
     if ($dataDirectories.Count -ne 1) { Throw-Sanitized 'The disposable copy does not have one unambiguous Unity data directory.' }
     $managedRoot = Join-Path $dataDirectories[0].FullName 'Managed'
     $bepInExCore = Join-Path $script:cleanGameRoot 'BepInEx\core\BepInEx.dll'
+    $unityEngine = Join-Path $managedRoot 'UnityEngine.dll'
     $unityCore = Join-Path $managedRoot 'UnityEngine.CoreModule.dll'
     $netstandard = Join-Path $managedRoot 'netstandard.dll'
-    foreach ($candidate in @($bepInExCore, $unityCore, $netstandard)) {
+    foreach ($candidate in @($bepInExCore, $unityEngine, $unityCore, $netstandard)) {
         if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { Throw-Sanitized 'Required local runtime evidence is missing from the disposable copy.' }
     }
 
@@ -175,7 +176,7 @@ function Invoke-PrivatePluginBuild {
     Copy-Item -LiteralPath (Join-Path $templateRoot 'ThroneForgeSyntheticPlugin.cs') -Destination $sourceRoot
     $projectText = Get-Content -LiteralPath (Join-Path $templateRoot 'PluginProject.csproj.template') -Raw
     $sourceText = Get-Content -LiteralPath (Join-Path $sourceRoot 'ThroneForgeSyntheticPlugin.cs') -Raw
-    $projectText = $projectText.Replace('__TARGET_FRAMEWORK__', $targetFramework).Replace('__BEPINEX_CORE__', $bepInExCore).Replace('__UNITY_CORE_MODULE__', $unityCore).Replace('__THRONEFORGE_API__', $apiPath).Replace('__THRONEFORGE_CONTRACTS__', $contractsPath)
+    $projectText = $projectText.Replace('__TARGET_FRAMEWORK__', $targetFramework).Replace('__BEPINEX_CORE__', $bepInExCore).Replace('__UNITY_ENGINE__', $unityEngine).Replace('__UNITY_CORE_MODULE__', $unityCore).Replace('__THRONEFORGE_API__', $apiPath).Replace('__THRONEFORGE_CONTRACTS__', $contractsPath)
     $sourceText = $sourceText.Replace('__THRONEFORGE_API_IDENTITY__', $apiIdentity).Replace('__THRONEFORGE_CONTRACTS_IDENTITY__', $contractsIdentity)
     Write-Utf8NoBom (Join-Path $sourceRoot 'ThroneForge.M1.SyntheticSmoke.csproj') $projectText
     Write-Utf8NoBom (Join-Path $sourceRoot 'ThroneForgeSyntheticPlugin.cs') $sourceText
