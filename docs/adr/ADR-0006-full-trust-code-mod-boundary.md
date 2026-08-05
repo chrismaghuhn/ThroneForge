@@ -11,7 +11,7 @@ The runtime therefore needs a small, portable decision boundary before a future 
 
 ## Decision
 
-The Task-7 lifecycle slice binds BepInEx `Awake` and public `UnityEngine.Application.quitting` to one synthetic mod instance only. It does not expand the admission boundary into a game API, Harmony, catalog, or custom-wave boundary. Its correction requires a shared tested host, strict logger-envelope/order validation, exact `UnityEngine.CoreModule` metadata, and independent plugin/removal/rollback/postcheck evidence. The result remains fingerprint-specific and provisional until the private evidence and post-checks are recorded.
+The Task-7 lifecycle slice binds BepInEx `Awake` and public `UnityEngine.Application.quitting` to one synthetic mod instance only. It does not expand the admission boundary into a game API, Harmony, catalog, or custom-wave boundary. Its correction requires a shared tested host, strict logger-envelope/order validation, exact `UnityEngine.CoreModule` metadata, and independent plugin/removal/rollback/postcheck evidence. The single corrective private run stopped before package deployment at `OriginalPreflight` with `original-preflight-failed` because the harness did not parse the discovery CLI's selected-executable output. No lifecycle evidence was recorded.
 
 Task 4 defines three separate concerns:
 
