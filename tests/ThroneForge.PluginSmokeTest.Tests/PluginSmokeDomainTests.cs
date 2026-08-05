@@ -90,6 +90,19 @@ public sealed class PluginSmokeDomainTests
     }
 
     [Fact]
+    public void LoggerPrefixedSingleLineMarkerIsAccepted()
+    {
+        var result = PluginSmokeMarkerParser.Parse(
+            "[Info   :ThroneForge M1 Synthetic Smoke] THRONEFORGE_SYNTHETIC_PLUGIN_READY|nonce=n|pluginGuid=dev.throneforge.m1.synthetic-smoke|pluginVersion=0.0.1|api=ThroneForge.API, Version=1.0.0.0|contracts=ThroneForge.Contracts, Version=1.0.0.0",
+            "n",
+            expectedApiIdentity: "ThroneForge.API, Version=1.0.0.0",
+            expectedContractsIdentity: "ThroneForge.Contracts, Version=1.0.0.0");
+
+        Assert.True(result.IsValid);
+        Assert.Equal(1, result.MarkerCount);
+    }
+
+    [Fact]
     public void MarkerParserRejectsLifecycleMarker()
     {
         var result = PluginSmokeMarkerParser.Parse(

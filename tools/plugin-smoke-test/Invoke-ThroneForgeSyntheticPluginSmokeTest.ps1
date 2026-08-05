@@ -262,6 +262,7 @@ if ($Mode -eq 'Full' -and (Test-Path -LiteralPath $cleanGameRoot)) { Throw-Sanit
 $loaderApplied = $false
 $pluginDeployed = $false
 $manualClosureRequired = $false
+$rollbackOperationVerified = $false
 $result = 'Failed'
 $failureSummary = 'The private smoke test did not complete.'
 $package = $null
@@ -300,7 +301,17 @@ catch {
 finally {
     if (-not $manualClosureRequired) {
         if ($pluginDeployed) { Invoke-PluginTool @('remove', '--clean-game', $cleanGameRoot) -AllowFailure | Out-Null }
-        if ($loaderApplied) { Invoke-Loader Rollback -AllowFailure | Out-Null }
+        if ($loaderApplied) {
+            $rollbackOperation = Invoke-Loader Rollback -AllowFailure
+            $rollbackVerifiedLine = @(
+                $rollbackOperation.Output -split '\r?\n' |
+                    Where-Object { $_.StartsWith('Rollback verified:', [StringComparison]::Ordinal) } |
+                    Select-Object -First 1
+            )
+            $rollbackOperationVerified = $rollbackOperation.ExitCode -eq 0
+                -and $rollbackVerifiedLine.Count -eq 1
+                -and $rollbackVerifiedLine[0] -match '(?i)Rollback verified:\s*True\s*$'
+        }
     }
     else {
         $marker = Join-Path $script:experimentRoot 'evidence\recovery-marker.json'
@@ -311,7 +322,7 @@ finally {
 $postOriginalManifest = Get-OutputValue (Invoke-PluginTool @('manifest', '--root', $script:gameRoot)).Output 'manifest-identity'
 $postRuntime = Invoke-DotnetOperation @('run', '--project', (Join-Path $repositoryRoot 'src\ThroneForge.Discovery'), '-c', 'Release', '--no-build', '--', 'runtime-compatibility', '--game-path', $script:gameRoot, '--fingerprint', $script:expectedFingerprint, '--output-root', (Join-Path $evidenceRoot 'original-post-runtime'), '--overwrite') -AllowFailure
 $originalUnchanged = $preOriginalManifest -eq $postOriginalManifest
-$rollbackVerified = -not $manualClosureRequired -and $originalUnchanged -and $postRuntime.ExitCode -eq 0
+$rollbackVerified = -not $manualClosureRequired -and $rollbackOperationVerified -and $originalUnchanged -and $postRuntime.ExitCode -eq 0
 if ($result -eq 'Passed' -and -not $rollbackVerified) { $result = 'Failed'; $failureSummary = 'The original installation post-verification or rollback verification failed.' }
 if ($manualClosureRequired) { $rollbackVerified = $false }
 
@@ -334,7 +345,7 @@ $reportLines = @(
     '- Plugin marker: one nonce-bound readiness marker verified; nonce omitted from this report',
     '- BepInEx evidence: version, preloader, chainloader, one plugin, API/Contracts identities and zero fatal/errors were required',
     '- Explicit ThroneForge lifecycle calls: none; lifecycle marker would fail the result',
-    "- Rollback/recovery state: $(if ($manualClosureRequired) { 'ManualClosureRequired; recovery marker persisted; no files were modified while process remained active.' } else { 'Rollback completed or was attempted before post-verification.' })",
+    "- Rollback/recovery state: $(if ($manualClosureRequired) { 'ManualClosureRequired; recovery marker persisted; no files were modified while process remained active.' } elseif ($rollbackOperationVerified) { 'Loader transaction rollback completed and reported verified.' } else { 'Loader transaction rollback was not verified.' })",
     "- Failure or warning summary: $failureSummary",
     '- Privacy statement: no absolute paths, nonce, usernames, machine names, raw logs, binaries, archives, or private manifests are included.',
     '- Next permitted task: review this evidence and plan M1 Task 7; no further plugin or game functionality is claimed.'

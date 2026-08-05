@@ -641,14 +641,24 @@ public static class PluginSmokeMarkerParser
         ArgumentNullException.ThrowIfNull(text);
         ArgumentException.ThrowIfNullOrWhiteSpace(expectedNonce);
         var lines = text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var markerCount = lines.Count(line => line.Equals(ReadyMarker, StringComparison.Ordinal));
-        var lifecycle = lines.Any(line => line.Equals(LifecycleMarker, StringComparison.Ordinal));
+        var markerLines = lines
+            .Where(line => line.Contains(ReadyMarker, StringComparison.Ordinal))
+            .ToArray();
+        var markerCount = markerLines.Length;
+        var lifecycle = lines.Any(line => line.Contains(LifecycleMarker, StringComparison.Ordinal));
         if (markerCount != 1)
         {
             return Invalid("marker-count", markerCount, lifecycle, null);
         }
 
-        var values = lines
+        var markerPayload = markerLines[0]
+            .Split(ReadyMarker, 2, StringSplitOptions.None)[1]
+            .Trim()
+            .TrimStart('|');
+        var valueLines = string.IsNullOrWhiteSpace(markerPayload)
+            ? lines
+            : markerPayload.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var values = valueLines
             .Where(line => line.Contains('=', StringComparison.Ordinal))
             .Select(line => line.Split('=', 2))
             .Where(parts => parts.Length == 2)

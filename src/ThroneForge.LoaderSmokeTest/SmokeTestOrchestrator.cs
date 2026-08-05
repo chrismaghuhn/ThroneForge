@@ -278,7 +278,19 @@ public static class SmokeTestOrchestrator
                 LoaderTransactionStatus.Applied,
                 LoaderTransactionStatus.LaunchObserved,
                 LoaderTransactionStatus.RollbackRequired
-            ]);
+            ],
+            verifyApplied: false);
+        var currentManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+        var generatedFiles = LoaderTransactionStateService.CaptureGeneratedEvidence(
+            state.ExpectedAppliedManifest,
+            currentManifest,
+            out var generatedDirectories);
+        state = state with
+        {
+            GeneratedEvidenceFiles = generatedFiles,
+            GeneratedEvidenceDirectories = generatedDirectories
+        };
+        LoaderTransactionStateService.SaveAtomic(TransactionStatePath(roots), state);
         var plan = new TransactionPlan(roots.ExtractedLoaderRoot, state.Entries);
         LoaderTransactionService.Rollback(roots, plan);
         var baseline = LoadBaseline(roots);
@@ -726,7 +738,8 @@ public static class SmokeTestOrchestrator
         LoaderSmokeTestRequest request,
         SmokeTestRoots roots,
         Preflight preflight,
-        IEnumerable<LoaderTransactionStatus> allowedStatuses)
+        IEnumerable<LoaderTransactionStatus> allowedStatuses,
+        bool verifyApplied = true)
     {
         var baselinePath = BaselinePath(roots);
         if (!File.Exists(baselinePath))
@@ -755,7 +768,7 @@ public static class SmokeTestOrchestrator
             request.ExpectedFingerprint,
             preflight.OriginalManifest,
             allowedStatuses);
-        if (state.Status is LoaderTransactionStatus.Applied or LoaderTransactionStatus.LaunchObserved)
+        if (verifyApplied && state.Status is (LoaderTransactionStatus.Applied or LoaderTransactionStatus.LaunchObserved))
         {
             LoaderTransactionStateService.VerifyAppliedProfile(roots, state);
         }
