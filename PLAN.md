@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 5 final native-image and load-context hardening is in progress on `agent/m1-plugin-load-smoke-test-hardening`, continuing from `1649336681fd76cb1f66623d151179015c812fcb`; no plugin was loaded in Thronefall and no game-facing behavior is claimed.
+M1 - Task 5 final native-image and load-context hardening is complete on `agent/m1-plugin-load-smoke-test-hardening` at `a8595e7b56b80ab338e5d148c1ba1f13455598d4`; no plugin was loaded in Thronefall and no game-facing behavior is claimed.
 
 ## Milestones
 
@@ -232,7 +232,9 @@ This follow-up continues from documentation head `1649336681fd76cb1f66623d151179
 - [x] Require `CorFlags.ILOnly`, reject `CorFlags.NativeEntryPoint`, and reject missing CLR headers before load.
 - [x] Verify `AssemblyLoadContext.GetLoadContext(assembly)` is the expected collectible context.
 - [x] Preserve path sanitization, unload observation, and architecture boundaries.
-- [ ] Run the new exact-SDK hosted matrix, inspect every TRX artifact, and update this plan with the final current-head run.
+- [x] Run the new exact-SDK hosted matrix, inspect every TRX artifact, and update this plan with the final current-head run.
+
+Final Task-5 native-image/load-context validation: run `30978672030` tested head `a8595e7b56b80ab338e5d148c1ba1f13455598d4`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 244 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were independently parsed; no `Overwriting results file` warning occurred. No private loader or game experiment was run.
 
 ### M1 Task 4 hardening: bound trust evidence and admission artifacts
 

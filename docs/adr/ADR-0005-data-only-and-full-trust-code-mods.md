@@ -1,6 +1,6 @@
 # ADR-0005: Data-only content versus full-trust code mods
 
-- Status: Accepted; M1 Task 5 final native-image/load-context correction in progress
+- Status: Accepted; M1 Task 5 final native-image/load-context correction complete
 - Date: 2026-08-03
 
 ## Context

@@ -1,6 +1,6 @@
 # ADR-0006: Full-trust code-mod admission boundary
 
-- Status: Accepted for M1 Task 4; M1 Task 5 final native-image/load-context correction in progress
+- Status: Accepted for M1 Task 4; M1 Task 5 final native-image/load-context correction complete
 - Date: 2026-08-04
 
 ## Context

@@ -38,4 +38,7 @@ This task validates only one synthetic managed assembly plus shared API/Contract
 
 - Pre-fix head: `1649336681fd76cb1f66623d151179015c812fcb`
 - Pre-fix hosted run: [30895740658](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30895740658)
-- Final exact-SDK hosted validation and artifact inspection are pending.
+- Final head: `a8595e7b56b80ab338e5d148c1ba1f13455598d4`
+- Hosted run: [30978672030](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30978672030)
+- Windows and Ubuntu: SDK `10.0.100`, 12 TRX files, 244 tests, 0 failures/errors/skips each.
+- The artifacts were independently parsed and no `Overwriting results file` warning occurred.

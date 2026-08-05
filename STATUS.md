@@ -2,11 +2,11 @@
 
 ## Current milestone
 
-M1 - Task 5 final native-image and load-context hardening is in progress on `agent/m1-plugin-load-smoke-test-hardening`, continuing from `1649336681fd76cb1f66623d151179015c812fcb`; PR creation/merge remains a repository-owner decision.
+M1 - Task 5 final native-image and load-context hardening is complete on `agent/m1-plugin-load-smoke-test-hardening` at `a8595e7b56b80ab338e5d148c1ba1f13455598d4`; PR creation/merge remains a repository-owner decision.
 
 ## State
 
-M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5's single-assembly hardening passed its previous hosted validation; the final IL-only/load-context correction is in progress below. No Thronefall plugin was loaded and M1 overall remains incomplete.
+M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 repository-only hardening is now complete and hosted-verified below. No Thronefall plugin was loaded and M1 overall remains incomplete.
 
 The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below.
 
@@ -193,8 +193,8 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - The pre-fix branch-head evidence was run [30895740658](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30895740658) for documentation head `1649336681fd76cb1f66623d151179015c812fcb`: Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 239 tests, and reported 0 failures, errors, or skips.
 - The correction requires a CLR header, `CorFlags.ILOnly`, no `CorFlags.NativeEntryPoint`, zero `ImplMap`/P/Invoke entries, and verification that the loaded assembly belongs to the expected collectible context.
 - New tests use only temporary PE mutations and source-level assertions; no compiled mixed-mode or C++/CLI fixture is committed.
-- Local SDK `10.0.110` validation currently passes restore, format, Release build, the full 244-test suite, 32 focused PluginLoad tests, 12 Architecture tests, and 27 Contracts tests. Exact pinned SDK validation remains pending in hosted CI.
-- Hosted validation for this final correction is pending. Do not mark Task 5 PR-ready until the new Windows/Linux run and all TRX artifacts pass independent inspection.
+- Local SDK `10.0.110` validation passes restore, format, Release build, the full 244-test suite, 32 focused PluginLoad tests, 12 Architecture tests, and 27 Contracts tests. Exact pinned SDK validation passed in hosted CI below; SDK `10.0.100` is not installed locally.
+- Final hosted validation passed in run [30978672030](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30978672030) for head `a8595e7b56b80ab338e5d148c1ba1f13455598d4`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 244 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were downloaded and independently parsed; no `Overwriting results file` warning occurred.
 
 ## Next task
 
