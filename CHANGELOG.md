@@ -1,6 +1,6 @@
 # Changelog
 
-- Task-7 loader-launch investigation implementation commit `c9429c5d56d11531e4c5bfbbf63a793d6d927edc` passed hosted run `31045763385` on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files and 371 passing tests per runner. It adds bounded LoaderLaunch/preloader diagnostics and sanitized relative rollback-drift evidence without retroactively claiming the historical cause. No private lifecycle or recovery execution was performed.
+- Task-7 loader-launch investigation implementation commit `c9429c5d56d11531e4c5bfbbf63a793d6d927edc` passed hosted run `31045763385`; final documentation/test head `142b65fa01e201917b379828a6c4c6ee4dfc2965` passed hosted run `31046374898` on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files and 372 passing tests per runner. It adds bounded LoaderLaunch/preloader diagnostics and sanitized relative rollback-drift evidence without retroactively claiming the historical cause. No private lifecycle or recovery execution was performed.
 
 - Started repository-only M1 Task 7 LoaderLaunch investigation on `agent/m1-task7-loader-launch-investigation`. Future runs now retain bounded process/log/BepInEx bootstrap diagnostics and recovery retains sanitized relative manifest-difference evidence. The historical final private run remains `Failed` at `LoaderLaunch` and its exact preloader cause and drift file are explicitly unavailable because raw logs and file-level drift evidence were not retained. No private or recovery execution was performed; Task 8 remains blocked.
 
