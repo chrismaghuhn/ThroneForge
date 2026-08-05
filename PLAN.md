@@ -4,7 +4,17 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is complete on `agent/m1-disposable-bepinex-plugin-smoke-test`; the previous private deployment stopped safely at a baseline-state path mismatch, and one corrected fresh private run passed. M1 Task 7 has not started.
+M1 - Task 7 recovery hardening is complete on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. The final authorized lifecycle result remains immutable `Failed` at `LoaderLaunch` with `loader-launch-failed`. The one permitted recovery-only rollback was executed after hosted validation and returned `Failed` with `recovery-runtime-drift`; no retry, lifecycle rerun, or Task 8 work is authorized. The C# `LifecycleExperimentOrchestrator` remains the single owner of stage execution, typed evidence, cleanup/recovery/postchecks, primary-failure persistence, and report generation; PowerShell is only an explicit-input wrapper around the real CLI operations.
+
+PR #7 review correction is active on the same branch. No private lifecycle or recovery execution is permitted in this correction. The work is limited to making plugin-deployed recovery remove the exact owned plugin before rollback drift validation, and propagating typed manual-closure evidence from BaselineLaunch and LoaderLaunch so active profiles never enter cleanup.
+
+The correction also preserves cleanup side-effect results when later rollback work fails and reuses the existing Task-6 state services for recovery. A recovery with no deployed package reports plugin removal as `NotRequired`; a manual-closure result remains `ProcessActive=true` and is persisted for recovery rather than entering cleanup.
+
+The correction head `1cd903c0aa1942d793409893d458939660e40c9d` passed hosted run `31039015040` on Windows and Ubuntu with SDK `10.0.100`; each runner produced 13 TRX files and 360 passing tests with no failure, error, timeout, abort, inconclusive, not-executed or skipped result.
+
+The follow-up review correction is repository-only: recovery keeps `PluginRemovalStatus=NotRequired` when no package was deployed, and BaselineLaunch manual closure records `NotApplied` with an explicit no-loader-cleanup action instead of a misleading rollback command. No private run is authorized.
+
+Correction head `bb960efd9e0715639807469a109b3ce28f700c72` passed PR run `31041425981` and push run `31041429428`; Windows and Ubuntu each reported 13 TRX files and 362 passing tests with all failure, error, timeout, abort, inconclusive, not-executed and skipped counters at zero.
 
 ## Milestones
 
@@ -14,13 +24,73 @@ Deliver a clean-clone buildable solution skeleton, pinned external-tool SDK, cen
 
 ### M1 - Task 6: disposable BepInEx synthetic-plugin smoke test (complete; M1 overall incomplete)
 
-The branch adds an external `ThroneForge.PluginSmokeTest` project, source-only synthetic plugin template, metadata-selected `netstandard2.0`/`netstandard2.1` build path, exact three-file package manifest and digest, immediate Task-4 admission, and a local-only orchestrator that reuses Task-3 copy/transaction/launch/rollback services. The earlier fresh attempt recaptured and metadata-validated the package but failed at disposable-profile deployment-state validation before plugin files were written. After the canonical state-path correction, one fresh private run passed with actual runtime identities, one plugin/nonce marker, successful removal and rollback, complete disposable restoration, and unchanged original verification. M1 Task 7 is not started.
+The branch adds an external `ThroneForge.PluginSmokeTest` project, source-only synthetic plugin template, metadata-selected `netstandard2.0`/`netstandard2.1` build path, exact three-file package manifest and digest, immediate Task-4 admission, and a local-only orchestrator that reuses Task-3 copy/transaction/launch/rollback services. The earlier fresh attempt recaptured and metadata-validated the package but failed at disposable-profile deployment-state validation before plugin files were written. After the canonical state-path correction, one fresh private run passed with actual runtime identities, one plugin/nonce marker, successful removal and rollback, complete disposable restoration, and unchanged original verification. M1 Task 7 is now the active bounded follow-up; its private lifecycle run is recorded separately as failed before loader transaction/package deployment.
 
 Task-6 completion is recorded by the sanitized report, unchanged original-installation manifest and runtime post-checks, verified loader rollback, and hosted run `30998768487` for correction head `bda540f9f4c97868d2469c0d5f48826269528e8f`. It does not claim a real Thronefall plugin, lifecycle, game API, Harmony, catalog, or custom-wave capability.
 
 ### M1 - Thronefall discovery spike
 
 Against an explicit local, legally obtained game path, detect executable architecture, Unity version, Mono/IL2CPP backend, loader compatibility, target framework, and a fingerprint. Document the selected BepInEx/Harmony setup, one verified lifecycle binding, the first binding report, catalog feasibility, and legal/distribution constraints. Do not implement custom waves until the M1 acceptance criteria pass.
+
+### M1 Task 7 - public Unity lifecycle binding and smoke test (orchestration hardening; M1 incomplete)
+
+- [x] Add metadata-only validation for the public `UnityEngine.Application.quitting` event in `UnityEngine.CoreModule`.
+- [x] Add the source-only lifecycle plugin template with exact package identity, synchronous-only lifecycle state machine, and nonce-bound markers.
+- [x] Add repository-only lifecycle, marker, log-stability, package, and architecture tests.
+- [x] Reuse Task-6 ownership, package capture, admission, deployment, launch, removal, rollback, and post-verification services.
+- [x] Run local validation and hosted Windows/Linux synthetic CI before any private run.
+- [x] Perform the one permitted fresh corrective private disposable-profile experiment after hosted CI passed; it stopped at `OriginalPreflight` with `original-preflight-failed` before loader transaction/package deployment.
+- [x] Commit exactly one sanitized fingerprint-specific lifecycle binding report and run final hosted validation.
+
+Task 7 is limited to the public Unity lifecycle source `UnityEngine.Application.quitting` and does not inspect Thronefall-defined types, gameplay state, Harmony hooks, catalogs, or custom waves.
+
+The correction consumes only `throneforge-runtime-compatibility-evidence-v1`, verifies canonical Task-3/Task-6 state through shared C# services using the saved disposable baseline, reports package capture/admission/deployment as one `AdmitAndDeploy` stage with bounded phase categories, and exercises stage progression and postchecks in repository tests. No private game or BepInEx run is authorized in this correction.
+
+Repository-only correction head `dbbcc3a` passed hosted run `31012843103` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 13 TRX files representing 327 tests with zero failures, errors, skips or not-executed tests. No private run was performed.
+
+Task-7 correction baseline: reviewed head `92094c4362f09f73ffdd1bc8807caaf4a904f611` passed hosted run `31005428380` with 13 TRX files and 304 tests per runner using SDK `10.0.100`. Correction head `bdd871fa263d5b97fc4a20160ee110d32f406c99` passed hosted run `31008620029` with 13 TRX files and 313 tests per runner using SDK `10.0.100`; all test counters were zero for failures, errors, skips, not-executed and aborted tests. The first corrective private run stopped at `OriginalPreflight` because the harness expected `Selected executable=...` while the discovery CLI emitted `Selected executable: ...`. The final authorized private run later stopped at `LoaderLaunch` with `loader-launch-failed`; no package, deployment or lifecycle marker was produced. Both results remain immutable historical evidence; no further lifecycle run is permitted.
+
+### Task-7 orchestration ownership correction
+
+- [x] Replace the PowerShell stage machine with the real `run-lifecycle-experiment` C# CLI operation.
+- [x] Use `ILifecycleExperimentOperations` and stage-specific evidence; missing evidence must fail closed.
+- [x] Persist immutable primary failure stage/category and separate cleanup failures.
+- [x] Run cleanup, disposable runtime/readiness/indicator verification, original postchecks, and sanitized report generation in C#.
+- [x] Validate the full repository-only implementation and hosted Windows/Linux CI; do not run another private experiment in this slice.
+
+The production-path correction head `39120f1abe4138d3ea0ef6b1842f4a89c66ac079` passed hosted run `31022292522` with 13 TRX files and 339 tests per runner on SDK `10.0.100`; all failure, error, skip, not-executed, aborted and inconclusive counters were zero, and no TRX overwrite warning occurred. No private run was performed; the final documentation head receives a separate hosted validation before this correction is considered ready for authorization.
+
+### Task-7 production-path hardening
+
+- [ ] Create and advance Task-6 ownership state from the real C# workflow.
+- [ ] Preserve loader/plugin/process side effects from failed evidence and guard cleanup while a process is active.
+- [ ] Add typed manual-closure recovery and an explicit C# rollback operation.
+- [ ] Capture the loader-only reference manifest after loader verification and immediately before deployment.
+- [ ] Bind package, manifest, Unity metadata, and runtime identity evidence to the owned profile and captured package.
+- [x] Add production-path ownership, side-effect, recovery, path-binding and failure coverage without performing a private run.
+- [ ] Run local and exact-SDK hosted validation, inspect every TRX artifact, and report readiness for separate private authorization.
+
+Current correction implementation adds a real C#-owned package-build boundary, Task-6 ownership creation before preparation, side-effect-preserving evidence application, typed manual-closure recovery/rollback, owned package and Unity metadata path validation, and independent cleanup/postcheck evidence. The private experiment remains forbidden in this correction. The checklist stays open until the new hosted validation has passed and every TRX artifact has been inspected.
+
+### Task-7 loader-only cleanup and recovery correction
+
+- [x] Add one shared loader-only manifest comparator that permits content changes only for the same recognized BepInEx log path while requiring exact paths, directories, and all nonvolatile hashes.
+- [x] Use that comparator in normal plugin removal and C# manual recovery; retain exact disposable-baseline verification after loader rollback.
+- [x] Add an executable `Rollback` wrapper mode for the C# `rollback-lifecycle-experiment` operation without reintroducing PowerShell cleanup logic.
+- [x] Bind the discovered selected executable to the explicitly supplied executable-relative path and derive the repository baseline commit from `git rev-parse HEAD`.
+- [x] Run the repository validation and exact-SDK hosted matrix, inspect every TRX artifact, and report readiness for one separately authorized private verification.
+
+This correction performs repository-only work. Implementation head `2139d41812b5da09c620a1685a217de1caa3510e` passed hosted run `31025440280`; the sanitized final-report head `e0bfd3958d4f2add190877b436737f7a0946b6e9` passed final hosted run `31028231111` on Windows and Ubuntu with SDK `10.0.100`. The recovery correction head `1549552810e826afc415355f87742faaecafc354` passed hosted run `31032572956` with 13 TRX files and 355 tests per runner; all tests passed and every artifact was parsed independently. The one separately authorized final private run was performed once and failed at `LoaderLaunch` with `loader-launch-failed`. The one permitted recovery-only rollback then failed before loader mutation with `recovery-runtime-drift`; no lifecycle binding conclusion is claimed and no retry is authorized.
+
+### Task-7 recovery closure
+
+- [x] Make cleanup conditional on recorded side effects; pre-deployment failure records plugin removal as `NotRequired`.
+- [x] Accept only a valid `Failed` ownership record with a bound rollback-eligible transaction for recovery.
+- [x] Validate bounded launch-time generated evidence before rollback and preserve exact baseline restoration as the final requirement.
+- [x] Keep experiment failure and recovery outcome separate in the sanitized report.
+- [x] Execute exactly one recovery-only rollback against the existing failed experiment after green hosted CI; it returned `recovery-runtime-drift` before loader mutation. No retry was performed.
+
+The final authorized experiment remains `Failed` at `LoaderLaunch` with no package, admission, deployment, or lifecycle evidence. Recovery did not establish the lifecycle binding and did not complete rollback; the original-installation postcheck from the experiment remains passed. M1 Task 8 must not begin.
 
 ### M2 - Contracts, schemas, validation, and fixtures
 
@@ -299,4 +369,4 @@ Task-2 merge evidence: PR #2 merged into `main` at `d3f1bb4fde9f77efbb84349f4403
 - [x] Bind Task-6 loader-state validation to the saved disposable baseline manifest and expose stable sanitized state-gate failure categories.
 - [x] Add positive real-service context-derivation coverage plus negative legacy/missing/mismatch state tests.
 - [x] Perform exactly one fresh private follow-up only after exact-SDK hosted synthetic CI passes; hosted run `30998768487` passed with 13 TRX files and 279 tests per runner.
-- [x] Keep M1 Task 7 unstarted.
+- [x] Keep M1 Task 7 out of scope for the Task-6 implementation.

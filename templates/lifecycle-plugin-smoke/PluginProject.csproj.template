@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>__TARGET_FRAMEWORK__</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>ThroneForge.M1.LifecycleSmoke</AssemblyName>
+    <RootNamespace>ThroneForge.M1.LifecycleSmoke</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="ThroneForgeLifecyclePlugin.cs" />
+    <Compile Include="LifecycleHost.cs" />
+    <Reference Include="BepInEx" HintPath="__BEPINEX_CORE__" Private="false" />
+    <Reference Include="UnityEngine" HintPath="__UNITY_ENGINE__" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="__UNITY_CORE_MODULE__" Private="false" />
+    <Reference Include="ThroneForge.API" HintPath="__THRONEFORGE_API__" Private="false" />
+    <Reference Include="ThroneForge.Contracts" HintPath="__THRONEFORGE_CONTRACTS__" Private="false" />
+  </ItemGroup>
+</Project>

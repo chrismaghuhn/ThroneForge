@@ -27,7 +27,8 @@ public sealed record SmokeTestExecutionResult(
     bool OriginalInstallationVerified,
     bool RollbackVerified,
     bool RecoveryMarkerPersisted = false,
-    string? RecoveryMarkerFailureCategory = null);
+    string? RecoveryMarkerFailureCategory = null,
+    LaunchObservationResult? LaunchObservation = null);
 
 public static class SmokeTestOrchestrator
 {
@@ -137,7 +138,8 @@ public static class SmokeTestOrchestrator
             preflight.Snapshot.Fingerprint,
             InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint,
             true,
-            false);
+            false,
+            LaunchObservation: baseline);
     }
 
     private static SmokeTestExecutionResult Install(
@@ -176,6 +178,29 @@ public static class SmokeTestOrchestrator
                 roots,
                 preflight.Snapshot.SelectedExecutableRelativePath,
                 TimeSpan.FromSeconds(60));
+            if (launch.RequiresManualClosure && !launch.Exited)
+            {
+                LoaderTransactionStateService.SaveAtomic(
+                    LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
+                    state with
+                    {
+                        Status = LoaderTransactionStatus.RollbackRequired,
+                        GeneratedEvidenceFiles = [],
+                        GeneratedEvidenceDirectories = [],
+                        LaunchEvidence = null
+                    });
+
+                return new SmokeTestExecutionResult(
+                    SmokeTestOutcome.Inconclusive,
+                    launch.FailureCategory,
+                    null,
+                    preflight.Snapshot.Fingerprint,
+                    InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint,
+                    true,
+                    false,
+                    LaunchObservation: launch);
+            }
+
             summary = LoaderLogParser.Parse(ReadKnownLoaderLog(roots.CleanGameRoot));
             var bootstrapObserved = LoaderBootstrapLaunchCriteria.IsObserved(launch, summary);
             var status = bootstrapObserved
@@ -203,7 +228,8 @@ public static class SmokeTestOrchestrator
                 preflight.Snapshot.Fingerprint,
                 InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint,
                 true,
-                false);
+                false,
+                LaunchObservation: launch);
         }
         catch (Exception exception)
         {
@@ -280,7 +306,7 @@ public static class SmokeTestOrchestrator
             ],
             verifyApplied: false);
         var currentManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
-        var generatedFiles = LoaderTransactionStateService.CaptureGeneratedEvidence(
+        var generatedFiles = LoaderTransactionStateService.CaptureRollbackGeneratedEvidence(
             state.ExpectedAppliedManifest,
             currentManifest,
             out var generatedDirectories);
@@ -745,7 +771,7 @@ public static class SmokeTestOrchestrator
             throw new SmokeTestException("The disposable copy does not exist; run Prepare first.");
         }
 
-        DisposableProfileBaselineService.LoadAndValidateInstalledProfile(
+        var baseline = DisposableProfileBaselineService.LoadAndValidateSavedBaseline(
             baselinePath,
             request.ExpectedFingerprint,
             preflight.OriginalManifest);
@@ -759,7 +785,7 @@ public static class SmokeTestOrchestrator
             LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
             roots,
             request.ExpectedFingerprint,
-            preflight.OriginalManifest,
+            baseline.DisposableManifest,
             allowedStatuses);
         if (verifyApplied && state.Status is (LoaderTransactionStatus.Applied or LoaderTransactionStatus.LaunchObserved))
         {

@@ -113,6 +113,49 @@ public sealed class LoaderTransactionServiceTests
     }
 
     [Fact]
+    public void RollbackGeneratedEvidenceAllowsApprovedLaunchDifferences()
+    {
+        var applied = new CopyManifest(
+            [new FileManifestEntry("BepInEx/core.dll", 3, new string('a', 64))],
+            ["BepInEx"]);
+        var current = new CopyManifest(
+            [
+                new FileManifestEntry("BepInEx/core.dll", 3, new string('a', 64)),
+                new FileManifestEntry("BepInEx/LogOutput.log", 2, new string('c', 64)),
+                new FileManifestEntry("BepInEx/config/generated.cfg", 2, new string('d', 64)),
+                new FileManifestEntry("BepInEx/cache/generated.bin", 2, new string('e', 64))
+            ],
+            ["BepInEx", "BepInEx/config", "BepInEx/cache"]);
+
+        var generated = LoaderTransactionStateService.CaptureRollbackGeneratedEvidence(
+            applied with { Files = [new FileManifestEntry("BepInEx/core.dll", 3, new string('a', 64)), new FileManifestEntry("BepInEx/LogOutput.log", 1, new string('f', 64))] },
+            current,
+            out var directories);
+
+        Assert.Equal(3, generated.Count);
+        Assert.Contains("BepInEx/config", directories);
+        Assert.Contains("BepInEx/cache", directories);
+    }
+
+    [Fact]
+    public void RollbackGeneratedEvidenceRejectsCoreGameAndArbitraryDifferences()
+    {
+        var applied = new CopyManifest(
+            [new FileManifestEntry("BepInEx/core.dll", 3, new string('a', 64)), new FileManifestEntry("game.dll", 3, new string('a', 64))],
+            ["BepInEx"]);
+
+        Assert.Throws<SmokeTestException>(() => LoaderTransactionStateService.CaptureRollbackGeneratedEvidence(
+            applied,
+            applied with { Files = [new FileManifestEntry("BepInEx/core.dll", 3, new string('b', 64)), new FileManifestEntry("game.dll", 3, new string('a', 64))] },
+            out _));
+
+        Assert.Throws<SmokeTestException>(() => LoaderTransactionStateService.CaptureRollbackGeneratedEvidence(
+            applied,
+            applied with { Files = [.. applied.Files, new FileManifestEntry("unexpected.bin", 1, new string('c', 64))] },
+            out _));
+    }
+
+    [Fact]
     public void ValidLaunchObservedStateRequiresAndRetainsBootstrapEvidence()
     {
         using var fixture = new SmokeTestFixture();

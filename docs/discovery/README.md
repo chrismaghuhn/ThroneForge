@@ -121,4 +121,42 @@ The disposable plugin is deployed only below `clean-game/BepInEx/plugins/dev.thr
 
 No nonce, absolute path, raw log, binary, archive, complete private manifest, or recovery marker is committed. A pass proves only this synthetic plugin bootstrap for the exact documented fingerprint. It does not prove a real Thronefall plugin, final plugin TFM compatibility beyond the local evidence used for the build, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, or custom waves.
 
+The current Task-7 production-path correction is repository-only. Its C# orchestrator owns the real workflow, including owned experiment state, typed evidence, cleanup/recovery, package and Unity path containment, and independent disposable/original postchecks. Head `39120f1abe4138d3ea0ef6b1842f4a89c66ac079` passed hosted run `31022292522` with 13 TRX files and 339 tests per runner; the two earlier private Task-7 attempts remain failed historical evidence and no additional private lifecycle run is authorized by this correction.
+
 The private Task-6 run passed for the documented fingerprint. The sanitized result is [the fingerprint-specific report](1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-synthetic-plugin-smoke-test.md). Raw logs, the disposable copy, package files, transaction state, and rollback evidence remain outside the repository.
+
+## M1 task 7: public Unity lifecycle binding smoke test
+
+Task 7 is limited to the public Unity event `UnityEngine.Application.quitting`, identified as `unity-application-quitting-v1`. The source metadata is inspected with `PEReader`/`MetadataReader` before a private run and must prove a public static `System.Action` event with public static add/remove accessors. The external validator never loads `UnityEngine.CoreModule.dll` and no Unity binary is committed.
+
+Task-7 orchestration consumes the Discovery command `runtime-compatibility-evidence`, which emits the exact schema `throneforge-runtime-compatibility-evidence-v1`. It contains only the fingerprint, selected game-relative executable, bounded runtime classification, Unity version, readiness and an independently computed loader-indicator absence flag. Human-readable colon-delimited CLI output is not a machine contract. Loader transaction and baseline state are verified by shared C# services at the canonical experiment-root manifest paths; the PowerShell wrapper does not parse Task-3 JSON.
+
+The source-only lifecycle package contains exactly `ThroneForge.M1.LifecycleSmoke.dll`, `ThroneForge.API.dll`, and `ThroneForge.Contracts.dll`. It reuses the Task-6 ownership, exact-byte package capture, admission, transactional deployment, bounded launch, removal, rollback, and original/disposable post-verification workflow. Its synthetic context exposes only the documented mod identity and reports every capability unavailable.
+
+The lifecycle host is synchronous-only and exactly-once: BepInEx `Awake` initializes one synthetic mod, `Application.quitting` shuts down that same instance, and `OnDestroy` is cleanup fallback only. A private pass requires one nonce-bound marker for initialization, one direct quitting-event marker, and one shutdown marker in sequence `1,2,3`, plus actual runtime API/Contracts identities and zero fatal/error evidence. Missing or unstable logs are bounded failures; a process requiring manual closure is inconclusive and never modified while active.
+
+Invocation is local-only and must happen only after repository tests and hosted synthetic Windows/Linux CI pass:
+
+```powershell
+./tools/plugin-smoke-test/Invoke-ThroneForgeLifecycleBindingSmokeTest.ps1 `
+  -Mode Full `
+  -GamePath "C:\Path\To\Thronefall" `
+  -ExperimentRoot "D:\ThroneForgeExperiments\<fingerprint>" `
+  -BepInExArchive "D:\ThroneForgeExperiments\downloads\BepInEx_win_x64_5.4.23.5.zip" `
+  -ExpectedFingerprint "<fingerprint>" `
+  -ExpectedBepInExDigest "<official-digest>"
+```
+
+The one permitted corrective private run produced the sanitized fingerprint-specific report `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-lifecycle-binding.md` with result `Failed` at `OriginalPreflight` and stable category `original-preflight-failed`: the harness did not consume the discovery CLI's colon-delimited selected-executable evidence, so no loader transaction was persisted, no lifecycle package was admitted or deployed, and no binding conclusion is claimed. The report contains no nonce, absolute path, raw log, binary, private manifest, machine identity, or process identity. A successful result would be described as a public Unity lifecycle binding observed while Thronefall was running, not as a verified Thronefall-internal method. No game API, Harmony, gameplay state, catalog, save, wave, async lifecycle, or cross-version compatibility is claimed, and no further private run was performed.
+
+The current repository-only cleanup correction shares one loader-only profile comparison between normal plugin removal and manual recovery. It requires identical file and directory paths, exact nonvolatile sizes and SHA-256 values, and the same recognized log-path set; only the contents of `BepInEx/LogOutput.log` or `BepInEx/LogOutput.txt` may differ during plugin removal. Exact disposable-baseline equality remains required after loader rollback. The wrapper derives the repository HEAD commit, requires discovered and supplied executable-relative paths to match, and exposes the supported C# rollback operation through `-Mode Rollback`. Implementation head `2139d41812b5da09c620a1685a217de1caa3510e` passed hosted run `31025440280`; final sanitized report head `e0bfd3958d4f2add190877b436737f7a0946b6e9` passed hosted run `31028231111` with 13 TRX files and 350 tests per runner using SDK `10.0.100`; every downloaded TRX artifact was parsed independently. The one authorized final private run failed once at `LoaderLaunch` with `loader-launch-failed`; the one recovery-only rollback then returned `recovery-runtime-drift` before mutation. No lifecycle binding is claimed and no retry is authorized.
+
+The recovery-only correction adds conditional plugin removal (`NotRequired` when no package was deployed), safe `Failed`-ownership recovery, rollback drift classification for approved generated BepInEx evidence, and a separate sanitized recovery result. The authorized recovery execution returned `recovery-runtime-drift`; it did not launch the game, mutate the disposable profile, or verify the lifecycle binding. The original-installation postcheck from the failed experiment remains passed.
+
+PR #7 review correction is repository-only. When a lifecycle package is recorded as deployed, recovery removes that exact ownership-bound plugin root before evaluating rollback drift and retains the removal result if a later rollback phase fails. BaselineLaunch and LoaderLaunch preserve typed manual-closure/process-active evidence; cleanup and file mutation are not attempted while the copied process remains active. No private lifecycle or recovery execution was performed for this correction.
+
+Correction head `1cd903c0aa1942d793409893d458939660e40c9d` passed hosted run `31039015040` on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files and 360 passing tests per runner. No TRX overwrite warning was reported.
+
+The follow-up review correction keeps plugin removal `NotRequired` through later recovery failures when no package was deployed. A BaselineLaunch manual-closure state records `NotApplied` and `no-loader-cleanup-required`; it does not advertise an unusable loader-rollback command. No private lifecycle or recovery execution was performed.
+
+Correction head `bb960efd9e0715639807469a109b3ce28f700c72` passed PR run `31041425981` and push run `31041429428` on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files and 362 passing tests per runner. No TRX overwrite warning was reported.

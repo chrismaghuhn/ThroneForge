@@ -11,6 +11,8 @@ The runtime therefore needs a small, portable decision boundary before a future 
 
 ## Decision
 
+The Task-7 lifecycle slice binds BepInEx `Awake` and public `UnityEngine.Application.quitting` to one synthetic mod instance only. It does not expand the admission boundary into a game API, Harmony, catalog, or custom-wave boundary. Its correction requires a shared tested host, strict logger-envelope/order validation, exact `UnityEngine.CoreModule` metadata, and independent plugin/removal/rollback/postcheck evidence. The single corrective private run stopped before package deployment at `OriginalPreflight` with `original-preflight-failed` because the harness did not parse the discovery CLI's selected-executable output. No lifecycle evidence was recorded.
+
 Task 4 defines three separate concerns:
 
 1. `ThroneForge.Contracts` carries immutable code-mod identity, package-integrity, approval, compatibility, activation-request, and admission-binding data. Mod IDs and versions are canonicalized with bounded portable rules. Integrity, approval, and compatibility evidence are bound to the same exact mod identity, package SHA-256, and game fingerprint; records never contain installation paths or executable objects.
@@ -32,3 +34,7 @@ Task 4 defines three separate concerns:
 ## Task-6 disposable experiment
 
 The private synthetic-plugin experiment reuses this admission boundary immediately before deployment. Its package digest is a versioned canonical digest of exactly three metadata-inspected managed files; approval, integrity, adapter evidence, and the fixed game fingerprint are bound to that digest. This is evidence binding, not a signature or sandbox. Task 6 passed for the documented fingerprint in an external disposable profile, loaded exactly one source-generated synthetic plugin, and invoked no ThroneForge lifecycle method. It did not load a Thronefall plugin or establish game compatibility.
+
+## Task-7 production-path correction
+
+The lifecycle adapter reuses the Task-4 admission boundary immediately before deployment and records package/binding digests from the exact captured bytes. It does not trust caller-supplied precondition booleans, does not write outside the positively identified Task-6 experiment, and does not claim the public Unity quitting event was observed unless the final structured result contains the valid marker sequence. No private run is performed by this correction.

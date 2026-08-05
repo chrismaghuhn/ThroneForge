@@ -95,6 +95,88 @@ public static class SmokeTestPathValidator
         return executable;
     }
 
+    public static string ValidateOwnedExperimentDirectory(
+        SmokeTestRoots roots,
+        string path,
+        string description)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        var normalized = CanonicalizeAbsolute(path, description);
+        if (File.Exists(normalized)
+            || !IsStrictDescendant(roots.ExperimentRoot, normalized)
+            || IsSameOrDescendant(roots.OriginalGameRoot, normalized)
+            || IsSameOrDescendant(roots.CleanGameRoot, normalized))
+        {
+            throw new SmokeTestException($"The {description} must be a directory below the owned experiment root and outside both game profiles.");
+        }
+
+        EnsureNoReparseOnExistingPath(normalized);
+        return normalized;
+    }
+
+    public static string ValidateOwnedExperimentFile(
+        SmokeTestRoots roots,
+        string path,
+        string description)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        var normalized = CanonicalizeAbsolute(path, description);
+        if (!IsStrictDescendant(roots.ExperimentRoot, normalized)
+            || IsSameOrDescendant(roots.OriginalGameRoot, normalized)
+            || IsSameOrDescendant(roots.CleanGameRoot, normalized)
+            || Directory.Exists(normalized))
+        {
+            throw new SmokeTestException($"The {description} must remain below the owned experiment root and outside both game profiles.");
+        }
+
+        EnsureNoReparseOnExistingPath(normalized);
+        return normalized;
+    }
+
+    public static string ValidateUnityAssemblyPath(
+        SmokeTestRoots roots,
+        string unityAssemblyPath,
+        string executableRelativePath)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        if (!string.Equals(Path.GetFileName(unityAssemblyPath), "UnityEngine.CoreModule.dll", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new SmokeTestException("The Unity metadata path must name UnityEngine.CoreModule.dll.");
+        }
+
+        if (string.IsNullOrWhiteSpace(executableRelativePath)
+            || Path.IsPathRooted(executableRelativePath)
+            || executableRelativePath.Contains('\\', StringComparison.Ordinal)
+            || executableRelativePath.Split('/').Any(part => part is "" or "." or ".."))
+        {
+            throw new SmokeTestException("The selected executable relative path is invalid for Unity metadata binding.");
+        }
+
+        var normalized = CanonicalizeAbsolute(unityAssemblyPath, "Unity metadata assembly");
+        if (!File.Exists(normalized))
+        {
+            throw new SmokeTestException("The fingerprint-bound Unity metadata assembly does not exist.");
+        }
+
+        var relativeExecutable = executableRelativePath.Replace('/', Path.DirectorySeparatorChar);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        foreach (var profileRoot in new[] { roots.OriginalGameRoot, roots.CleanGameRoot })
+        {
+            var executable = Path.GetFullPath(Path.Combine(profileRoot, relativeExecutable));
+            var managedRoot = Path.Combine(
+                Path.GetDirectoryName(executable) ?? throw new SmokeTestException("The selected executable has no parent directory."),
+                Path.GetFileNameWithoutExtension(executable) + "_Data",
+                "Managed");
+            if (string.Equals(Path.GetDirectoryName(normalized)?.TrimEnd(Path.DirectorySeparatorChar), managedRoot.TrimEnd(Path.DirectorySeparatorChar), comparison))
+            {
+                EnsureNoReparseOnExistingPath(normalized);
+                return normalized;
+            }
+        }
+
+        throw new SmokeTestException("The Unity metadata assembly is outside the fingerprint-bound original or disposable Managed directory.");
+    }
+
     public static string ValidateCommittedReportPath(SmokeTestRoots roots, string expectedFingerprint)
     {
         ArgumentNullException.ThrowIfNull(roots);
@@ -116,6 +198,35 @@ public static class SmokeTestPathValidator
             || IsSameOrDescendant(roots.CleanGameRoot, normalized))
         {
             throw new SmokeTestException("The committed report must remain below the repository docs/discovery directory and outside both game profiles.");
+        }
+
+        EnsureNoReparseOnExistingPath(normalized);
+        return normalized;
+    }
+
+    public static string ValidateLifecycleReportPath(string repositoryRoot, string expectedFingerprint)
+    {
+        var repository = Path.GetFullPath(repositoryRoot);
+        if (!Directory.Exists(repository))
+        {
+            throw new SmokeTestException("The repository root for the lifecycle report does not exist.");
+        }
+
+        if (string.IsNullOrWhiteSpace(expectedFingerprint)
+            || expectedFingerprint.Length != 64
+            || expectedFingerprint.Any(character => !Uri.IsHexDigit(character)))
+        {
+            throw new SmokeTestException("The expected fingerprint must be a 64-character SHA-256 value.");
+        }
+
+        EnsureNoReparseOnExistingPath(repository);
+        var discoveryRoot = Path.Combine(repository, "docs", "discovery");
+        var reportPath = Path.Combine(discoveryRoot, $"{expectedFingerprint.ToLowerInvariant()}-lifecycle-binding.md");
+        var normalized = Path.GetFullPath(reportPath);
+        if (!normalized.StartsWith(Path.TrimEndingDirectorySeparator(repository) + Path.DirectorySeparatorChar, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
+            || !normalized.StartsWith(Path.TrimEndingDirectorySeparator(discoveryRoot) + Path.DirectorySeparatorChar, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        {
+            throw new SmokeTestException("The lifecycle report path must remain below docs/discovery.");
         }
 
         EnsureNoReparseOnExistingPath(normalized);

@@ -26,6 +26,33 @@ public class PluginSmokeException : Exception
     }
 }
 
+public sealed class PluginDeploymentVerificationException : PluginSmokeException
+{
+    public PluginDeploymentVerificationException(string message)
+        : base(message)
+    {
+    }
+
+    public PluginDeploymentVerificationException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
+public sealed class PluginSmokePhaseException : PluginSmokeException
+{
+    public PluginSmokePhaseException(string phase, string failureCategory, string message, Exception? innerException = null)
+        : base(message, innerException ?? new InvalidOperationException(message))
+    {
+        Phase = phase;
+        FailureCategory = failureCategory;
+    }
+
+    public string Phase { get; }
+
+    public string FailureCategory { get; }
+}
+
 public static class PluginSmokeStateFailureCategories
 {
     public const string OwnershipStateInvalid = "ownership-state-invalid";
@@ -850,7 +877,7 @@ public static class PluginDeploymentService
             var expected = AddDeploymentToManifest(context.PreDeploymentManifest, destinations);
             if (!InstallationCopyService.CompareManifests(expected, after).Matches)
             {
-                throw new PluginSmokeException("The complete disposable manifest did not match the transactional deployment result.");
+                throw new PluginDeploymentVerificationException("The complete disposable manifest did not match the transactional deployment result.");
             }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or PluginSmokeException)
@@ -927,6 +954,9 @@ public static class PluginDeploymentService
 
         return new CopyManifest(files.Values.OrderBy(item => item.RelativePath, StringComparer.Ordinal).ToArray(), directories.Order(StringComparer.Ordinal).ToArray());
     }
+
+    public static bool IsProfileProcessActive(string cleanGameRoot)
+        => FindRunningProcessUnder(cleanGameRoot);
 
     private static bool FindRunningProcessUnder(string cleanGameRoot)
     {

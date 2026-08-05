@@ -27,7 +27,8 @@ public sealed record Task6ExperimentState(
     string? PackageSha256 = null,
     string? AdmissionBindingDigest = null,
     string? PluginRelativeRoot = null,
-    string? LoaderTransactionStatus = null);
+    string? LoaderTransactionStatus = null,
+    CopyManifest? LoaderOnlyManifest = null);
 
 public sealed record Task6RecoveryState(
     string SchemaVersion,
@@ -36,23 +37,26 @@ public sealed record Task6RecoveryState(
     string ExperimentId,
     string? PackageSha256,
     string? AdmissionBindingDigest,
-    string PluginRelativeRoot,
+    string? PluginRelativeRoot,
     string LoaderTransactionStatus,
     string Status);
 
 public static class Task6ExperimentStateService
 {
-    public const string SchemaVersion = "throneforge-task6-experiment-v1";
+    public const string SchemaVersion = "throneforge-task6-experiment-v2";
     public const string TaskVersion = "m1-disposable-bepinex-plugin-smoke-test-v2";
     public const string CleanGameRelativePath = "clean-game";
     public const string StateRelativePath = "manifests/task6-experiment-state.json";
     public const string RecoveryRelativePath = "evidence/task6-recovery-state.json";
+    public const string SyntheticPluginRelativeRoot = "BepInEx/plugins/dev.throneforge.m1.synthetic-smoke";
+    public const string LifecyclePluginRelativeRoot = "BepInEx/plugins/dev.throneforge.m1.lifecycle-smoke";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public static Task6ExperimentState CreatePrepared(
         string experimentRoot,
         string expectedFingerprint,
-        string repositoryBaselineCommit)
+        string repositoryBaselineCommit,
+        string? experimentId = null)
     {
         ValidateFingerprint(expectedFingerprint);
         ValidateRepositoryCommit(repositoryBaselineCommit);
@@ -62,11 +66,17 @@ public static class Task6ExperimentStateService
             throw new PluginSmokeException("A new Task-6 experiment requires a nonexistent or empty experiment root.");
         }
 
+        var resolvedExperimentId = experimentId ?? Guid.NewGuid().ToString("N");
+        if (!Guid.TryParseExact(resolvedExperimentId, "N", out _))
+        {
+            throw new PluginSmokeException("The Task-6 experiment identity is invalid.");
+        }
+
         return new Task6ExperimentState(
             SchemaVersion,
             TaskVersion,
             expectedFingerprint.ToLowerInvariant(),
-            Guid.NewGuid().ToString("N"),
+            resolvedExperimentId,
             repositoryBaselineCommit,
             CleanGameRelativePath,
             Task6ExperimentStatus.Prepared);
@@ -156,7 +166,7 @@ public static class Task6ExperimentStateService
         ValidateFingerprint(recovery.ExpectedFingerprint);
         if (string.IsNullOrWhiteSpace(recovery.ExperimentId)
             || !recovery.ExperimentId.All(char.IsAsciiLetterOrDigit)
-            || !string.Equals(recovery.PluginRelativeRoot, "BepInEx/plugins/dev.throneforge.m1.synthetic-smoke", StringComparison.Ordinal)
+            || recovery.PluginRelativeRoot is not null && !IsAllowedPluginRoot(recovery.PluginRelativeRoot)
             || string.IsNullOrWhiteSpace(recovery.LoaderTransactionStatus))
         {
             throw new PluginSmokeException("The Task-6 recovery record contains unsafe ownership data.");
@@ -201,6 +211,7 @@ public static class Task6ExperimentStateService
         if (!string.Equals(state.SchemaVersion, SchemaVersion, StringComparison.Ordinal)
             || !string.Equals(state.TaskVersion, TaskVersion, StringComparison.Ordinal)
             || !string.Equals(state.CleanGameRelativePath, CleanGameRelativePath, StringComparison.Ordinal)
+            || !Enum.IsDefined(state.Status)
             || !Guid.TryParseExact(state.ExperimentId, "N", out _))
         {
             throw new PluginSmokeException("The Task-6 ownership record has an unsupported schema, task, path, or experiment identity.");
@@ -214,10 +225,14 @@ public static class Task6ExperimentStateService
             throw new PluginSmokeException("The Task-6 ownership record contains an invalid package or admission digest.");
         }
 
-        if (state.PluginRelativeRoot is not null
-            && !state.PluginRelativeRoot.Equals("BepInEx/plugins/dev.throneforge.m1.synthetic-smoke", StringComparison.Ordinal))
+        if (state.PluginRelativeRoot is not null && !IsAllowedPluginRoot(state.PluginRelativeRoot))
         {
             throw new PluginSmokeException("The Task-6 ownership record contains an unsafe plugin root.");
+        }
+
+        if (state.LoaderOnlyManifest is not null)
+        {
+            ValidateManifest(state.LoaderOnlyManifest);
         }
     }
 
@@ -231,12 +246,55 @@ public static class Task6ExperimentStateService
 
     private static void ValidateRepositoryCommit(string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Length > 64 || value.Any(character => char.IsControl(character) || char.IsWhiteSpace(character) || character is '/' or '\\' or ':'))
+        if (string.IsNullOrWhiteSpace(value) || value.Length != 40 || value.Any(character => !Uri.IsHexDigit(character)))
         {
-            throw new PluginSmokeException("The Task-6 repository baseline identifier is invalid.");
+            throw new PluginSmokeException("The Task-6 repository baseline commit must be a 40-character hexadecimal SHA-1.");
         }
     }
 
     private static bool IsSha256(string value)
         => value.Length == 64 && value.All(Uri.IsHexDigit);
+
+    private static bool IsAllowedPluginRoot(string value)
+        => value.Equals(SyntheticPluginRelativeRoot, StringComparison.Ordinal)
+            || value.Equals(LifecyclePluginRelativeRoot, StringComparison.Ordinal);
+
+    private static void ValidateManifest(CopyManifest manifest)
+    {
+        if (manifest.Files is null)
+        {
+            throw new PluginSmokeException("The Task-6 ownership record contains an incomplete loader-only manifest.");
+        }
+
+        var paths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var file in manifest.Files)
+        {
+            ValidateRelativeManifestPath(file.RelativePath);
+            if (!paths.Add(file.RelativePath) || !IsSha256(file.Sha256))
+            {
+                throw new PluginSmokeException("The Task-6 ownership record contains an invalid loader-only manifest.");
+            }
+        }
+
+        foreach (var directory in manifest.Directories ?? [])
+        {
+            ValidateRelativeManifestPath(directory);
+            if (!paths.Add(directory))
+            {
+                throw new PluginSmokeException("The Task-6 ownership record contains duplicate loader-only manifest paths.");
+            }
+        }
+    }
+
+    private static void ValidateRelativeManifestPath(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)
+            || value.Contains('\\', StringComparison.Ordinal)
+            || value.Contains(':', StringComparison.Ordinal)
+            || value[0] == '/'
+            || value.Split('/').Any(part => part is "" or "." or ".."))
+        {
+            throw new PluginSmokeException("The Task-6 ownership record contains an unsafe loader-only manifest path.");
+        }
+    }
 }

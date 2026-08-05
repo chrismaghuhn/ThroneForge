@@ -5,6 +5,7 @@
     <RootNamespace>ThroneForge.PluginSmokeTest</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\templates\lifecycle-plugin-smoke\LifecycleHost.cs" Link="LifecycleHost.cs" />
     <ProjectReference Include="../ThroneForge.API/ThroneForge.API.csproj" />
     <ProjectReference Include="../ThroneForge.Contracts/ThroneForge.Contracts.csproj" />
     <ProjectReference Include="../ThroneForge.Runtime/ThroneForge.Runtime.csproj" />
