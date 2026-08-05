@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is complete on `agent/m1-disposable-bepinex-plugin-smoke-test`; the previous private deployment stopped safely at a baseline-state path mismatch, and one corrected fresh private run passed. M1 Task 7 has not started.
+M1 - Task 7 public Unity lifecycle binding and synthetic lifecycle smoke test is in progress on `agent/m1-lifecycle-binding-smoke-test`, based on merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. No Task-7 lifecycle conclusion has been claimed yet.
 
 ## Milestones
 
@@ -21,6 +21,18 @@ Task-6 completion is recorded by the sanitized report, unchanged original-instal
 ### M1 - Thronefall discovery spike
 
 Against an explicit local, legally obtained game path, detect executable architecture, Unity version, Mono/IL2CPP backend, loader compatibility, target framework, and a fingerprint. Document the selected BepInEx/Harmony setup, one verified lifecycle binding, the first binding report, catalog feasibility, and legal/distribution constraints. Do not implement custom waves until the M1 acceptance criteria pass.
+
+### M1 Task 7 - public Unity lifecycle binding and smoke test (in progress)
+
+- [ ] Add metadata-only validation for the public `UnityEngine.Application.quitting` event in `UnityEngine.CoreModule`.
+- [ ] Add the source-only lifecycle plugin template with exact package identity, synchronous-only lifecycle state machine, and nonce-bound markers.
+- [ ] Add repository-only lifecycle, marker, log-stability, package, and architecture tests.
+- [ ] Reuse Task-6 ownership, package capture, admission, deployment, launch, removal, rollback, and post-verification services.
+- [ ] Run local validation and hosted Windows/Linux synthetic CI before any private run.
+- [ ] Perform at most one fresh private disposable-profile experiment after hosted CI passes.
+- [ ] Commit exactly one sanitized fingerprint-specific lifecycle binding report and run final hosted validation.
+
+Task 7 is limited to the public Unity lifecycle source `UnityEngine.Application.quitting` and does not inspect Thronefall-defined types, gameplay state, Harmony hooks, catalogs, or custom waves.
 
 ### M2 - Contracts, schemas, validation, and fixtures
 

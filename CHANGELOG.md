@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Started M1 Task 7: a bounded public Unity `Application.quitting` lifecycle-binding smoke test for the documented fingerprint. No private lifecycle result is claimed yet.
+
 All notable ThroneForge changes are documented here.
 
 ## Unreleased

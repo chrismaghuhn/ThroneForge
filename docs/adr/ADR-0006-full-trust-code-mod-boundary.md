@@ -11,6 +11,8 @@ The runtime therefore needs a small, portable decision boundary before a future 
 
 ## Decision
 
+The Task-7 lifecycle slice binds BepInEx `Awake` and public `UnityEngine.Application.quitting` to one synthetic mod instance only. It does not expand the admission boundary into a game API, Harmony, catalog, or custom-wave boundary. The result remains fingerprint-specific and provisional until the private evidence and post-checks are recorded.
+
 Task 4 defines three separate concerns:
 
 1. `ThroneForge.Contracts` carries immutable code-mod identity, package-integrity, approval, compatibility, activation-request, and admission-binding data. Mod IDs and versions are canonicalized with bounded portable rules. Integrity, approval, and compatibility evidence are bound to the same exact mod identity, package SHA-256, and game fingerprint; records never contain installation paths or executable objects.

@@ -47,6 +47,8 @@ public static class Task6ExperimentStateService
     public const string CleanGameRelativePath = "clean-game";
     public const string StateRelativePath = "manifests/task6-experiment-state.json";
     public const string RecoveryRelativePath = "evidence/task6-recovery-state.json";
+    public const string SyntheticPluginRelativeRoot = "BepInEx/plugins/dev.throneforge.m1.synthetic-smoke";
+    public const string LifecyclePluginRelativeRoot = "BepInEx/plugins/dev.throneforge.m1.lifecycle-smoke";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public static Task6ExperimentState CreatePrepared(
@@ -156,7 +158,7 @@ public static class Task6ExperimentStateService
         ValidateFingerprint(recovery.ExpectedFingerprint);
         if (string.IsNullOrWhiteSpace(recovery.ExperimentId)
             || !recovery.ExperimentId.All(char.IsAsciiLetterOrDigit)
-            || !string.Equals(recovery.PluginRelativeRoot, "BepInEx/plugins/dev.throneforge.m1.synthetic-smoke", StringComparison.Ordinal)
+            || !IsAllowedPluginRoot(recovery.PluginRelativeRoot)
             || string.IsNullOrWhiteSpace(recovery.LoaderTransactionStatus))
         {
             throw new PluginSmokeException("The Task-6 recovery record contains unsafe ownership data.");
@@ -214,8 +216,7 @@ public static class Task6ExperimentStateService
             throw new PluginSmokeException("The Task-6 ownership record contains an invalid package or admission digest.");
         }
 
-        if (state.PluginRelativeRoot is not null
-            && !state.PluginRelativeRoot.Equals("BepInEx/plugins/dev.throneforge.m1.synthetic-smoke", StringComparison.Ordinal))
+        if (state.PluginRelativeRoot is not null && !IsAllowedPluginRoot(state.PluginRelativeRoot))
         {
             throw new PluginSmokeException("The Task-6 ownership record contains an unsafe plugin root.");
         }
@@ -239,4 +240,8 @@ public static class Task6ExperimentStateService
 
     private static bool IsSha256(string value)
         => value.Length == 64 && value.All(Uri.IsHexDigit);
+
+    private static bool IsAllowedPluginRoot(string value)
+        => value.Equals(SyntheticPluginRelativeRoot, StringComparison.Ordinal)
+            || value.Equals(LifecyclePluginRelativeRoot, StringComparison.Ordinal);
 }

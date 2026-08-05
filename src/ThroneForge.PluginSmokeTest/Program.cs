@@ -14,7 +14,7 @@ public static class PluginSmokeCli
     {
         if (args.Length == 0)
         {
-            stderr.WriteLine("Usage: package|admit|deploy|remove|parse-marker with explicit paths and evidence.");
+            stderr.WriteLine("Usage: package|lifecycle-package|admit|admit-and-deploy|remove|parse-marker|inspect-lifecycle-binding|verify-lifecycle-log with explicit paths and evidence.");
             return 2;
         }
 
@@ -23,15 +23,18 @@ public static class PluginSmokeCli
             return args[0].ToLowerInvariant() switch
             {
                 "package" => Package(args, stdout),
+                "lifecycle-package" => LifecyclePackage(args, stdout),
                 "admit" => Admit(args, stdout),
                 "admit-and-deploy" => AdmitAndDeploy(args, stdout),
                 "deploy" => throw new PluginSmokeException("Direct deployment is disabled; use admit-and-deploy with a validated Task-6 ownership record."),
                 "remove" => Remove(args, stdout),
                 "parse-marker" => ParseMarker(args, stdout),
                 "inspect" => Inspect(args, stdout),
+                "inspect-lifecycle-binding" => InspectLifecycleBinding(args, stdout),
                 "tfm" => Tfm(args, stdout),
                 "launch" => Launch(args, stdout),
                 "verify-log" => VerifyLog(args, stdout),
+                "verify-lifecycle-log" => VerifyLifecycleLog(args, stdout),
                 "manifest" => Manifest(args, stdout),
                 "ownership" => Ownership(args, stdout),
                 "recovery" => Recovery(args, stdout),
@@ -89,13 +92,21 @@ public static class PluginSmokeCli
         return 0;
     }
 
+    private static int LifecyclePackage(string[] args, TextWriter stdout)
+    {
+        var manifest = LifecyclePluginPackageService.CreateManifestFromDirectory(Value(args, "--package-root"));
+        PluginPackageManifestService.Save(Value(args, "--manifest-path"), manifest);
+        stdout.WriteLine($"package-sha256={manifest.PackageSha256.Value}");
+        stdout.WriteLine("package-file-count=3");
+        return 0;
+    }
+
     private static int Admit(string[] args, TextWriter stdout)
     {
         var expected = PluginPackageManifestService.Load(Value(args, "--manifest-path"));
-        var captured = PluginAdmissionService.CaptureAndValidate(
-            Value(args, "--package-root"),
-            expected,
-            Value(args, "--target-framework"));
+        var captured = IsLifecycle(args)
+            ? LifecyclePluginPackageService.CaptureAndValidate(Value(args, "--package-root"), expected)
+            : PluginAdmissionService.CaptureAndValidate(Value(args, "--package-root"), expected, Value(args, "--target-framework"));
         var fingerprint = new ThroneForge.Contracts.GameFingerprint(Value(args, "--expected-fingerprint"));
         var decision = PluginAdmissionService.EvaluateApprovedPackage(
             captured.Manifest,
@@ -119,7 +130,9 @@ public static class PluginSmokeCli
     {
         var expected = PluginPackageManifestService.Load(Value(args, "--manifest-path"));
         var targetFramework = Value(args, "--target-framework");
-        var captured = PluginAdmissionService.CaptureAndValidate(Value(args, "--package-root"), expected, targetFramework);
+        var captured = IsLifecycle(args)
+            ? LifecyclePluginPackageService.CaptureAndValidate(Value(args, "--package-root"), expected)
+            : PluginAdmissionService.CaptureAndValidate(Value(args, "--package-root"), expected, targetFramework);
         var fingerprint = new ThroneForge.Contracts.GameFingerprint(Value(args, "--expected-fingerprint"));
         var decision = PluginAdmissionService.EvaluateApprovedPackage(
             captured.Manifest,
@@ -169,7 +182,9 @@ public static class PluginSmokeCli
             Value(args, "--repository-root"),
             Value(args, "--original-game"),
             experimentRoot);
-        PluginDeploymentService.Remove(Value(args, "--clean-game"), "dev.throneforge.m1.synthetic-smoke");
+        PluginDeploymentService.Remove(
+            Value(args, "--clean-game"),
+            OptionalValue(args, "--plugin-guid") ?? "dev.throneforge.m1.synthetic-smoke");
         Task6ExperimentStateService.SaveAtomic(experimentRoot, state with
         {
             Status = Task6ExperimentStatus.LoaderApplied,
@@ -212,6 +227,23 @@ public static class PluginSmokeCli
         stdout.WriteLine($"assembly-references={string.Join(',', metadata.AssemblyReferences)}");
         stdout.WriteLine($"sha256={metadata.Sha256.Value}");
         return 0;
+    }
+
+    private static int InspectLifecycleBinding(string[] args, TextWriter stdout)
+    {
+        var result = UnityLifecycleMetadataInspector.Inspect(Value(args, "--assembly-path"));
+        stdout.WriteLine($"binding-id={result.BindingId}");
+        stdout.WriteLine($"metadata-valid={result.IsValid}");
+        stdout.WriteLine($"assembly-identity={result.AssemblyIdentity ?? "unknown"}");
+        stdout.WriteLine($"source-type={result.SourceType ?? "unknown"}");
+        stdout.WriteLine($"source-event={result.SourceEvent ?? "unknown"}");
+        stdout.WriteLine($"handler-type={result.HandlerType ?? "unknown"}");
+        if (!result.IsValid)
+        {
+            stdout.WriteLine($"failure-category={result.FailureCategory}");
+        }
+
+        return result.IsValid ? 0 : 1;
     }
 
     private static int Tfm(string[] args, TextWriter stdout)
@@ -281,6 +313,58 @@ public static class PluginSmokeCli
         return summary.MeetsCriteria ? 0 : 1;
     }
 
+    private static int VerifyLifecycleLog(string[] args, TextWriter stdout)
+    {
+        var stable = LifecycleLogStabilityObserver.Observe(
+            Value(args, "--log-path"),
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromMilliseconds(100));
+        if (!stable.IsStable || stable.Text is null)
+        {
+            stdout.WriteLine("log-stable=false");
+            stdout.WriteLine($"failure-category={stable.FailureCategory}");
+            return 1;
+        }
+
+        var loader = ThroneForge.LoaderSmokeTest.LoaderLogParser.Parse(stable.Text);
+        var marker = LifecycleMarkerParser.Parse(
+            stable.Text,
+            Value(args, "--nonce"),
+            Value(args, "--api-identity"),
+            Value(args, "--contracts-identity"));
+        var firstMarker = marker.Markers.Count == 0 ? null : marker.Markers[0];
+        var meetsCriteria = string.Equals(loader.BepInExVersion, "5.4.23.5", StringComparison.Ordinal)
+            && loader.PreloaderInitialized
+            && loader.ChainloaderInitialized
+            && loader.PluginsDiscovered == 1
+            && loader.ErrorCount == 0
+            && loader.FatalErrorCount == 0
+            && marker.IsValid;
+
+        stdout.WriteLine("log-stable=true");
+        stdout.WriteLine($"bepinex-version={loader.BepInExVersion ?? "unknown"}");
+        stdout.WriteLine($"preloader={loader.PreloaderInitialized}");
+        stdout.WriteLine($"chainloader={loader.ChainloaderInitialized}");
+        stdout.WriteLine($"plugins={loader.PluginsDiscovered}");
+        stdout.WriteLine($"warnings={loader.WarningCount}");
+        stdout.WriteLine($"errors={loader.ErrorCount}");
+        stdout.WriteLine($"fatal-errors={loader.FatalErrorCount}");
+        stdout.WriteLine($"marker={marker.IsValid}");
+        stdout.WriteLine($"initialization-count={marker.InitializationCount}");
+        stdout.WriteLine($"quitting-count={marker.QuittingCount}");
+        stdout.WriteLine($"shutdown-count={marker.ShutdownCount}");
+        stdout.WriteLine($"marker-sequence={string.Join(',', marker.Markers.OrderBy(item => item.Sequence).Select(item => item.Sequence))}");
+        stdout.WriteLine($"runtime-api-identity={firstMarker?.ApiIdentity ?? "unknown"}");
+        stdout.WriteLine($"runtime-contracts-identity={firstMarker?.ContractsIdentity ?? "unknown"}");
+        stdout.WriteLine($"lifecycle-criteria={meetsCriteria}");
+        if (!marker.IsValid)
+        {
+            stdout.WriteLine($"failure-category={marker.FailureCategory}");
+        }
+
+        return meetsCriteria ? 0 : 1;
+    }
+
     private static int Manifest(string[] args, TextWriter stdout)
     {
         var manifest = ThroneForge.LoaderSmokeTest.InstallationCopyService.CaptureManifest(Value(args, "--root"));
@@ -325,7 +409,7 @@ public static class PluginSmokeCli
             ownership.ExperimentId,
             OptionalValue(args, "--package-sha256") ?? ownership.PackageSha256,
             OptionalValue(args, "--binding-digest") ?? ownership.AdmissionBindingDigest,
-            "BepInEx/plugins/dev.throneforge.m1.synthetic-smoke",
+            OptionalValue(args, "--plugin-root") ?? Task6ExperimentStateService.SyntheticPluginRelativeRoot,
             OptionalValue(args, "--loader-status") ?? "RollbackRequired",
             "ManualClosureRequired");
         Task6ExperimentStateService.SaveRecoveryAtomic(experimentRoot, recovery);
@@ -374,6 +458,10 @@ public static class PluginSmokeCli
 
         return result;
     }
+
+    private static bool IsLifecycle(string[] args)
+        => string.Equals(OptionalValue(args, "--package-kind"), "lifecycle", StringComparison.OrdinalIgnoreCase)
+            || args[0].Equals("lifecycle-package", StringComparison.OrdinalIgnoreCase);
 
     private static string? NormalizeTargetFramework(string? targetFramework)
     {

@@ -122,3 +122,25 @@ The disposable plugin is deployed only below `clean-game/BepInEx/plugins/dev.thr
 No nonce, absolute path, raw log, binary, archive, complete private manifest, or recovery marker is committed. A pass proves only this synthetic plugin bootstrap for the exact documented fingerprint. It does not prove a real Thronefall plugin, final plugin TFM compatibility beyond the local evidence used for the build, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, or custom waves.
 
 The private Task-6 run passed for the documented fingerprint. The sanitized result is [the fingerprint-specific report](1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-synthetic-plugin-smoke-test.md). Raw logs, the disposable copy, package files, transaction state, and rollback evidence remain outside the repository.
+
+## M1 task 7: public Unity lifecycle binding smoke test
+
+Task 7 is limited to the public Unity event `UnityEngine.Application.quitting`, identified as `unity-application-quitting-v1`. The source metadata is inspected with `PEReader`/`MetadataReader` before a private run and must prove a public static `System.Action` event with public static add/remove accessors. The external validator never loads `UnityEngine.CoreModule.dll` and no Unity binary is committed.
+
+The source-only lifecycle package contains exactly `ThroneForge.M1.LifecycleSmoke.dll`, `ThroneForge.API.dll`, and `ThroneForge.Contracts.dll`. It reuses the Task-6 ownership, exact-byte package capture, admission, transactional deployment, bounded launch, removal, rollback, and original/disposable post-verification workflow. Its synthetic context exposes only the documented mod identity and reports every capability unavailable.
+
+The lifecycle host is synchronous-only and exactly-once: BepInEx `Awake` initializes one synthetic mod, `Application.quitting` shuts down that same instance, and `OnDestroy` is cleanup fallback only. A private pass requires one nonce-bound marker for initialization, one direct quitting-event marker, and one shutdown marker in sequence `1,2,3`, plus actual runtime API/Contracts identities and zero fatal/error evidence. Missing or unstable logs are bounded failures; a process requiring manual closure is inconclusive and never modified while active.
+
+Invocation is local-only and must happen only after repository tests and hosted synthetic Windows/Linux CI pass:
+
+```powershell
+./tools/plugin-smoke-test/Invoke-ThroneForgeLifecycleBindingSmokeTest.ps1 `
+  -Mode Full `
+  -GamePath "C:\Path\To\Thronefall" `
+  -ExperimentRoot "D:\ThroneForgeExperiments\<fingerprint>" `
+  -BepInExArchive "D:\ThroneForgeExperiments\downloads\BepInEx_win_x64_5.4.23.5.zip" `
+  -ExpectedFingerprint "<fingerprint>" `
+  -ExpectedBepInExDigest "<official-digest>"
+```
+
+The committed output, if the one permitted private run passes or is inconclusive, is the sanitized fingerprint-specific report `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-lifecycle-binding.md`. It contains no nonce, absolute path, raw log, binary, private manifest, machine identity, or process identity. The binding is described as a public Unity lifecycle binding observed while Thronefall was running, not as a verified Thronefall-internal method. No game API, Harmony, gameplay state, catalog, save, wave, async lifecycle, or cross-version compatibility is claimed.

@@ -2,9 +2,11 @@
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is complete on `agent/m1-disposable-bepinex-plugin-smoke-test`; the corrected private run passed in one fresh external profile. M1 Task 7 has not started.
+M1 - Task 7 public Unity lifecycle binding and synthetic lifecycle smoke test is in progress on `agent/m1-lifecycle-binding-smoke-test`, based on merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. No Task-7 lifecycle result has been recorded yet.
 
 ## State
+
+Task 6 was merged through PR #6. Task 7 now verifies only the public `UnityEngine.Application.quitting` source with binding ID `unity-application-quitting-v1`. It will bind BepInEx `Awake` to one synthetic mod initialization and the public quitting event to one shutdown of the same mod. No Harmony hook, game-defined type, gameplay state, catalog, save data, or custom wave is in scope. The lifecycle experiment is synchronous-only; `OnDestroy` is cleanup fallback and cannot satisfy the pass criteria. Hosted CI must pass before one fresh private disposable-profile run is considered. No lifecycle conclusion has been claimed yet.
 
 M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. M1 Task 5 repository-only hardening is complete and hosted-verified below. Task 6 state-path hardening is implemented at `bda540f9f4c97868d2469c0d5f48826269528e8f`; final documentation head `fb8bcf46cafe1afa82ca3044b94a85251e704529` passed run `30999995802`, followed by one corrected private `Passed` run. M1 overall remains incomplete.
 
@@ -12,7 +14,7 @@ The Task 4 bounded slice and hardening passed hosted validation before PR #4 mer
 
 Task 6 hardening adds an atomically owned experiment state, derived loader/profile preconditions, exact-byte three-file recapture and admission, transactional deployment rollback, full package metadata validation, runtime API/Contracts identity markers, public-surface parity checks, and owned cleanup/recovery paths. The earlier private run remains limited `PassedWithWarnings` evidence because it did not capture actual runtime identity evidence. The subsequent `final15` attempt remains `Failed` because the legacy baseline path stopped deployment before plugin files were written. The corrected fresh run passed with actual runtime identity evidence, one plugin marker, complete rollback, and unchanged original-installation verification.
 
-The diagnosed mismatch was `baseline.json` in `PluginDeploymentService` versus the canonical `baseline-copy-manifest.json` written by the Task-3 orchestrator. The correction centralizes both Task-3 state paths and validates loader transactions against `baseline.DisposableManifest`. Hosted pre-private run `30998768487` validated the correction; final run `30999995802` validated documentation head `fb8bcf46cafe1afa82ca3044b94a85251e704529` on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files, and 279 tests per runner. Both final artifacts were downloaded and parsed independently with zero overwrite warnings. One fresh corrected private run then passed. M1 Task 7 remains unstarted.
+The diagnosed mismatch was `baseline.json` in `PluginDeploymentService` versus the canonical `baseline-copy-manifest.json` written by the Task-3 orchestrator. The correction centralizes both Task-3 state paths and validates loader transactions against `baseline.DisposableManifest`. Hosted pre-private run `30998768487` validated the correction; final run `30999995802` validated documentation head `fb8bcf46cafe1afa82ca3044b94a85251e704529` on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files, and 279 tests per runner. Both final artifacts were downloaded and parsed independently with zero overwrite warnings. One fresh corrected private run then passed. Task 7 is now in progress on a separate branch; no lifecycle result is claimed yet.
 
 ## Completed
 
