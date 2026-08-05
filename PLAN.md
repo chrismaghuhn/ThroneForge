@@ -14,6 +14,8 @@ The correction head `1cd903c0aa1942d793409893d458939660e40c9d` passed hosted run
 
 The follow-up review correction is repository-only: recovery keeps `PluginRemovalStatus=NotRequired` when no package was deployed, and BaselineLaunch manual closure records `NotApplied` with an explicit no-loader-cleanup action instead of a misleading rollback command. No private run is authorized.
 
+Correction head `bb960efd9e0715639807469a109b3ce28f700c72` passed PR run `31041425981` and push run `31041429428`; Windows and Ubuntu each reported 13 TRX files and 362 passing tests with all failure, error, timeout, abort, inconclusive, not-executed and skipped counters at zero.
+
 ## Milestones
 
 ### M0 - Repository bootstrap and architecture skeleton
