@@ -308,9 +308,11 @@ finally {
                     Where-Object { $_.StartsWith('Rollback verified:', [StringComparison]::Ordinal) } |
                     Select-Object -First 1
             )
-            $rollbackOperationVerified = $rollbackOperation.ExitCode -eq 0
-                -and $rollbackVerifiedLine.Count -eq 1
-                -and $rollbackVerifiedLine[0] -match '(?i)Rollback verified:\s*True\s*$'
+            $rollbackOperationVerified = (
+                $rollbackOperation.ExitCode -eq 0 -and
+                $rollbackVerifiedLine.Count -eq 1 -and
+                $rollbackVerifiedLine[0] -match '(?i)Rollback verified:\s*True\s*$'
+            )
         }
     }
     else {
