@@ -48,7 +48,7 @@ Task-7 correction baseline: reviewed head `92094c4362f09f73ffdd1bc8807caaf4a904f
 - [x] Run cleanup, disposable runtime/readiness/indicator verification, original postchecks, and sanitized report generation in C#.
 - [x] Validate the full repository-only implementation and hosted Windows/Linux CI; do not run another private experiment in this slice.
 
-The final repository-only correction head `1207546c1f7885eb4cb43fa70fa70c62051a7145` passed hosted run `31016602789` with 13 TRX files and 333 tests per runner on SDK `10.0.100`; all failure, error, skip, not-executed and aborted counters were zero. No private run was performed, and a separately authorized private attempt remains the next possible verification step.
+The production-path correction head `39120f1abe4138d3ea0ef6b1842f4a89c66ac079` passed hosted run `31022292522` with 13 TRX files and 339 tests per runner on SDK `10.0.100`; all failure, error, skip, not-executed, aborted and inconclusive counters were zero, and no TRX overwrite warning occurred. No private run was performed; the final documentation head receives a separate hosted validation before this correction is considered ready for authorization.
 
 ### Task-7 production-path hardening
 
@@ -57,7 +57,7 @@ The final repository-only correction head `1207546c1f7885eb4cb43fa70fa70c62051a7
 - [ ] Add typed manual-closure recovery and an explicit C# rollback operation.
 - [ ] Capture the loader-only reference manifest after loader verification and immediately before deployment.
 - [ ] Bind package, manifest, Unity metadata, and runtime identity evidence to the owned profile and captured package.
-- [ ] Add a real production-path integration test and failure coverage without performing a private run.
+- [x] Add production-path ownership, side-effect, recovery, path-binding and failure coverage without performing a private run.
 - [ ] Run local and exact-SDK hosted validation, inspect every TRX artifact, and report readiness for separate private authorization.
 
 Current correction implementation adds a real C#-owned package-build boundary, Task-6 ownership creation before preparation, side-effect-preserving evidence application, typed manual-closure recovery/rollback, owned package and Unity metadata path validation, and independent cleanup/postcheck evidence. The private experiment remains forbidden in this correction. The checklist stays open until the new hosted validation has passed and every TRX artifact has been inspected.
