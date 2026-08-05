@@ -298,6 +298,7 @@ public static class PluginSmokeCli
         stdout.WriteLine($"binding-digest={result.AdmissionBindingDigest ?? "not-observed"}");
         stdout.WriteLine($"recovery-marker-persisted={result.RecoveryMarkerPersisted?.ToString() ?? "not-observed"}");
         stdout.WriteLine($"rollback-operation={result.RollbackCommand ?? "not-observed"}");
+        stdout.WriteLine($"recovery-action={result.RecoveryAction ?? "not-observed"}");
         stdout.WriteLine($"report={Path.GetFileName(reportPath)}");
         return result.OverallResult == "Passed" ? 0 : 1;
     }

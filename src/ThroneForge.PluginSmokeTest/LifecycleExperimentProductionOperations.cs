@@ -97,7 +97,17 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
         try
         {
             var ownership = Task6ExperimentStateService.LoadAndValidate(roots.ExperimentRoot, options.ExpectedFingerprint);
-            var loaderStatus = ownership.LoaderTransactionStatus ?? LoaderTransactionStatus.RollbackRequired.ToString();
+            var loaderApplied = ownership.Status is Task6ExperimentStatus.LoaderApplied
+                or Task6ExperimentStatus.PluginDeployed
+                or Task6ExperimentStatus.LaunchObserved
+                || ownership.LoaderTransactionStatus is not null
+                    && (ownership.LoaderTransactionStatus.Equals(LoaderTransactionStatus.Applied.ToString(), StringComparison.Ordinal)
+                        || ownership.LoaderTransactionStatus.Equals(LoaderTransactionStatus.LaunchObserved.ToString(), StringComparison.Ordinal)
+                        || ownership.LoaderTransactionStatus.Equals(LoaderTransactionStatus.RollbackRequired.ToString(), StringComparison.Ordinal));
+            var loaderStatus = loaderApplied
+                ? ownership.LoaderTransactionStatus ?? LoaderTransactionStatus.RollbackRequired.ToString()
+                : "NotApplied";
+            var recoveryAction = loaderApplied ? "rollback-lifecycle-experiment" : "no-loader-cleanup-required";
             var recovery = new Task6RecoveryState(
                 Task6ExperimentStateService.SchemaVersion,
                 Task6ExperimentStateService.TaskVersion,
@@ -118,7 +128,9 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
                 PluginRelativeRoot = recovery.PluginRelativeRoot,
                 LoaderTransactionStatus = recovery.LoaderTransactionStatus
             });
-            return new(true, true, RollbackCommand: "rollback-lifecycle-experiment");
+            return loaderApplied
+                ? new(true, true, RollbackCommand: recoveryAction, RecoveryAction: recoveryAction)
+                : new(true, true, RecoveryAction: recoveryAction);
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {

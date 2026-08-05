@@ -12,6 +12,8 @@ The correction also preserves cleanup side-effect results when later rollback wo
 
 The correction head `1cd903c0aa1942d793409893d458939660e40c9d` passed hosted run `31039015040` on Windows and Ubuntu with SDK `10.0.100`; each runner produced 13 TRX files and 360 passing tests with no failure, error, timeout, abort, inconclusive, not-executed or skipped result.
 
+The follow-up review correction is repository-only: recovery keeps `PluginRemovalStatus=NotRequired` when no package was deployed, and BaselineLaunch manual closure records `NotApplied` with an explicit no-loader-cleanup action instead of a misleading rollback command. No private run is authorized.
+
 ## Milestones
 
 ### M0 - Repository bootstrap and architecture skeleton

@@ -123,6 +123,7 @@ public sealed class LifecycleExperimentReportWriter
         Append(builder, "Recovery marker persisted", Format(result.RecoveryMarkerPersisted));
         Append(builder, "Recovery marker failure category", SafeToken(result.RecoveryMarkerFailureCategory));
         Append(builder, "Rollback command", SafeToken(result.RollbackCommand));
+        Append(builder, "Recovery action", SafeToken(result.RecoveryAction));
         builder.AppendLine();
         builder.AppendLine("## Historical private attempts");
         builder.AppendLine();

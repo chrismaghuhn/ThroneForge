@@ -9,7 +9,8 @@ public sealed record LifecycleExperimentRecoveryOptions(
     string ExperimentRoot,
     string ExpectedFingerprint,
     string BepInExArchivePath,
-    string ExpectedBepInExDigest);
+    string ExpectedBepInExDigest,
+    Func<LoaderSmokeTestRequest, SmokeTestExecutionResult>? RollbackRunner = null);
 
 public sealed record LifecycleExperimentRollbackResult(
     string OverallResult,
@@ -140,7 +141,7 @@ public static class LifecycleExperimentRecoveryService
                 return Failed(LifecycleExperimentFailureCategories.RecoveryRuntimeDrift, pluginRemovalStatus);
             }
 
-            var rollback = SmokeTestOrchestrator.Run(new LoaderSmokeTestRequest(
+            var rollbackRequest = new LoaderSmokeTestRequest(
                 SmokeTestMode.Rollback,
                 roots.OriginalGameRoot,
                 roots.ExperimentRoot,
@@ -148,10 +149,12 @@ public static class LifecycleExperimentRecoveryService
                 roots.RepositoryRoot,
                 options.BepInExArchivePath,
                 null,
-                OfficialAssetDigest: options.ExpectedBepInExDigest));
+                OfficialAssetDigest: options.ExpectedBepInExDigest);
+            var rollback = options.RollbackRunner?.Invoke(rollbackRequest)
+                ?? SmokeTestOrchestrator.Run(rollbackRequest);
             if (rollback.Outcome is SmokeTestOutcome.Failed or SmokeTestOutcome.Inconclusive)
             {
-                return Failed(LifecycleExperimentFailureCategories.RecoveryLoaderRollbackFailed, CleanupOperationStatus.Passed, CleanupOperationStatus.Failed);
+                return Failed(LifecycleExperimentFailureCategories.RecoveryLoaderRollbackFailed, pluginRemovalStatus, CleanupOperationStatus.Failed);
             }
 
             transaction = LoaderTransactionStateService.LoadAndValidate(
@@ -162,14 +165,14 @@ public static class LifecycleExperimentRecoveryService
                 [LoaderTransactionStatus.RolledBack]);
             if (transaction.Status != LoaderTransactionStatus.RolledBack)
             {
-                return Failed(LifecycleExperimentFailureCategories.RecoveryLoaderRollbackFailed, CleanupOperationStatus.Passed, CleanupOperationStatus.Failed);
+                return Failed(LifecycleExperimentFailureCategories.RecoveryLoaderRollbackFailed, pluginRemovalStatus, CleanupOperationStatus.Failed);
             }
 
             var disposableRestored = VerifyProfile(roots, baseline.DisposableManifest, options.ExpectedFingerprint, "recovery-disposable");
             var originalVerified = VerifyOriginal(roots, baseline.OriginalManifest, options.ExpectedFingerprint, "recovery-original");
             if (!disposableRestored)
             {
-                return Failed(LifecycleExperimentFailureCategories.RecoveryDisposableReadinessFailed, CleanupOperationStatus.Passed, CleanupOperationStatus.Passed, true, false);
+                return Failed(LifecycleExperimentFailureCategories.RecoveryDisposableReadinessFailed, pluginRemovalStatus, CleanupOperationStatus.Passed, true, false);
             }
 
             var rolledBack = ownership with
@@ -181,7 +184,7 @@ public static class LifecycleExperimentRecoveryService
             Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, rolledBack);
             if (!originalVerified)
             {
-                return Failed(LifecycleExperimentFailureCategories.RecoveryOriginalPostcheckFailed, CleanupOperationStatus.Passed, CleanupOperationStatus.Passed, true, true);
+                return Failed(LifecycleExperimentFailureCategories.RecoveryOriginalPostcheckFailed, pluginRemovalStatus, CleanupOperationStatus.Passed, true, true);
             }
 
             Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, rolledBack with { Status = Task6ExperimentStatus.Completed });

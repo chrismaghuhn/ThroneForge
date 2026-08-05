@@ -152,6 +152,92 @@ public sealed class LifecycleRecoveryTests
         }
     }
 
+    [Fact]
+    public void RecoveryWithoutDeployedPluginKeepsRemovalNotRequiredWhenRollbackFails()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var roots = CreateRoots(root);
+            Directory.CreateDirectory(roots.RepositoryRoot);
+            Directory.CreateDirectory(roots.OriginalGameRoot);
+            Directory.CreateDirectory(roots.CleanGameRoot);
+            var originalManifest = InstallationCopyService.CaptureManifest(roots.OriginalGameRoot);
+            var loaderFile = Path.Combine(roots.CleanGameRoot, "BepInEx", "core.dll");
+            Directory.CreateDirectory(Path.GetDirectoryName(loaderFile)!);
+            File.WriteAllText(loaderFile, "loader");
+            var appliedManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+            DisposableProfileBaselineService.Save(
+                LoaderSmokeTestStatePaths.GetBaselinePath(roots),
+                new DisposableProfileBaseline(
+                    DisposableProfileBaselineService.SchemaVersion,
+                    DisposableProfileBaselineService.TaskVersion,
+                    Fingerprint,
+                    originalManifest,
+                    originalManifest));
+
+            var transaction = new LoaderTransactionState(
+                LoaderTransactionStateService.SchemaVersion,
+                LoaderTransactionStateService.TaskVersion,
+                Fingerprint,
+                InstallationCopyService.ComputeManifestIdentity(originalManifest),
+                "BepInEx_win_x64_5.4.23.5.zip",
+                new string('a', 64),
+                LoaderTransactionStatus.RollbackRequired,
+                appliedManifest,
+                [new TransactionEntry(
+                    "BepInEx/core.dll",
+                    TransactionChangeKind.NewFile,
+                    null,
+                    appliedManifest.Files.Single(file => file.RelativePath == "BepInEx/core.dll").Sha256,
+                    null)],
+                [],
+                [],
+                null);
+            LoaderTransactionStateService.SaveAtomic(
+                LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
+                transaction);
+            Task6ExperimentStateService.SaveAtomic(
+                roots.ExperimentRoot,
+                new Task6ExperimentState(
+                    Task6ExperimentStateService.SchemaVersion,
+                    Task6ExperimentStateService.TaskVersion,
+                    Fingerprint,
+                    Guid.NewGuid().ToString("N"),
+                    RepositoryCommit,
+                    Task6ExperimentStateService.CleanGameRelativePath,
+                    Task6ExperimentStatus.Failed,
+                    LoaderTransactionStatus: LoaderTransactionStatus.RollbackRequired.ToString()));
+
+            var result = LifecycleExperimentRecoveryService.Rollback(new LifecycleExperimentRecoveryOptions(
+                roots.RepositoryRoot,
+                roots.OriginalGameRoot,
+                roots.ExperimentRoot,
+                Fingerprint,
+                Path.Combine(root, "missing-BepInEx.zip"),
+                new string('a', 64),
+                RollbackRunner: _ => new SmokeTestExecutionResult(
+                    SmokeTestOutcome.Failed,
+                    "synthetic-loader-rollback-failure",
+                    null,
+                    Fingerprint,
+                    Fingerprint,
+                    true,
+                    false)));
+
+            Assert.Equal("Failed", result.OverallResult);
+            Assert.Equal(CleanupOperationStatus.NotRequired, result.PluginRemovalStatus);
+            Assert.Equal(CleanupOperationStatus.Failed, result.LoaderRollbackStatus);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private static string CreateRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "throneforge-task7-recovery", Guid.NewGuid().ToString("N"));

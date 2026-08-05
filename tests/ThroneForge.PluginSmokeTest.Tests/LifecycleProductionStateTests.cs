@@ -161,6 +161,53 @@ public sealed class LifecycleProductionStateTests
         }
     }
 
+    [Fact]
+    public void ProductionBaselineManualClosureRequiresNoLoaderCleanupRoute()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "throneforge-task7-production-baseline-recovery", Guid.NewGuid().ToString("N"));
+        var repository = Path.Combine(root, "repository");
+        var original = Path.Combine(root, "original");
+        var experiment = Path.Combine(root, "experiment");
+        Directory.CreateDirectory(repository);
+        Directory.CreateDirectory(original);
+        var unity = Path.Combine(original, "Thronefall_Data", "Managed", "UnityEngine.CoreModule.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(unity)!);
+        File.WriteAllBytes(unity, [0]);
+        var options = CreateOptions(repository, original, experiment, unity, _ =>
+            new SmokeTestExecutionResult(
+                SmokeTestOutcome.Inconclusive,
+                LifecycleExperimentFailureCategories.ManualClosureRequired,
+                null,
+                Fingerprint,
+                null,
+                true,
+                false,
+                LaunchObservation: new LaunchObservationResult(true, true, false, null, true, true, TimeSpan.Zero, LifecycleExperimentFailureCategories.ManualClosureRequired)));
+
+        try
+        {
+            var operations = new LifecycleExperimentProductionOperations(options);
+            var context = new LifecycleExperimentContext(experiment, Guid.NewGuid().ToString("N"), Fingerprint, RepositoryCommit);
+            Assert.True(operations.EnsureOwnership(context).Succeeded);
+            var recovery = operations.PersistManualClosureRecovery(context);
+
+            Assert.True(recovery.Succeeded);
+            Assert.True(recovery.MarkerPersisted);
+            Assert.Equal("no-loader-cleanup-required", recovery.RecoveryAction);
+            Assert.Null(recovery.RollbackCommand);
+            var ownership = Task6ExperimentStateService.LoadAndValidate(experiment, Fingerprint);
+            Assert.Equal(Task6ExperimentStatus.ManualClosureRequired, ownership.Status);
+            Assert.Equal("NotApplied", ownership.LoaderTransactionStatus);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private static LifecycleExperimentProductionOptions CreateOptions(
         string repository,
         string original,

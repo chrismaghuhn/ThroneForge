@@ -124,7 +124,8 @@ public sealed record RecoveryEvidence(
     bool Succeeded,
     bool MarkerPersisted,
     string? FailureCategory = null,
-    string? RollbackCommand = null)
+    string? RollbackCommand = null,
+    string? RecoveryAction = null)
     : LifecycleStageEvidence(Succeeded, FailureCategory, ProcessActive: true);
 
 public interface ILifecycleExperimentOperations
@@ -189,7 +190,8 @@ public sealed record LifecycleExperimentResult(
     bool PluginDeployed = false,
     bool ProcessActive = false,
     CleanupOperationStatus? PluginRemovalStatus = null,
-    CleanupOperationStatus? LoaderRollbackStatus = null);
+    CleanupOperationStatus? LoaderRollbackStatus = null,
+    string? RecoveryAction = null);
 
 /// <summary>
 /// The single repository and private-experiment owner of Task 7 stage execution.
@@ -621,6 +623,7 @@ public sealed class LifecycleExperimentOrchestrator
         public bool? RecoveryMarkerPersisted { get; private set; }
         public string? RecoveryMarkerFailureCategory { get; private set; }
         public string? RollbackCommand { get; private set; }
+        public string? RecoveryAction { get; private set; }
         public bool LoaderApplied { get; private set; }
         public bool PluginDeployed { get; private set; }
         public bool ProcessActive { get; private set; }
@@ -706,6 +709,7 @@ public sealed class LifecycleExperimentOrchestrator
                 RecoveryMarkerPersisted = recovery.MarkerPersisted;
                 RecoveryMarkerFailureCategory = recovery.FailureCategory;
                 RollbackCommand = recovery.RollbackCommand;
+                RecoveryAction = recovery.RecoveryAction;
             }
         }
 
@@ -757,7 +761,8 @@ public sealed class LifecycleExperimentOrchestrator
                 PluginDeployed,
                 ProcessActive,
                 PluginRemovalStatus,
-                LoaderRollbackStatus);
+                LoaderRollbackStatus,
+                RecoveryAction);
     }
 
     private static bool RelativePathsEqual(string left, string right)
