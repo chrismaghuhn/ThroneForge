@@ -33,6 +33,7 @@ public static class LifecycleExperimentFailureCategories
     public const string StageOperationMissing = "stage-operation-missing";
     public const string StageStatePersistenceFailed = "stage-state-persistence-failed";
     public const string OriginalPreflightFailed = "original-preflight-failed";
+    public const string ExecutableBindingMismatch = "executable-binding-mismatch";
     public const string DisposablePrepareFailed = "disposable-prepare-failed";
     public const string BaselineLaunchFailed = "baseline-launch-failed";
     public const string LoaderInstallFailed = "loader-install-failed";
@@ -72,7 +73,7 @@ public static class LifecycleExperimentFailureCategories
     public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
         InProgress, StageCompleted, StageOperationMissing, StageStatePersistenceFailed,
-        OriginalPreflightFailed, DisposablePrepareFailed, BaselineLaunchFailed,
+        OriginalPreflightFailed, ExecutableBindingMismatch, DisposablePrepareFailed, BaselineLaunchFailed,
         LoaderInstallFailed, LoaderTransactionMissing, LoaderLaunchFailed, LoaderVerifyFailed,
         UnityMetadataPreflightFailed, PackageBuildFailed, PackageCaptureFailed, AdmissionFailed,
         DeploymentFailed, MetadataValidationFailed, DeploymentContextFailed, DeploymentWriteFailed,

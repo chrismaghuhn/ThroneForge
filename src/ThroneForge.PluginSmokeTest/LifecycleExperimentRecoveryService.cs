@@ -63,7 +63,7 @@ public static class LifecycleExperimentRecoveryService
                 }
 
                 if (ownership.LoaderOnlyManifest is null
-                    || !InstallationCopyService.CompareManifests(
+                    || !LoaderOnlyProfileVerificationService.Compare(
                         ownership.LoaderOnlyManifest,
                         InstallationCopyService.CaptureManifest(roots.CleanGameRoot)).Matches)
                 {

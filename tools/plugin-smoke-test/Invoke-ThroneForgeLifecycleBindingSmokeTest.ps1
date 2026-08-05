@@ -1,15 +1,16 @@
 [CmdletBinding()]
 param(
+    [ValidateSet('Full', 'Rollback')]
+    [string]$Mode = 'Full',
     [Parameter(Mandatory = $true)] [string]$GamePath,
     [Parameter(Mandatory = $true)] [string]$ExperimentRoot,
     [Parameter(Mandatory = $true)] [string]$BepInExArchive,
     [Parameter(Mandatory = $true)] [string]$ExpectedFingerprint,
     [Parameter(Mandatory = $true)] [string]$ExpectedBepInExDigest,
-    [Parameter(Mandatory = $true)] [string]$PackageRoot,
-    [Parameter(Mandatory = $true)] [string]$ManifestPath,
-    [Parameter(Mandatory = $true)] [string]$UnityAssemblyPath,
-    [Parameter(Mandatory = $true)] [string]$ExecutableRelativePath,
-    [Parameter(Mandatory = $true)] [string]$RepositoryBaselineCommit,
+    [string]$PackageRoot,
+    [string]$ManifestPath,
+    [string]$UnityAssemblyPath,
+    [string]$ExecutableRelativePath,
     [string]$Nonce
 )
 
@@ -25,12 +26,30 @@ function Require-AbsolutePath([string]$PathValue, [string]$Label) {
 foreach ($item in @(
     @($GamePath, 'GamePath'),
     @($ExperimentRoot, 'ExperimentRoot'),
-    @($BepInExArchive, 'BepInExArchive'),
-    @($PackageRoot, 'PackageRoot'),
-    @($ManifestPath, 'ManifestPath'),
-    @($UnityAssemblyPath, 'UnityAssemblyPath')
+    @($BepInExArchive, 'BepInExArchive')
 )) {
     Require-AbsolutePath $item[0] $item[1]
+}
+
+if ($Mode -eq 'Full') {
+    foreach ($item in @(
+        @($PackageRoot, 'PackageRoot'),
+        @($ManifestPath, 'ManifestPath'),
+        @($UnityAssemblyPath, 'UnityAssemblyPath'),
+        @($ExecutableRelativePath, 'ExecutableRelativePath')
+    )) {
+        if ([string]::IsNullOrWhiteSpace($item[0])) {
+            throw "$($item[1]) is required in Full mode."
+        }
+        if ($item[1] -ne 'ExecutableRelativePath') {
+            Require-AbsolutePath $item[0] $item[1]
+        }
+    }
+}
+
+$repositoryCommit = ((& git -C $repositoryRoot rev-parse HEAD 2>$null) | Out-String).Trim()
+if ($repositoryCommit -notmatch '^[0-9a-fA-F]{40}$') {
+    throw 'The repository HEAD is not a valid 40-character commit SHA.'
 }
 
 $dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
@@ -38,22 +57,27 @@ if ($null -eq $dotnetCommand) {
     throw 'The .NET SDK executable could not be located.'
 }
 
+$operation = if ($Mode -eq 'Rollback') { 'rollback-lifecycle-experiment' } else { 'run-lifecycle-experiment' }
 $arguments = @(
     'run', '--project', (Join-Path $repositoryRoot 'src\ThroneForge.PluginSmokeTest'),
-    '-c', 'Release', '--no-build', '--', 'run-lifecycle-experiment',
+    '-c', 'Release', '--no-build', '--', $operation,
     '--repository-root', $repositoryRoot,
     '--original-game', $GamePath,
     '--experiment-root', $ExperimentRoot,
     '--expected-fingerprint', $ExpectedFingerprint,
     '--bepinex-archive', $BepInExArchive,
     '--official-digest', $ExpectedBepInExDigest,
-    '--package-root', $PackageRoot,
-    '--manifest-path', $ManifestPath,
-    '--unity-assembly', $UnityAssemblyPath,
-    '--executable-relative-path', $ExecutableRelativePath,
-    '--repository-baseline-commit', $RepositoryBaselineCommit,
     '--dotnet-path', $dotnetCommand.Source
 )
+if ($Mode -eq 'Full') {
+    $arguments += @(
+        '--package-root', $PackageRoot,
+        '--manifest-path', $ManifestPath,
+        '--unity-assembly', $UnityAssemblyPath,
+        '--executable-relative-path', $ExecutableRelativePath,
+        '--repository-baseline-commit', $repositoryCommit
+    )
+}
 if (-not [string]::IsNullOrWhiteSpace($Nonce)) {
     $arguments += @('--nonce', $Nonce)
 }

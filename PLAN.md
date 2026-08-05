@@ -62,6 +62,16 @@ The production-path correction head `39120f1abe4138d3ea0ef6b1842f4a89c66ac079` p
 
 Current correction implementation adds a real C#-owned package-build boundary, Task-6 ownership creation before preparation, side-effect-preserving evidence application, typed manual-closure recovery/rollback, owned package and Unity metadata path validation, and independent cleanup/postcheck evidence. The private experiment remains forbidden in this correction. The checklist stays open until the new hosted validation has passed and every TRX artifact has been inspected.
 
+### Task-7 loader-only cleanup and recovery correction
+
+- [x] Add one shared loader-only manifest comparator that permits content changes only for the same recognized BepInEx log path while requiring exact paths, directories, and all nonvolatile hashes.
+- [x] Use that comparator in normal plugin removal and C# manual recovery; retain exact disposable-baseline verification after loader rollback.
+- [x] Add an executable `Rollback` wrapper mode for the C# `rollback-lifecycle-experiment` operation without reintroducing PowerShell cleanup logic.
+- [x] Bind the discovered selected executable to the explicitly supplied executable-relative path and derive the repository baseline commit from `git rev-parse HEAD`.
+- [ ] Run the repository validation and exact-SDK hosted matrix, inspect every TRX artifact, and report readiness for one separately authorized private verification.
+
+This correction performs repository-only work. No private lifecycle run is authorized or performed here; the two historical failed attempts remain unchanged.
+
 ### M2 - Contracts, schemas, validation, and fixtures
 
 Implement portable value objects, manifests, validation issues, schema registry, manifest/wave/configuration schemas, migrations, catalogs, and valid/invalid fixtures. Make Studio, CLI, packaging, runtime, and tests consume one validation facade. Add deterministic serialization and stable error/path coverage.

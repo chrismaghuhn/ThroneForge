@@ -246,9 +246,9 @@ public static class Task6ExperimentStateService
 
     private static void ValidateRepositoryCommit(string value)
     {
-        if (string.IsNullOrWhiteSpace(value) || value.Length > 64 || value.Any(character => char.IsControl(character) || char.IsWhiteSpace(character) || character is '/' or '\\' or ':'))
+        if (string.IsNullOrWhiteSpace(value) || value.Length != 40 || value.Any(character => !Uri.IsHexDigit(character)))
         {
-            throw new PluginSmokeException("The Task-6 repository baseline identifier is invalid.");
+            throw new PluginSmokeException("The Task-6 repository baseline commit must be a 40-character hexadecimal SHA-1.");
         }
     }
 

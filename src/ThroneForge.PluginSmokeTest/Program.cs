@@ -282,7 +282,8 @@ public static class PluginSmokeCli
             experimentId,
             expectedFingerprint,
             operation,
-            repositoryBaselineCommit).Run();
+            repositoryBaselineCommit,
+            Value(args, "--executable-relative-path")).Run();
         var reportPath = new LifecycleExperimentReportWriter(repositoryRoot, expectedFingerprint).Write(result);
 
         stdout.WriteLine($"result={result.OverallResult}");
@@ -295,6 +296,8 @@ public static class PluginSmokeCli
         stdout.WriteLine($"stage-state-persisted={result.StageStatePersisted}");
         stdout.WriteLine($"package-sha256={result.PackageSha256 ?? "not-observed"}");
         stdout.WriteLine($"binding-digest={result.AdmissionBindingDigest ?? "not-observed"}");
+        stdout.WriteLine($"recovery-marker-persisted={result.RecoveryMarkerPersisted?.ToString() ?? "not-observed"}");
+        stdout.WriteLine($"rollback-operation={result.RollbackCommand ?? "not-observed"}");
         stdout.WriteLine($"report={Path.GetFileName(reportPath)}");
         return result.OverallResult == "Passed" ? 0 : 1;
     }

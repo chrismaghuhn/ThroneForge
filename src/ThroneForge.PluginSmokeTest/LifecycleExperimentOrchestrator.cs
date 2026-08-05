@@ -4,7 +4,8 @@ public sealed record LifecycleExperimentContext(
     string ExperimentRoot,
     string ExperimentId,
     string ExpectedFingerprint,
-    string RepositoryBaselineCommit);
+    string RepositoryBaselineCommit,
+    string? ExpectedExecutableRelativePath = null);
 
 public record LifecycleStageEvidence(
     bool Succeeded,
@@ -191,6 +192,7 @@ public sealed class LifecycleExperimentOrchestrator
     private readonly string experimentId;
     private readonly string expectedFingerprint;
     private readonly string repositoryBaselineCommit;
+    private readonly string? expectedExecutableRelativePath;
     private readonly ILifecycleExperimentOperations operations;
 
     public LifecycleExperimentOrchestrator(
@@ -198,18 +200,20 @@ public sealed class LifecycleExperimentOrchestrator
         string experimentId,
         string expectedFingerprint,
         ILifecycleExperimentOperations operations,
-        string repositoryBaselineCommit = "test-baseline")
+        string repositoryBaselineCommit = "0000000000000000000000000000000000000000",
+        string? expectedExecutableRelativePath = null)
     {
         this.experimentRoot = experimentRoot;
         this.experimentId = experimentId;
         this.expectedFingerprint = expectedFingerprint;
         this.repositoryBaselineCommit = repositoryBaselineCommit;
+        this.expectedExecutableRelativePath = expectedExecutableRelativePath;
         this.operations = operations ?? throw new ArgumentNullException(nameof(operations));
     }
 
     public LifecycleExperimentResult Run()
     {
-        var context = new LifecycleExperimentContext(experimentRoot, experimentId, expectedFingerprint, repositoryBaselineCommit);
+        var context = new LifecycleExperimentContext(experimentRoot, experimentId, expectedFingerprint, repositoryBaselineCommit, expectedExecutableRelativePath);
         var accumulator = new LifecycleEvidenceAccumulator();
         var currentStage = RequiredStages[0];
         LifecycleExperimentStage? lastCompleted = null;
@@ -397,6 +401,8 @@ public sealed class LifecycleExperimentOrchestrator
         {
             case LifecycleExperimentStage.OriginalPreflight when evidence is OriginalPreflightEvidence preflight:
                 return !string.IsNullOrWhiteSpace(preflight.SelectedExecutableRelativePath)
+                    && (context.ExpectedExecutableRelativePath is null
+                        || RelativePathsEqual(preflight.SelectedExecutableRelativePath, context.ExpectedExecutableRelativePath))
                     && string.Equals(preflight.Fingerprint, context.ExpectedFingerprint, StringComparison.OrdinalIgnoreCase)
                     && preflight.RuntimeReady == true
                     && preflight.LoaderIndicatorsAbsent == true;
@@ -702,6 +708,12 @@ public sealed class LifecycleExperimentOrchestrator
                 PluginDeployed,
                 ProcessActive);
     }
+
+    private static bool RelativePathsEqual(string left, string right)
+        => string.Equals(
+            left.Replace('\\', '/'),
+            right.Replace('\\', '/'),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 }
 
 internal static class LifecycleStageListExtensions

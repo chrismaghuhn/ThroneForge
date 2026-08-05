@@ -59,6 +59,28 @@ public sealed class LifecycleOrchestrationTests
     }
 
     [Fact]
+    public void SuppliedExecutableBindingMustMatchDiscoveredEvidence()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                Guid.NewGuid().ToString("N"),
+                Fingerprint,
+                new SuccessfulLifecycleOperations(),
+                expectedExecutableRelativePath: "other/Thronefall.exe").Run();
+
+            Assert.Equal(LifecycleExperimentStage.OriginalPreflight, result.PrimaryFailedStage);
+            Assert.Equal(LifecycleExperimentFailureCategories.OriginalPreflightFailed, result.PrimaryFailureCategory);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void PrimaryFailureSurvivesCleanupAndPostchecks()
     {
         var root = CreateRoot();

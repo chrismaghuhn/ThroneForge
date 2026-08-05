@@ -351,7 +351,7 @@ public sealed class PluginSmokeDomainTests
             var state = Task6ExperimentStateService.CreatePrepared(
                 root,
                 Fingerprint.Value,
-                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+                "0123456789abcdef0123456789abcdef01234567");
             Task6ExperimentStateService.SaveAtomic(root, state);
 
             var loaded = Task6ExperimentStateService.LoadAndValidate(root, Fingerprint.Value);

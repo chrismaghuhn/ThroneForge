@@ -116,7 +116,7 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
                 PluginRelativeRoot = recovery.PluginRelativeRoot,
                 LoaderTransactionStatus = recovery.LoaderTransactionStatus
             });
-            return new(true, true, RollbackCommand: "rollback-lifecycle-experiment --owned-experiment");
+            return new(true, true, RollbackCommand: "rollback-lifecycle-experiment");
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
@@ -156,6 +156,17 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
             originalManifest = InstallationCopyService.CaptureManifest(roots.OriginalGameRoot);
             var result = InspectRuntime(roots.OriginalGameRoot, "original-preflight");
             selectedExecutableRelativePath = result.SelectedExecutableRelativePath;
+            if (!RelativePathsEqual(result.SelectedExecutableRelativePath, options.ExecutableRelativePath))
+            {
+                return new(
+                    false,
+                    result.SelectedExecutableRelativePath,
+                    result.GameFingerprint,
+                    result.IsReadyForReversibleTest,
+                    result.LoaderIndicatorsAbsent,
+                    LifecycleExperimentFailureCategories.ExecutableBindingMismatch);
+            }
+
             return new(
                 result.IsReadyForReversibleTest,
                 result.SelectedExecutableRelativePath,
@@ -556,7 +567,7 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
             var pluginPath = Path.Combine(roots.CleanGameRoot, "BepInEx", "plugins", LifecyclePluginPackageService.PluginGuid);
             var removal = !Directory.Exists(pluginPath);
             var expectedLoaderOnly = loaderOnlyManifest ?? ownership.LoaderOnlyManifest;
-            var loaderOnly = expectedLoaderOnly is not null && InstallationCopyService.CompareManifests(expectedLoaderOnly, InstallationCopyService.CaptureManifest(roots.CleanGameRoot)).Matches;
+            var loaderOnly = expectedLoaderOnly is not null && LoaderOnlyProfileVerificationService.Compare(expectedLoaderOnly, InstallationCopyService.CaptureManifest(roots.CleanGameRoot)).Matches;
             if (!removal || !loaderOnly)
             {
                 return new(false, LifecycleExperimentFailureCategories.PluginRemovalFailed, removal, loaderOnly);
@@ -730,6 +741,13 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
             return true;
         }
     }
+
+    private static bool RelativePathsEqual(string? left, string right)
+        => left is not null
+            && string.Equals(
+                left.Replace('\\', '/'),
+                right.Replace('\\', '/'),
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
     private static bool IsSanitizedExternalFailure(Exception exception)
         => exception is PluginSmokeException

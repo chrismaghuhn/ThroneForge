@@ -6,6 +6,7 @@ namespace ThroneForge.PluginSmokeTest.Tests;
 public sealed class LifecycleOrchestratorBoundaryTests
 {
     private const string Fingerprint = "1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d";
+    private const string RepositoryCommit = "0123456789abcdef0123456789abcdef01234567";
 
     [Fact]
     public void ReportWriterDerivesClaimsFromResultAndRedactsAbsoluteValues()
@@ -90,7 +91,7 @@ public sealed class LifecycleOrchestratorBoundaryTests
                 "--manifest-path", Path.Combine(experimentRoot, "package-manifest.json"),
                 "--unity-assembly", unityPath,
                 "--executable-relative-path", "Thronefall.exe",
-                "--repository-baseline-commit", "test-baseline"
+                "--repository-baseline-commit", RepositoryCommit
             ], stdout, stderr);
 
             Assert.Equal(1, exitCode);
@@ -115,7 +116,7 @@ public sealed class LifecycleOrchestratorBoundaryTests
         Directory.CreateDirectory(root);
         try
         {
-            var owner = Task6ExperimentStateService.CreatePrepared(root, Fingerprint, "test-baseline");
+            var owner = Task6ExperimentStateService.CreatePrepared(root, Fingerprint, RepositoryCommit);
             Task6ExperimentStateService.SaveAtomic(root, owner);
 
             var result = new LifecycleExperimentOrchestrator(
@@ -149,6 +150,10 @@ public sealed class LifecycleOrchestratorBoundaryTests
         Assert.DoesNotContain("Fail-CurrentStage", script, StringComparison.Ordinal);
         Assert.DoesNotContain("admit-and-deploy", script, StringComparison.Ordinal);
         Assert.DoesNotContain("lifecycle-binding.md", script, StringComparison.Ordinal);
+        Assert.Contains("git -C", script, StringComparison.Ordinal);
+        Assert.Contains("rollback-lifecycle-experiment", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("Remove-Item", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("$RepositoryBaselineCommit", script, StringComparison.Ordinal);
     }
 
     private sealed class OwnershipRejectingOperations : ILifecycleExperimentOperations
