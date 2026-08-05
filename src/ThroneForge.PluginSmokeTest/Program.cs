@@ -39,6 +39,11 @@ public static class PluginSmokeCli
                 _ => throw new PluginSmokeException("The requested plugin smoke-test operation is unsupported.")
             };
         }
+        catch (PluginSmokeStateException exception)
+        {
+            stderr.WriteLine($"Plugin smoke test failed: state-failure-category={exception.FailureCategory}.");
+            return 2;
+        }
         catch (PluginSmokeException exception)
         {
             stderr.WriteLine($"Plugin smoke test failed: {exception.Message}");

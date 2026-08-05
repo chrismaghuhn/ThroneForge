@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using ThroneForge.Contracts;
+using ThroneForge.Discovery;
 using ThroneForge.LoaderSmokeTest;
 using Xunit;
 
@@ -201,7 +202,7 @@ public sealed class PluginSmokeDomainTests
                 Fingerprint,
                 "throneforge.adapter",
                 "1.0.0");
-            Assert.Throws<PluginSmokeException>(() => PluginDeploymentService.DeriveContext(
+            Assert.ThrowsAny<PluginSmokeException>(() => PluginDeploymentService.DeriveContext(
                 original,
                 Path.Combine(experiment, "clean-game"),
                 experiment,
@@ -217,6 +218,128 @@ public sealed class PluginSmokeDomainTests
                 Directory.Delete(root, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public void DeriveContextUsesTheCanonicalBaselineAndDisposableManifestBinding()
+    {
+        using var fixture = DeploymentStateFixture.Create();
+
+        var context = PluginDeploymentService.DeriveContext(
+            fixture.Roots.OriginalGameRoot,
+            fixture.Roots.CleanGameRoot,
+            fixture.Roots.ExperimentRoot,
+            fixture.Roots.RepositoryRoot,
+            fixture.ExpectedFingerprint,
+            fixture.Binding);
+
+        Assert.True(InstallationCopyService.CompareManifests(
+            fixture.Baseline.DisposableManifest,
+            context.Baseline.DisposableManifest).Matches);
+        Assert.Equal(
+            InstallationCopyService.ComputeManifestIdentity(fixture.Baseline.DisposableManifest),
+            context.LoaderTransaction.BaselineManifestIdentity);
+        Assert.True(InstallationCopyService.CompareManifests(
+            fixture.CurrentManifest,
+            context.PreDeploymentManifest).Matches);
+        Assert.DoesNotContain(
+            Directory.EnumerateFiles(fixture.Roots.CleanGameRoot, "*", SearchOption.AllDirectories),
+            path => path.Contains("plugins", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void LegacyBaselinePathIsNotAcceptedAsTheCanonicalBaseline()
+    {
+        using var fixture = DeploymentStateFixture.Create();
+        File.Delete(LoaderSmokeTestStatePaths.GetBaselinePath(fixture.Roots));
+        File.WriteAllText(Path.Combine(fixture.Roots.ManifestsRoot, "baseline.json"), "legacy");
+
+        var exception = Assert.Throws<PluginSmokeStateException>(() => PluginDeploymentService.DeriveContext(
+            fixture.Roots.OriginalGameRoot,
+            fixture.Roots.CleanGameRoot,
+            fixture.Roots.ExperimentRoot,
+            fixture.Roots.RepositoryRoot,
+            fixture.ExpectedFingerprint,
+            fixture.Binding));
+
+        Assert.Equal("baseline-state-missing", exception.FailureCategory);
+        Assert.DoesNotContain(Path.GetFullPath(fixture.Root), exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MismatchedDisposableBaselineIsRejectedWithStableCategory()
+    {
+        using var fixture = DeploymentStateFixture.Create();
+        var mismatched = fixture.Baseline with
+        {
+            OriginalManifest = new CopyManifest([new FileManifestEntry("different.txt", 1, Digest("different").Value)], [])
+        };
+        DisposableProfileBaselineService.Save(LoaderSmokeTestStatePaths.GetBaselinePath(fixture.Roots), mismatched);
+
+        var exception = Assert.Throws<PluginSmokeStateException>(() => PluginDeploymentService.DeriveContext(
+            fixture.Roots.OriginalGameRoot,
+            fixture.Roots.CleanGameRoot,
+            fixture.Roots.ExperimentRoot,
+            fixture.Roots.RepositoryRoot,
+            fixture.ExpectedFingerprint,
+            fixture.Binding));
+
+        Assert.Equal("baseline-state-mismatch", exception.FailureCategory);
+    }
+
+    [Fact]
+    public void TransactionBoundToAnotherDisposableBaselineIsRejectedWithStableCategory()
+    {
+        using var fixture = DeploymentStateFixture.Create();
+        var mismatched = fixture.Transaction with
+        {
+            BaselineManifestIdentity = new string('b', 64)
+        };
+        LoaderTransactionStateService.SaveAtomic(LoaderSmokeTestStatePaths.GetTransactionStatePath(fixture.Roots), mismatched);
+
+        var exception = Assert.Throws<PluginSmokeStateException>(() => PluginDeploymentService.DeriveContext(
+            fixture.Roots.OriginalGameRoot,
+            fixture.Roots.CleanGameRoot,
+            fixture.Roots.ExperimentRoot,
+            fixture.Roots.RepositoryRoot,
+            fixture.ExpectedFingerprint,
+            fixture.Binding));
+
+        Assert.Equal("transaction-state-mismatch", exception.FailureCategory);
+    }
+
+    [Fact]
+    public void MissingCanonicalTransactionStateIsRejectedWithStableCategory()
+    {
+        using var fixture = DeploymentStateFixture.Create();
+        File.Delete(LoaderSmokeTestStatePaths.GetTransactionStatePath(fixture.Roots));
+
+        var exception = Assert.Throws<PluginSmokeStateException>(() => PluginDeploymentService.DeriveContext(
+            fixture.Roots.OriginalGameRoot,
+            fixture.Roots.CleanGameRoot,
+            fixture.Roots.ExperimentRoot,
+            fixture.Roots.RepositoryRoot,
+            fixture.ExpectedFingerprint,
+            fixture.Binding));
+
+        Assert.Equal("transaction-state-missing", exception.FailureCategory);
+    }
+
+    [Fact]
+    public void AppliedProfileDriftIsRejectedWithStableCategory()
+    {
+        using var fixture = DeploymentStateFixture.Create();
+        File.AppendAllText(Path.Combine(fixture.Roots.CleanGameRoot, "BepInEx", "core.dll"), "drift");
+
+        var exception = Assert.Throws<PluginSmokeStateException>(() => PluginDeploymentService.DeriveContext(
+            fixture.Roots.OriginalGameRoot,
+            fixture.Roots.CleanGameRoot,
+            fixture.Roots.ExperimentRoot,
+            fixture.Roots.RepositoryRoot,
+            fixture.ExpectedFingerprint,
+            fixture.Binding));
+
+        Assert.Equal("applied-profile-drift", exception.FailureCategory);
     }
 
     [Fact]
@@ -419,6 +542,114 @@ public sealed class PluginSmokeDomainTests
 
     private static Sha256Digest Digest(string text)
         => new(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant());
+
+    private sealed class DeploymentStateFixture : IDisposable
+    {
+        private DeploymentStateFixture(
+            string root,
+            SmokeTestRoots roots,
+            string expectedFingerprint,
+            DisposableProfileBaseline baseline,
+            LoaderTransactionState transaction,
+            CopyManifest currentManifest,
+            CodeModAdmissionBinding binding)
+        {
+            Root = root;
+            Roots = roots;
+            ExpectedFingerprint = expectedFingerprint;
+            Baseline = baseline;
+            Transaction = transaction;
+            CurrentManifest = currentManifest;
+            Binding = binding;
+        }
+
+        public string Root { get; }
+        public SmokeTestRoots Roots { get; }
+        public string ExpectedFingerprint { get; }
+        public DisposableProfileBaseline Baseline { get; }
+        public LoaderTransactionState Transaction { get; }
+        public CopyManifest CurrentManifest { get; }
+        public CodeModAdmissionBinding Binding { get; }
+
+        public static DeploymentStateFixture Create()
+        {
+            var root = Path.Combine(Path.GetTempPath(), $"throneforge-task6-state-{Guid.NewGuid():N}");
+            var repository = Path.Combine(root, "repository");
+            var original = Path.Combine(root, "original");
+            Directory.CreateDirectory(repository);
+            Directory.CreateDirectory(original);
+            File.WriteAllText(Path.Combine(original, "game.txt"), "game");
+
+            var experiment = Path.Combine(root, "experiment");
+            var roots = SmokeTestPathValidator.ValidateRoots(repository, original, experiment);
+
+            var expectedFingerprint = InstallationFingerprintService.Capture(original).Fingerprint;
+            var ownership = Task6ExperimentStateService.CreatePrepared(
+                experiment,
+                expectedFingerprint,
+                new string('a', 40))
+            with
+            {
+                Status = Task6ExperimentStatus.LoaderApplied
+            };
+            Task6ExperimentStateService.SaveAtomic(experiment, ownership);
+
+            Directory.CreateDirectory(roots.CleanGameRoot);
+            File.Copy(Path.Combine(original, "game.txt"), Path.Combine(roots.CleanGameRoot, "game.txt"));
+
+            var originalManifest = InstallationCopyService.CaptureManifest(original);
+            var disposableManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+            var baseline = new DisposableProfileBaseline(
+                DisposableProfileBaselineService.SchemaVersion,
+                DisposableProfileBaselineService.TaskVersion,
+                expectedFingerprint,
+                originalManifest,
+                disposableManifest);
+            DisposableProfileBaselineService.Save(LoaderSmokeTestStatePaths.GetBaselinePath(roots), baseline);
+
+            var loaderBytes = Encoding.UTF8.GetBytes("synthetic-loader");
+            var loaderPath = Path.Combine(roots.CleanGameRoot, "BepInEx", "core.dll");
+            Directory.CreateDirectory(Path.GetDirectoryName(loaderPath)!);
+            File.WriteAllBytes(loaderPath, loaderBytes);
+            var currentManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+            var transaction = new LoaderTransactionState(
+                LoaderTransactionStateService.SchemaVersion,
+                LoaderTransactionStateService.TaskVersion,
+                expectedFingerprint,
+                InstallationCopyService.ComputeManifestIdentity(disposableManifest),
+                "BepInEx_win_x64_5.4.23.5.zip",
+                Digest("archive").Value,
+                LoaderTransactionStatus.LaunchObserved,
+                currentManifest,
+                [new TransactionEntry("BepInEx/core.dll", TransactionChangeKind.NewFile, null, Digest("synthetic-loader").Value, null)],
+                [],
+                [],
+                new LoaderBootstrapEvidence("5.4.23.5", true, true, 0, 0, 0, 0));
+            LoaderTransactionStateService.SaveAtomic(LoaderSmokeTestStatePaths.GetTransactionStatePath(roots), transaction);
+
+            return new DeploymentStateFixture(
+                root,
+                roots,
+                expectedFingerprint,
+                baseline,
+                transaction,
+                currentManifest,
+                new CodeModAdmissionBinding(
+                    new ModIdentity("dev.throneforge.m1.synthetic-smoke", "0.0.1"),
+                    Digest("package"),
+                    new GameFingerprint(expectedFingerprint),
+                    "throneforge.adapter",
+                    "1.0.0"));
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Root))
+            {
+                Directory.Delete(Root, recursive: true);
+            }
+        }
+    }
 
     private static string FindRepositoryRoot()
     {

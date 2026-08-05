@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is blocked after the final private deployment attempt on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; M1 Task 7 has not started.
+M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is in progress on `agent/m1-disposable-bepinex-plugin-smoke-test`; the previous private deployment stopped safely at a baseline-state path mismatch. M1 Task 7 has not started.
 
 ## Milestones
 
@@ -284,7 +284,7 @@ Task-2 merge evidence: PR #2 merged into `main` at `d3f1bb4fde9f77efbb84349f4403
 - [x] Add regression coverage for output protection, renamed installations, crash-handler ordering, ambiguous executables, CLI redaction, and report non-creation after rejected output.
 - [x] Correct status, plan, README, and changelog wording; run local and hosted validation without starting loader/runtime work.
 
-## M1 Task 6 hardening follow-up (blocked after private validation)
+## M1 Task 6 hardening follow-up (state-path correction in progress)
 
 - [x] Add an atomically persisted, fingerprint-bound Task-6 ownership record and reject unowned rollback/cleanup targets.
 - [x] Derive plugin-deployment preconditions from the owned disposable profile, loader transaction state, complete current manifest, process state, and empty custom-plugin root.
@@ -295,5 +295,8 @@ Task-2 merge evidence: PR #2 merged into `main` at `d3f1bb4fde9f77efbb84349f4403
 - [x] Add structured recovery-marker persistence and malformed-marker handling; do not claim recovery when the marker is unavailable.
 - [x] Run local validation with installed SDK 10.0.110, restore `global.json` to committed SDK 10.0.100, push the hardened branch, and inspect green hosted Windows/Linux CI with complete TRX artifact inspection.
 - [x] Perform the required fresh private attempt after hosted CI in an external profile. Package recapture and metadata validation passed, but `admit-and-deploy` rejected disposable-profile state before plugin files were written; rollback and original post-verification passed.
-- [ ] Diagnose the deployment-state rejection and obtain a separately approved follow-up private run; no further private run was performed in this task.
+- [ ] Centralize the canonical Task-3 baseline and transaction-state paths and use them from both the loader orchestrator and Task-6 deployment service.
+- [ ] Bind Task-6 loader-state validation to the saved disposable baseline manifest and expose stable sanitized state-gate failure categories.
+- [ ] Add positive real-service context-derivation coverage plus negative legacy/missing/mismatch state tests.
+- [ ] Perform exactly one fresh private follow-up only after exact-SDK hosted synthetic CI passes.
 - [x] Keep M1 Task 7 unstarted.

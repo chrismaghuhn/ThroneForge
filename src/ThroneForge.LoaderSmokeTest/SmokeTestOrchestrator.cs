@@ -32,7 +32,6 @@ public sealed record SmokeTestExecutionResult(
 public static class SmokeTestOrchestrator
 {
     private const string ExpectedArchiveName = "BepInEx_win_x64_5.4.23.5.zip";
-    private const string TransactionStateFileName = "transaction-state.json";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public static SmokeTestExecutionResult Run(
@@ -188,7 +187,7 @@ public static class SmokeTestOrchestrator
                 out var generatedDirectories);
 
             LoaderTransactionStateService.SaveAtomic(
-                TransactionStatePath(roots),
+                LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
                 state with
                 {
                     Status = status,
@@ -211,7 +210,7 @@ public static class SmokeTestOrchestrator
             try
             {
                 LoaderTransactionStateService.SaveAtomic(
-                    TransactionStatePath(roots),
+                    LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
                     state with
                     {
                         Status = LoaderTransactionStatus.RollbackRequired,
@@ -290,7 +289,7 @@ public static class SmokeTestOrchestrator
             GeneratedEvidenceFiles = generatedFiles,
             GeneratedEvidenceDirectories = generatedDirectories
         };
-        LoaderTransactionStateService.SaveAtomic(TransactionStatePath(roots), state);
+        LoaderTransactionStateService.SaveAtomic(LoaderSmokeTestStatePaths.GetTransactionStatePath(roots), state);
         var plan = new TransactionPlan(roots.ExtractedLoaderRoot, state.Entries);
         LoaderTransactionService.Rollback(roots, plan);
         var baseline = LoadBaseline(roots);
@@ -305,7 +304,7 @@ public static class SmokeTestOrchestrator
         {
             SmokeTestRecoveryMarkerService.Clear(Path.Combine(roots.ManifestsRoot, "recovery-marker.json"));
             LoaderTransactionStateService.SaveAtomic(
-                TransactionStatePath(roots),
+                LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
                 state with
                 {
                     Status = LoaderTransactionStatus.RolledBack,
@@ -338,7 +337,7 @@ public static class SmokeTestOrchestrator
             copyManifest = baseline.DisposableManifest;
             var current = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
             DisposableProfileBaselineService.LoadAndValidateResume(
-                BaselinePath(roots),
+                LoaderSmokeTestStatePaths.GetBaselinePath(roots),
                 request.ExpectedFingerprint,
                 preflight.OriginalManifest,
                 current,
@@ -486,13 +485,13 @@ public static class SmokeTestOrchestrator
             LoaderTransactionService.BuildExpectedAppliedManifest(baselineManifest, extracted),
             plan.Entries,
             []);
-        LoaderTransactionStateService.SaveAtomic(TransactionStatePath(roots), prepared);
+        LoaderTransactionStateService.SaveAtomic(LoaderSmokeTestStatePaths.GetTransactionStatePath(roots), prepared);
         try
         {
             LoaderTransactionService.Apply(roots, plan, extracted);
             LoaderTransactionStateService.VerifyAppliedProfile(roots, prepared);
             var applied = prepared with { Status = LoaderTransactionStatus.Applied };
-            LoaderTransactionStateService.SaveAtomic(TransactionStatePath(roots), applied);
+            LoaderTransactionStateService.SaveAtomic(LoaderSmokeTestStatePaths.GetTransactionStatePath(roots), applied);
             return (plan, applied);
         }
         catch (Exception exception)
@@ -510,7 +509,7 @@ public static class SmokeTestOrchestrator
             if (rollbackSucceeded)
             {
                 LoaderTransactionStateService.SaveAtomic(
-                    TransactionStatePath(roots),
+                    LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
                     prepared with { Status = LoaderTransactionStatus.FailedAndRolledBack });
             }
 
@@ -545,7 +544,7 @@ public static class SmokeTestOrchestrator
             if (restored)
             {
                 LoaderTransactionStateService.SaveAtomic(
-                    TransactionStatePath(roots),
+                    LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
                     state with
                     {
                         Status = LoaderTransactionStatus.RolledBack,
@@ -628,19 +627,13 @@ public static class SmokeTestOrchestrator
             confidenceMatches);
     }
 
-    private static string BaselinePath(SmokeTestRoots roots)
-        => Path.Combine(roots.ManifestsRoot, "baseline-copy-manifest.json");
-
-    private static string TransactionStatePath(SmokeTestRoots roots)
-        => Path.Combine(roots.ManifestsRoot, TransactionStateFileName);
-
     private static void SaveBaseline(
         SmokeTestRoots roots,
         string expectedFingerprint,
         CopyManifest originalManifest,
         CopyManifest disposableManifest)
         => DisposableProfileBaselineService.Save(
-            BaselinePath(roots),
+            LoaderSmokeTestStatePaths.GetBaselinePath(roots),
             new DisposableProfileBaseline(
                 DisposableProfileBaselineService.SchemaVersion,
                 DisposableProfileBaselineService.TaskVersion,
@@ -649,7 +642,7 @@ public static class SmokeTestOrchestrator
                 disposableManifest));
 
     private static DisposableProfileBaseline LoadBaseline(SmokeTestRoots roots)
-        => LoadJson<DisposableProfileBaseline>(BaselinePath(roots));
+        => LoadJson<DisposableProfileBaseline>(LoaderSmokeTestStatePaths.GetBaselinePath(roots));
 
     private static void EnsureTransactionCanBeReplaced(
         LoaderSmokeTestRequest request,
@@ -662,13 +655,13 @@ public static class SmokeTestOrchestrator
             throw new SmokeTestException("An unversioned loader transaction plan exists; it must be explicitly removed or rolled back before installation.");
         }
 
-        if (!File.Exists(TransactionStatePath(roots)))
+        if (!File.Exists(LoaderSmokeTestStatePaths.GetTransactionStatePath(roots)))
         {
             return;
         }
 
         var existing = LoaderTransactionStateService.LoadAndValidate(
-            TransactionStatePath(roots),
+            LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
             roots,
             request.ExpectedFingerprint,
             baselineManifest,
@@ -708,7 +701,7 @@ public static class SmokeTestOrchestrator
         SmokeTestRoots roots,
         Preflight preflight)
     {
-        if (!File.Exists(BaselinePath(roots)))
+        if (!File.Exists(LoaderSmokeTestStatePaths.GetBaselinePath(roots)))
         {
             throw new SmokeTestException("No schema-backed disposable baseline exists; run Prepare or a fresh Full mode first.");
         }
@@ -726,7 +719,7 @@ public static class SmokeTestOrchestrator
             runtimeRoot,
             OverwriteExisting: true));
         return DisposableProfileBaselineService.LoadAndValidateResume(
-            BaselinePath(roots),
+            LoaderSmokeTestStatePaths.GetBaselinePath(roots),
             request.ExpectedFingerprint,
             preflight.OriginalManifest,
             currentManifest,
@@ -741,7 +734,7 @@ public static class SmokeTestOrchestrator
         IEnumerable<LoaderTransactionStatus> allowedStatuses,
         bool verifyApplied = true)
     {
-        var baselinePath = BaselinePath(roots);
+        var baselinePath = LoaderSmokeTestStatePaths.GetBaselinePath(roots);
         if (!File.Exists(baselinePath))
         {
             throw new SmokeTestException("No schema-backed disposable baseline exists; run Prepare or a fresh Full mode first.");
@@ -757,13 +750,13 @@ public static class SmokeTestOrchestrator
             request.ExpectedFingerprint,
             preflight.OriginalManifest);
 
-        if (!File.Exists(TransactionStatePath(roots)))
+        if (!File.Exists(LoaderSmokeTestStatePaths.GetTransactionStatePath(roots)))
         {
             throw new SmokeTestException("No verified loader transaction exists for this staged mode.");
         }
 
         var state = LoaderTransactionStateService.LoadAndValidate(
-            TransactionStatePath(roots),
+            LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
             roots,
             request.ExpectedFingerprint,
             preflight.OriginalManifest,

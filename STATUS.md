@@ -2,7 +2,7 @@
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is blocked by the final private deployment attempt on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; M1 Task 7 has not started.
+M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is in progress on `agent/m1-disposable-bepinex-plugin-smoke-test`; the final private attempt exposed and safely stopped at a Task-3/Task-6 baseline-state path mismatch. The correction is implemented locally; M1 Task 7 has not started.
 
 ## State
 
@@ -12,7 +12,7 @@ The Task 4 bounded slice and hardening passed hosted validation before PR #4 mer
 
 Task 6 hardening adds an atomically owned experiment state, derived loader/profile preconditions, exact-byte three-file recapture and admission, transactional deployment rollback, full package metadata validation, runtime API/Contracts identity markers, public-surface parity checks, and owned cleanup/recovery paths. The earlier private run is `PassedWithWarnings` because it did not capture actual runtime identity evidence. The fresh `final15` attempt recaptured the package successfully but `admit-and-deploy` rejected the disposable profile state before writing plugin files; rollback and original post-verification passed. The exact deployment-state rejection remains unresolved.
 
-The current blocker is to diagnose and fix the deployment-state rejection without modifying the original installation. No further private run is authorized by this task; M1 Task 7 remains unstarted.
+The diagnosed mismatch was `baseline.json` in `PluginDeploymentService` versus the canonical `baseline-copy-manifest.json` written by the Task-3 orchestrator. The correction centralizes both Task-3 state paths and validates loader transactions against `baseline.DisposableManifest`. The previous private result remains `Failed`; a fresh private rerun is allowed only after the corrected branch passes hosted synthetic CI. M1 Task 7 remains unstarted.
 
 ## Completed
 
@@ -114,6 +114,14 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Hosted run [30995632643](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30995632643) validated commit `a35f579d68dc04085adf431ce8e1df6afa8f1de3`; Windows and Ubuntu each uploaded 13 TRX files representing 272 tests, with 0 failures/errors/skips and SDK `10.0.100`.
 - Final hosted validation run [30996981194](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30996981194) validated implementation/documentation head `a34d8327063ac6ff8d11e0e2fd76223223d1a531`; Windows and Ubuntu each uploaded 13 TRX files representing 272 tests, with 0 failures/errors/skips and SDK `10.0.100`. Both artifacts were downloaded and parsed independently.
 - Fresh private attempt: external profile `final15`, package recapture and metadata validation passed, but `admit-and-deploy` rejected disposable-profile state before writing plugin files. Loader rollback, disposable restoration, original complete-manifest equality, and original runtime post-verification passed. No plugin marker, runtime API/Contracts identity, or plugin deployment pass was claimed. No further private run was performed.
+
+### M1 Task 6 state-path correction
+
+- Added `LoaderSmokeTestStatePaths` as the single owner of `baseline-copy-manifest.json` and `transaction-state.json`; the loader orchestrator, plugin deployment service, and state tests use it.
+- `PluginDeploymentService.DeriveContext` now loads the canonical disposable baseline, validates the original manifest against it, and passes `baseline.DisposableManifest` to loader-transaction validation.
+- State-gate failures now expose sanitized stable categories including `baseline-state-missing`, `baseline-state-mismatch`, `transaction-state-missing`, `transaction-state-mismatch`, and `applied-profile-drift`; the CLI does not print paths or inner exception text.
+- Local validation with SDK `10.0.110`: locked restore PASS, format verification PASS, Release build PASS with 0 warnings/errors, full tests PASS with 279 tests, and focused PluginSmokeTest/LoaderSmokeTest suites PASS with 31/70 tests. The committed SDK selection remains `10.0.100`.
+- The corrected branch-head hosted CI and its TRX artifacts are still pending. No corrected private run has been performed yet.
 
 ## Unverified assumptions
 
@@ -217,7 +225,7 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 
 ## Next task
 
-The next task gate is current-head hosted Windows/Linux CI with exact SDK `10.0.100`, followed by inspection of every TRX artifact. Only then may the corrected private Task-6 run be executed once in a fresh external profile. M1 Task 7 remains unstarted.
+The next task gate is current-head hosted Windows/Linux CI with exact SDK `10.0.100`, followed by inspection of every TRX artifact. Only then may the corrected private Task-6 run be executed exactly once in a fresh external profile. M1 Task 7 remains unstarted.
 
 ### M1 Task 3 earlier hardening evidence
 

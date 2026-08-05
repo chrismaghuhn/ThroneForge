@@ -25,7 +25,9 @@ The historical private run remains limited evidence because its template emitted
 - [x] Enforce exact package shape, managed IL/no-native/no-PInvoke/no-module-initializer rules, expected BepInEx metadata, and one public plugin implementation.
 - [x] Emit runtime API/Contracts identities from actual loaded assemblies and compare them in the log parser.
 - [x] Add metadata-only public API/Contracts net10.0/netstandard2.1 parity checks and structured recovery-marker parsing.
-- [ ] Run current-head hosted CI, inspect every TRX artifact, then perform exactly one fresh private rerun and update the report with actual runtime identity and admit-and-deploy evidence.
+- [ ] Run corrected current-head hosted CI, inspect every TRX artifact, then perform exactly one fresh private rerun and update the report with actual runtime identity and admit-and-deploy evidence.
+- [x] Diagnose the deployment-state mismatch: the Task-6 service used legacy `baseline.json` while Task 3 writes `baseline-copy-manifest.json`; centralize both state paths and bind the transaction check to `baseline.DisposableManifest`.
+- [x] Add a positive real-service context-derivation test plus negative canonical-path and state-mismatch tests; expose sanitized state-gate failure categories.
 - [ ] Do not begin M1 Task 7.
 
 ## Planned repository surfaces

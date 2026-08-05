@@ -13,7 +13,7 @@ using ThroneForge.Runtime;
 
 namespace ThroneForge.PluginSmokeTest;
 
-public sealed class PluginSmokeException : Exception
+public class PluginSmokeException : Exception
 {
     public PluginSmokeException(string message)
         : base(message)
@@ -24,6 +24,37 @@ public sealed class PluginSmokeException : Exception
         : base(message, innerException)
     {
     }
+}
+
+public static class PluginSmokeStateFailureCategories
+{
+    public const string OwnershipStateInvalid = "ownership-state-invalid";
+    public const string BaselineStateMissing = "baseline-state-missing";
+    public const string BaselineStateMismatch = "baseline-state-mismatch";
+    public const string TransactionStateMissing = "transaction-state-missing";
+    public const string TransactionStateMismatch = "transaction-state-mismatch";
+    public const string AppliedProfileDrift = "applied-profile-drift";
+    public const string FingerprintMismatch = "fingerprint-mismatch";
+    public const string ExistingPlugin = "existing-plugin";
+    public const string ProcessActive = "process-active";
+    public const string BootstrapEvidenceInvalid = "bootstrap-evidence-invalid";
+}
+
+public sealed class PluginSmokeStateException : PluginSmokeException
+{
+    public PluginSmokeStateException(string failureCategory, string message)
+        : base(message)
+    {
+        FailureCategory = failureCategory;
+    }
+
+    public PluginSmokeStateException(string failureCategory, string message, Exception innerException)
+        : base(message, innerException)
+    {
+        FailureCategory = failureCategory;
+    }
+
+    public string FailureCategory { get; }
 }
 
 public enum PluginTargetFramework
@@ -585,52 +616,168 @@ public static class PluginDeploymentService
         }
         catch (SmokeTestException exception)
         {
-            throw new PluginSmokeException("The Task-6 deployment roots are not valid.", exception);
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.OwnershipStateInvalid,
+                "The Task-6 deployment ownership roots are not valid.",
+                exception);
         }
         if (!Path.GetFullPath(cleanGameRoot).Equals(roots.CleanGameRoot, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
         {
-            throw new PluginSmokeException("The requested disposable profile is not the owned clean-game path.");
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.OwnershipStateInvalid,
+                "The requested disposable profile is not the owned clean-game path.");
         }
 
-        var ownership = Task6ExperimentStateService.LoadAndValidate(experimentRoot, expectedFingerprint);
+        Task6ExperimentState ownership;
+        try
+        {
+            ownership = Task6ExperimentStateService.LoadAndValidate(experimentRoot, expectedFingerprint);
+        }
+        catch (PluginSmokeStateException)
+        {
+            throw;
+        }
+        catch (PluginSmokeException exception)
+        {
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.OwnershipStateInvalid,
+                "The Task-6 ownership record is invalid for deployment.",
+                exception);
+        }
         if (ownership.Status is not (Task6ExperimentStatus.LoaderApplied or Task6ExperimentStatus.LaunchObserved))
         {
-            throw new PluginSmokeException("The Task-6 ownership record is not in a loader-ready state for plugin deployment.");
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.OwnershipStateInvalid,
+                "The Task-6 ownership record is not in a loader-ready state for plugin deployment.");
         }
 
-        var originalManifest = InstallationCopyService.CaptureManifest(roots.OriginalGameRoot);
-        var baseline = DisposableProfileBaselineService.LoadAndValidateSavedBaseline(
-            Path.Combine(roots.ManifestsRoot, "baseline.json"),
-            expectedFingerprint,
-            originalManifest);
-        var current = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
-        var loaderState = LoaderTransactionStateService.LoadAndValidate(
-            Path.Combine(roots.ManifestsRoot, "transaction-state.json"),
-            roots,
-            expectedFingerprint,
-            originalManifest,
-            [LoaderTransactionStatus.LaunchObserved]);
-        LoaderTransactionStateService.VerifyAppliedProfile(roots, loaderState);
-        var currentFingerprint = InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint;
+        CopyManifest originalManifest;
+        try
+        {
+            originalManifest = InstallationCopyService.CaptureManifest(roots.OriginalGameRoot);
+        }
+        catch (SmokeTestException exception)
+        {
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.OwnershipStateInvalid,
+                "The original installation manifest could not be validated for deployment.",
+                exception);
+        }
+
+        var baselinePath = LoaderSmokeTestStatePaths.GetBaselinePath(roots);
+        if (!File.Exists(baselinePath))
+        {
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.BaselineStateMissing,
+                "The canonical disposable-profile baseline state is missing.");
+        }
+
+        DisposableProfileBaseline baseline;
+        try
+        {
+            baseline = DisposableProfileBaselineService.LoadAndValidateSavedBaseline(
+                baselinePath,
+                expectedFingerprint,
+                originalManifest);
+        }
+        catch (SmokeTestException exception)
+        {
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.BaselineStateMismatch,
+                "The canonical disposable-profile baseline state does not match the original installation.",
+                exception);
+        }
+
+        CopyManifest current;
+        try
+        {
+            current = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+        }
+        catch (SmokeTestException exception)
+        {
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.AppliedProfileDrift,
+                "The disposable profile manifest could not be validated before deployment.",
+                exception);
+        }
+
+        var transactionPath = LoaderSmokeTestStatePaths.GetTransactionStatePath(roots);
+        if (!File.Exists(transactionPath))
+        {
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.TransactionStateMissing,
+                "The canonical loader transaction state is missing.");
+        }
+
+        LoaderTransactionState loaderState;
+        try
+        {
+            loaderState = LoaderTransactionStateService.LoadAndValidate(
+                transactionPath,
+                roots,
+                expectedFingerprint,
+                baseline.DisposableManifest,
+                [LoaderTransactionStatus.LaunchObserved]);
+        }
+        catch (SmokeTestException exception)
+        {
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.TransactionStateMismatch,
+                "The loader transaction state does not match the saved disposable baseline.",
+                exception);
+        }
+
+        try
+        {
+            LoaderTransactionStateService.VerifyAppliedProfile(roots, loaderState);
+        }
+        catch (SmokeTestException exception)
+        {
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.AppliedProfileDrift,
+                "The disposable profile does not match the persisted applied loader state.",
+                exception);
+        }
+
+        string currentFingerprint;
+        try
+        {
+            currentFingerprint = InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint;
+        }
+        catch (Exception exception) when (exception is DiscoveryException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.FingerprintMismatch,
+                "The disposable profile fingerprint could not be verified.",
+                exception);
+        }
         if (!currentFingerprint.Equals(expectedFingerprint, StringComparison.OrdinalIgnoreCase))
         {
-            throw new PluginSmokeException("The disposable profile fingerprint does not match the expected clean-profile evidence.");
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.FingerprintMismatch,
+                "The disposable profile fingerprint does not match the expected clean-profile evidence.");
         }
 
         var pluginRoot = Path.Combine(roots.CleanGameRoot, "BepInEx", "plugins");
         if (Directory.Exists(pluginRoot) && Directory.EnumerateFileSystemEntries(pluginRoot).Any())
         {
-            throw new PluginSmokeException("An existing custom plugin is present in the disposable profile.");
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.ExistingPlugin,
+                "An existing custom plugin is present in the disposable profile.");
         }
 
         if (FindRunningProcessUnder(roots.CleanGameRoot))
         {
-            throw new PluginSmokeException("The disposable game process is still active; deployment is refused.");
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.ProcessActive,
+                "The disposable game process is still active; deployment is refused.");
         }
 
         if (!loaderState.LaunchEvidence?.MeetsBootstrapCriteria ?? true)
         {
-            throw new PluginSmokeException("The persisted loader transaction does not prove a clean BepInEx bootstrap.");
+            throw new PluginSmokeStateException(
+                PluginSmokeStateFailureCategories.BootstrapEvidenceInvalid,
+                "The persisted loader transaction does not prove a clean BepInEx bootstrap.");
         }
 
         return new PluginDeploymentContext(roots, ownership, baseline, loaderState, current, admissionBinding);
