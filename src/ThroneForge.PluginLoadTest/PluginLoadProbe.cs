@@ -206,7 +206,19 @@ public static class PluginLoadProbe
         try
         {
             var loaded = LoadAndInspect(capture.Bytes, ApiIdentity, ContractsIdentity, TrustedPlatformAssemblyKeys, out loadContextReference);
+            closureEvidence = closureEvidence with { ActualAssemblyContext = loaded.ActualAssemblyContext };
             unloadStatus = ObserveUnload(loadContextReference);
+            if (loaded.ActualAssemblyContext != PluginAssemblyContextStatus.ExpectedCollectible)
+            {
+                return Failed(
+                    PluginLoadReasonCodes.LoadContextMismatch,
+                    "The loaded assembly did not belong to the expected collectible load context.",
+                    admission.Binding,
+                    unloadStatus,
+                    true,
+                    closureEvidence);
+            }
+
             if (unloadStatus != PluginUnloadStatus.UnloadObserved)
             {
                 return new PluginLoadResult(
@@ -362,16 +374,48 @@ public static class PluginLoadProbe
         {
             using var assemblyStream = new MemoryStream(artifactBytes.ToArray(), writable: false);
             var assembly = loadContext.LoadFromStream(assemblyStream);
-            var contractInspection = InspectContractTypes(assembly);
+            var actualAssemblyContext = ClassifyActualAssemblyContext(assembly, loadContext);
+            var contractInspection = actualAssemblyContext == PluginAssemblyContextStatus.ExpectedCollectible
+                ? InspectContractTypes(assembly)
+                : new ContractInspection(Array.Empty<string>(), Array.Empty<string>(), 0);
             return new LoadedAssemblyFacts(
                 assembly.GetName().Name,
                 contractInspection.ImplementedContractTypes,
-                contractInspection.Issues);
+                contractInspection.Issues,
+                actualAssemblyContext);
         }
         finally
         {
             loadContext.Unload();
         }
+    }
+
+    internal static PluginAssemblyContextStatus ClassifyActualAssemblyContext(
+        Assembly assembly,
+        AssemblyLoadContext expectedContext)
+    {
+        ArgumentNullException.ThrowIfNull(assembly);
+        ArgumentNullException.ThrowIfNull(expectedContext);
+
+        var actualContext = AssemblyLoadContext.GetLoadContext(assembly);
+        if (ReferenceEquals(actualContext, expectedContext))
+        {
+            return PluginAssemblyContextStatus.ExpectedCollectible;
+        }
+
+        if (actualContext is null)
+        {
+            return PluginAssemblyContextStatus.Unidentified;
+        }
+
+        if (ReferenceEquals(actualContext, AssemblyLoadContext.Default))
+        {
+            return PluginAssemblyContextStatus.Default;
+        }
+
+        return actualContext.IsCollectible
+            ? PluginAssemblyContextStatus.OtherCollectible
+            : PluginAssemblyContextStatus.Other;
     }
 
     private static ContractInspection InspectContractTypes(Assembly assembly)
@@ -483,7 +527,8 @@ public static class PluginLoadProbe
     private sealed record LoadedAssemblyFacts(
         string? AssemblyName,
         IReadOnlyList<string> ImplementedContractTypes,
-        IReadOnlyList<string> ContractIssues);
+        IReadOnlyList<string> ContractIssues,
+        PluginAssemblyContextStatus ActualAssemblyContext);
 
     private sealed record ContractInspection(
         IReadOnlyList<string> ImplementedContractTypes,
@@ -538,7 +583,11 @@ public static class PluginLoadProbe
         IReadOnlyList<string> TrustedPlatformAssemblyReferences,
         IReadOnlyList<string> NonPlatformAssemblyReferences,
         bool NativeDependenciesDetected,
-        bool HasModuleInitializer)
+        bool HasModuleInitializer,
+        bool ClrHeaderPresent,
+        bool IlOnlyImage,
+        bool NativeEntryPointPresent,
+        int PInvokeEntryCount)
     {
         public static PluginAssemblyPreflight Inspect(
             ReadOnlyMemory<byte> bytes,
@@ -548,6 +597,22 @@ public static class PluginLoadProbe
         {
             using var stream = new MemoryStream(bytes.ToArray(), writable: false);
             using var peReader = new PEReader(stream);
+            var corHeader = peReader.PEHeaders.CorHeader;
+            if (corHeader is null)
+            {
+                return new PluginAssemblyPreflight(
+                    "unidentified",
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    Array.Empty<string>(),
+                    true,
+                    false,
+                    false,
+                    false,
+                    false,
+                    0);
+            }
+
             if (!peReader.HasMetadata)
             {
                 throw new BadImageFormatException();
@@ -577,14 +642,27 @@ public static class PluginLoadProbe
                 }
             }
 
+            var clrHeaderPresent = corHeader is not null;
+            var ilOnlyImage = clrHeaderPresent && (corHeader!.Flags & CorFlags.ILOnly) != 0;
+            var nativeEntryPointPresent = clrHeaderPresent && (corHeader!.Flags & CorFlags.NativeEntryPoint) != 0;
+            var pinvokeEntryCount = metadata.GetTableRowCount(TableIndex.ImplMap);
+            var importTablePresent = peReader.PEHeaders.PEHeader?.ImportTableDirectory.Size > 0;
+
             return new PluginAssemblyPreflight(
                 assemblyIdentity.Display,
                 shared.Order(StringComparer.Ordinal).ToArray(),
                 trusted.Order(StringComparer.Ordinal).ToArray(),
                 nonPlatform.Order(StringComparer.Ordinal).ToArray(),
-                (peReader.PEHeaders.CorHeader is null && peReader.PEHeaders.PEHeader?.ImportTableDirectory.Size > 0)
-                    || metadata.GetTableRowCount(TableIndex.ImplMap) > 0,
-                ContainsModuleInitializer(metadata));
+                !clrHeaderPresent
+                    || !ilOnlyImage
+                    || nativeEntryPointPresent
+                    || pinvokeEntryCount > 0
+                    || (!clrHeaderPresent && importTablePresent),
+                ContainsModuleInitializer(metadata),
+                clrHeaderPresent,
+                ilOnlyImage,
+                nativeEntryPointPresent,
+                pinvokeEntryCount);
         }
 
         public PluginLoadClosureEvidence ToClosureEvidence(
@@ -596,7 +674,12 @@ public static class PluginLoadProbe
                 new[] { apiIdentity.Display, contractsIdentity.Display },
                 TrustedPlatformAssemblyReferences,
                 NonPlatformAssemblyReferences,
-                NativeDependenciesDetected);
+                NativeDependenciesDetected,
+                ClrHeaderPresent,
+                IlOnlyImage,
+                NativeEntryPointPresent,
+                PInvokeEntryCount,
+                PluginAssemblyContextStatus.NotAttempted);
 
         private static bool ContainsModuleInitializer(MetadataReader metadata)
         {

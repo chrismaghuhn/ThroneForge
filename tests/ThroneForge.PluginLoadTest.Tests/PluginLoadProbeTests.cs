@@ -1,4 +1,6 @@
+using System.Buffers.Binary;
 using System.Reflection;
+using System.Reflection.PortableExecutable;
 using System.Runtime.Loader;
 using System.Security.Cryptography;
 using ThroneForge.Contracts;
@@ -42,6 +44,102 @@ public sealed class PluginLoadProbeTests
         Assert.Contains(result.ClosureEvidence.SharedAssemblyIdentities, identity => identity.StartsWith("ThroneForge.Contracts,", StringComparison.Ordinal));
         Assert.Empty(result.ClosureEvidence.NonPlatformAssemblyReferences);
         Assert.False(result.ClosureEvidence.NativeDependenciesDetected);
+    }
+
+    [Fact]
+    public void SuccessfulResultRecordsPureManagedImageEvidenceAndOwningContext()
+    {
+        var artifactPath = typeof(ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod).Assembly.Location;
+
+        var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+        Assert.Equal(PluginAssemblyContextStatus.ExpectedCollectible, result.ClosureEvidence!.ActualAssemblyContext);
+        Assert.True(result.ClosureEvidence.ClrHeaderPresent);
+        Assert.True(result.ClosureEvidence.IlOnlyImage);
+        Assert.False(result.ClosureEvidence.NativeEntryPointPresent);
+        Assert.Equal(0, result.ClosureEvidence.PInvokeEntryCount);
+    }
+
+    [Fact]
+    public void ImageWithoutIlOnlyFlagIsRejectedBeforeLoad()
+    {
+        var artifactPath = CreateCorFlagsVariant(
+            typeof(ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod).Assembly.Location,
+            flags => flags & ~CorFlags.ILOnly);
+
+        try
+        {
+            var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+            Assert.Equal(PluginLoadStatus.Rejected, result.Status);
+            Assert.Equal(PluginLoadReasonCodes.NativeDependencyNotAllowed, result.ReasonCode);
+            Assert.Null(result.AssemblyName);
+            Assert.False(result.ClosureEvidence!.IlOnlyImage);
+            Assert.DoesNotContain(artifactPath, result.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(artifactPath);
+        }
+    }
+
+    [Fact]
+    public void ImageWithNativeEntryPointIsRejectedBeforeLoad()
+    {
+        var artifactPath = CreateCorFlagsVariant(
+            typeof(ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod).Assembly.Location,
+            flags => flags | CorFlags.NativeEntryPoint);
+
+        try
+        {
+            var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+            Assert.Equal(PluginLoadStatus.Rejected, result.Status);
+            Assert.Equal(PluginLoadReasonCodes.NativeDependencyNotAllowed, result.ReasonCode);
+            Assert.Null(result.AssemblyName);
+            Assert.True(result.ClosureEvidence!.NativeEntryPointPresent);
+            Assert.DoesNotContain(artifactPath, result.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(artifactPath);
+        }
+    }
+
+    [Fact]
+    public void ImageWithoutClrHeaderCannotBeAdmittedAsManagedPlugin()
+    {
+        var artifactPath = CreateWithoutClrHeader(typeof(ThroneForge.PluginLoadFixture.SyntheticThroneForgeMod).Assembly.Location);
+
+        try
+        {
+            var result = PluginLoadProbe.Load(CreateRequest(artifactPath));
+
+            Assert.NotEqual(PluginLoadStatus.Loaded, result.Status);
+            Assert.Equal(PluginLoadReasonCodes.NativeDependencyNotAllowed, result.ReasonCode);
+            Assert.Null(result.AssemblyName);
+            Assert.DoesNotContain(artifactPath, result.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(artifactPath);
+        }
+    }
+
+    [Fact]
+    public void WrongAssemblyLoadContextClassificationFailsClosed()
+    {
+        var expectedContext = new AssemblyLoadContext("synthetic-expected-context", isCollectible: true);
+        try
+        {
+            Assert.Equal(
+                PluginAssemblyContextStatus.Default,
+                PluginLoadProbe.ClassifyActualAssemblyContext(typeof(string).Assembly, expectedContext));
+        }
+        finally
+        {
+            expectedContext.Unload();
+        }
     }
 
     [Fact]
@@ -541,5 +639,78 @@ public sealed class PluginLoadProbeTests
     {
         using var stream = File.OpenRead(path);
         return Convert.ToHexString(SHA256.HashData(stream));
+    }
+
+    private static string CreateCorFlagsVariant(string sourcePath, Func<CorFlags, CorFlags> mutate)
+    {
+        var bytes = File.ReadAllBytes(sourcePath);
+        using (var stream = new MemoryStream(bytes, writable: false))
+        using (var reader = new PEReader(stream))
+        {
+            var flagsOffset = FindClrHeaderOffset(bytes, reader) + 16;
+            var flags = (CorFlags)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(flagsOffset, sizeof(uint)));
+            BinaryPrimitives.WriteUInt32LittleEndian(
+                bytes.AsSpan(flagsOffset, sizeof(uint)),
+                (uint)mutate(flags));
+        }
+
+        var path = Path.Combine(Path.GetTempPath(), $"throneforge-corflags-{Guid.NewGuid():N}.dll");
+        File.WriteAllBytes(path, bytes);
+        return path;
+    }
+
+    private static string CreateWithoutClrHeader(string sourcePath)
+    {
+        var bytes = File.ReadAllBytes(sourcePath);
+        var directoryOffset = FindClrDirectoryOffset(bytes);
+        BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(directoryOffset, sizeof(ulong)), 0);
+
+        var path = Path.Combine(Path.GetTempPath(), $"throneforge-no-clr-{Guid.NewGuid():N}.dll");
+        File.WriteAllBytes(path, bytes);
+        return path;
+    }
+
+    private static int FindClrHeaderOffset(byte[] bytes, PEReader reader)
+    {
+        if (reader.PEHeaders.PEHeader is null)
+        {
+            throw new InvalidOperationException("Synthetic fixture has no PE header.");
+        }
+
+        var peOffset = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(0x3C, sizeof(int)));
+        var coffOffset = peOffset + 4;
+        var sectionCount = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(coffOffset + 2, sizeof(ushort)));
+        var optionalHeaderSize = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(coffOffset + 16, sizeof(ushort)));
+        var optionalHeaderOffset = coffOffset + 20;
+        var clrDirectoryOffset = FindClrDirectoryOffset(bytes);
+        var clrRva = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(clrDirectoryOffset, sizeof(uint)));
+        var sectionTableOffset = optionalHeaderOffset + optionalHeaderSize;
+
+        for (var index = 0; index < sectionCount; index++)
+        {
+            var sectionOffset = sectionTableOffset + (index * 40);
+            var virtualSize = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(sectionOffset + 8, sizeof(uint)));
+            var virtualAddress = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(sectionOffset + 12, sizeof(uint)));
+            var rawSize = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(sectionOffset + 16, sizeof(uint)));
+            var rawPointer = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(sectionOffset + 20, sizeof(uint)));
+            var sectionSize = Math.Max(virtualSize, rawSize);
+
+            if (clrRva >= virtualAddress && clrRva < virtualAddress + sectionSize)
+            {
+                return checked((int)(rawPointer + clrRva - virtualAddress));
+            }
+        }
+
+        throw new InvalidOperationException("Synthetic fixture CLR header is outside the section table.");
+    }
+
+    private static int FindClrDirectoryOffset(byte[] bytes)
+    {
+        var peOffset = BinaryPrimitives.ReadInt32LittleEndian(bytes.AsSpan(0x3C, sizeof(int)));
+        var coffOffset = peOffset + 4;
+        var optionalHeaderOffset = coffOffset + 20;
+        var magic = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(optionalHeaderOffset, sizeof(ushort)));
+        var dataDirectoryOffset = optionalHeaderOffset + (magic == 0x20B ? 112 : 96);
+        return dataDirectoryOffset + (14 * 8);
     }
 }

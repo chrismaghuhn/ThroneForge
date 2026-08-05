@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 5 repository-only synthetic plugin-load probe hardening is complete on `agent/m1-plugin-load-smoke-test-hardening` at `bb32de1dd211ddd5174f8d8f6e6490164da970db`; no plugin was loaded in Thronefall and no game-facing behavior is claimed.
+M1 - Task 5 final native-image and load-context hardening is in progress on `agent/m1-plugin-load-smoke-test-hardening`, continuing from `1649336681fd76cb1f66623d151179015c812fcb`; no plugin was loaded in Thronefall and no game-facing behavior is claimed.
 
 ## Milestones
 
@@ -222,6 +222,17 @@ This follow-up starts from reviewed head `10897f7b03d45f1e470b5930a9dc1341939cde
 - [x] Update documentation after the branch-head hosted run and keep M1 overall incomplete.
 
 Task-5 hardening hosted validation: run `30895225156` tested head `bb32de1dd211ddd5174f8d8f6e6490164da970db`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 239 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were independently parsed; no `Overwriting results file` warning occurred. Run `30895090026` was superseded after a formatter import-order failure and is retained only as diagnostic history. No private loader or game experiment was run.
+
+### M1 Task 5 final native-image and load-context correction
+
+This follow-up continues from documentation head `1649336681fd76cb1f66623d151179015c812fcb` and pre-fix hosted run `30895740658`. It remains repository-only and must reject non-IL-only, native-entry-point, missing-CLR-header, and wrong-context images before a successful result.
+
+- [x] Add temporary-PE mutation tests for missing `ILOnly`, present `NativeEntryPoint`, and missing CLR header.
+- [x] Add structured pure-managed image evidence and actual owning-context classification.
+- [x] Require `CorFlags.ILOnly`, reject `CorFlags.NativeEntryPoint`, and reject missing CLR headers before load.
+- [x] Verify `AssemblyLoadContext.GetLoadContext(assembly)` is the expected collectible context.
+- [x] Preserve path sanitization, unload observation, and architecture boundaries.
+- [ ] Run the new exact-SDK hosted matrix, inspect every TRX artifact, and update this plan with the final current-head run.
 
 ### M1 Task 4 hardening: bound trust evidence and admission artifacts
 

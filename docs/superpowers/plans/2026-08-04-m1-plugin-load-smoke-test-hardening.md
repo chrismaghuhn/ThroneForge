@@ -2,7 +2,7 @@
 
 ## Objective
 
-Harden the repository-only synthetic plugin-load probe without running a private Thronefall or BepInEx experiment. The probe must bind the complete single-assembly load closure, reject module initializers before loading, accept exactly one public closed `IThroneForgeMod` implementation, and require bounded collectible-context unload observation.
+Harden the repository-only synthetic plugin-load probe without running a private Thronefall or BepInEx experiment. The probe must bind the complete single-assembly load closure, require a pure managed IL-only image, reject module initializers before loading, accept exactly one public closed `IThroneForgeMod` implementation, verify the actual collectible load context, and require bounded collectible-context unload observation.
 
 ## Implementation slices
 
@@ -12,6 +12,9 @@ Harden the repository-only synthetic plugin-load probe without running a private
 - [x] Strengthen contract inspection to require one public, top-level, non-abstract, closed class implementing the shared `IThroneForgeMod` contract.
 - [x] Refactor loading around one bounded byte capture and report closure evidence, exact-byte admission, sanitized outcomes, and bounded unload status.
 - [x] Update all focused tests, architecture boundaries, design/ADR documentation, and current-head validation evidence.
+- [x] Add temporary PE mutation tests for missing `ILOnly`, present `NativeEntryPoint`, and missing CLR headers.
+- [x] Record CLR-header, IL-only, native-entry-point, P/Invoke, and actual-context evidence without paths or runtime object identities.
+- [x] Verify `AssemblyLoadContext.GetLoadContext(assembly)` is the expected collectible context and fail closed for simulated mismatches.
 
 ## Acceptance gates
 
@@ -24,9 +27,15 @@ Harden the repository-only synthetic plugin-load probe without running a private
 
 This task validates only one synthetic managed assembly plus shared API/Contracts and trusted platform assemblies. It does not design multi-file package integrity, load a Thronefall plugin, select a plugin TFM, claim BepInEx compatibility, or invoke plugin lifecycle methods.
 
-## Final validation
+## Previous validation before the final native-image correction
 
 - Head: `bb32de1dd211ddd5174f8d8f6e6490164da970db`
 - Hosted run: [30895225156](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30895225156)
 - Windows and Ubuntu: SDK `10.0.100`, 12 TRX files, 239 tests, 0 failures/errors/skips each.
 - The artifacts were independently parsed and no `Overwriting results file` warning occurred.
+
+## Final correction validation
+
+- Pre-fix head: `1649336681fd76cb1f66623d151179015c812fcb`
+- Pre-fix hosted run: [30895740658](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30895740658)
+- Final exact-SDK hosted validation and artifact inspection are pending.

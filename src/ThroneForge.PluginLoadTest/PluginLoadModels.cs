@@ -17,6 +17,16 @@ public enum PluginUnloadStatus
     UnloadNotObservedWithinBound
 }
 
+public enum PluginAssemblyContextStatus
+{
+    NotAttempted = 0,
+    ExpectedCollectible,
+    Default,
+    OtherCollectible,
+    Other,
+    Unidentified
+}
+
 public static class PluginLoadReasonCodes
 {
     public const string InvalidRequest = "TF-LOAD-000";
@@ -31,6 +41,7 @@ public static class PluginLoadReasonCodes
     public const string ModuleInitializerNotAllowed = "TF-LOAD-009";
     public const string ContractInvalid = "TF-LOAD-010";
     public const string UnloadNotObserved = "TF-LOAD-011";
+    public const string LoadContextMismatch = "TF-LOAD-012";
 }
 
 public static class PluginContractIssueCodes
@@ -54,7 +65,12 @@ public sealed record PluginLoadClosureEvidence(
     IReadOnlyList<string> SharedAssemblyIdentities,
     IReadOnlyList<string> TrustedPlatformAssemblyReferences,
     IReadOnlyList<string> NonPlatformAssemblyReferences,
-    bool NativeDependenciesDetected);
+    bool NativeDependenciesDetected,
+    bool ClrHeaderPresent,
+    bool IlOnlyImage,
+    bool NativeEntryPointPresent,
+    int PInvokeEntryCount,
+    PluginAssemblyContextStatus ActualAssemblyContext);
 
 public sealed record PluginLoadResult(
     PluginLoadStatus Status,
