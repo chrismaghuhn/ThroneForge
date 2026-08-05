@@ -27,6 +27,7 @@ public static class LifecycleExperimentRecoveryService
 {
     public static LifecycleExperimentRollbackResult Rollback(LifecycleExperimentRecoveryOptions options)
     {
+        var pluginRemovalStatus = CleanupOperationStatus.NotRequired;
         try
         {
             var roots = SmokeTestPathValidator.ValidateRoots(
@@ -93,6 +94,40 @@ public static class LifecycleExperimentRecoveryService
                 return Failed(LifecycleExperimentFailureCategories.RecoveryOwnershipInvalid);
             }
 
+            if (ownership.PluginRelativeRoot is not null)
+            {
+                pluginRemovalStatus = CleanupOperationStatus.Passed;
+                try
+                {
+                    PluginDeploymentService.Remove(roots.CleanGameRoot, LifecyclePluginPackageService.PluginGuid);
+                    var pluginPath = Path.Combine(roots.CleanGameRoot, "BepInEx", "plugins", LifecyclePluginPackageService.PluginGuid);
+                    if (Directory.Exists(pluginPath))
+                    {
+                        return Failed(LifecycleExperimentFailureCategories.RecoveryPluginRemovalFailed, CleanupOperationStatus.Failed);
+                    }
+
+                    if (ownership.LoaderOnlyManifest is null
+                        || !LoaderOnlyProfileVerificationService.Compare(
+                            ownership.LoaderOnlyManifest,
+                            InstallationCopyService.CaptureManifest(roots.CleanGameRoot)).Matches)
+                    {
+                        return Failed(LifecycleExperimentFailureCategories.RecoveryPluginRemovalFailed, CleanupOperationStatus.Failed);
+                    }
+
+                    ownership = ownership with
+                    {
+                        Status = Task6ExperimentStatus.LoaderApplied,
+                        PluginRelativeRoot = null,
+                        LoaderOnlyManifest = ownership.LoaderOnlyManifest
+                    };
+                    Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, ownership);
+                }
+                catch (Exception exception) when (exception is PluginSmokeException or SmokeTestException or IOException)
+                {
+                    return Failed(LifecycleExperimentFailureCategories.RecoveryPluginRemovalFailed, CleanupOperationStatus.Failed);
+                }
+            }
+
             try
             {
                 _ = LoaderTransactionStateService.CaptureRollbackGeneratedEvidence(
@@ -102,27 +137,7 @@ public static class LifecycleExperimentRecoveryService
             }
             catch (Exception exception) when (exception is PluginSmokeException or SmokeTestException or IOException)
             {
-                return Failed(LifecycleExperimentFailureCategories.RecoveryRuntimeDrift);
-            }
-
-            var pluginRemovalStatus = CleanupOperationStatus.NotRequired;
-            if (ownership.PluginRelativeRoot is not null)
-            {
-                pluginRemovalStatus = CleanupOperationStatus.Passed;
-                PluginDeploymentService.Remove(roots.CleanGameRoot, LifecyclePluginPackageService.PluginGuid);
-                var pluginPath = Path.Combine(roots.CleanGameRoot, "BepInEx", "plugins", LifecyclePluginPackageService.PluginGuid);
-                if (Directory.Exists(pluginPath))
-                {
-                    return Failed(LifecycleExperimentFailureCategories.RecoveryPluginRemovalFailed, CleanupOperationStatus.Failed);
-                }
-
-                if (ownership.LoaderOnlyManifest is null
-                    || !LoaderOnlyProfileVerificationService.Compare(
-                        ownership.LoaderOnlyManifest,
-                        InstallationCopyService.CaptureManifest(roots.CleanGameRoot)).Matches)
-                {
-                    return Failed(LifecycleExperimentFailureCategories.RecoveryPluginRemovalFailed, CleanupOperationStatus.Failed);
-                }
+                return Failed(LifecycleExperimentFailureCategories.RecoveryRuntimeDrift, pluginRemovalStatus);
             }
 
             var rollback = SmokeTestOrchestrator.Run(new LoaderSmokeTestRequest(
@@ -175,11 +190,11 @@ public static class LifecycleExperimentRecoveryService
         }
         catch (PluginSmokeStateException exception)
         {
-            return Failed(exception.FailureCategory);
+            return Failed(exception.FailureCategory, pluginRemovalStatus);
         }
         catch (Exception exception) when (exception is PluginSmokeException or SmokeTestException or DiscoveryException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
-            return Failed(LifecycleExperimentFailureCategories.RecoveryLoaderRollbackFailed);
+            return Failed(LifecycleExperimentFailureCategories.RecoveryLoaderRollbackFailed, pluginRemovalStatus);
         }
     }
 

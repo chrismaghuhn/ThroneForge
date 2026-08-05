@@ -1,3 +1,4 @@
+using ThroneForge.LoaderSmokeTest;
 using ThroneForge.PluginSmokeTest;
 using Xunit;
 
@@ -251,6 +252,78 @@ public sealed class LifecycleOrchestrationTests
     }
 
     [Fact]
+    public void BaselineLaunchManualClosureIsPropagatedAndSkipsCleanup()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var operations = new SuccessfulLifecycleOperations
+            {
+                BaselineLaunchResult = new LoaderModeExecutionEvidence(
+                    false,
+                    LifecycleExperimentFailureCategories.ManualClosureRequired,
+                    ActiveProcess: true,
+                    RequiresManualClosure: true)
+            };
+
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                operations.ExperimentId,
+                Fingerprint,
+                operations).Run();
+
+            Assert.Equal("Inconclusive", result.OverallResult);
+            Assert.Equal(LifecycleExperimentStage.BaselineLaunch, result.PrimaryFailedStage);
+            Assert.Equal(LifecycleExperimentFailureCategories.ManualClosureRequired, result.PrimaryFailureCategory);
+            Assert.True(result.ProcessActive);
+            Assert.True(result.RecoveryMarkerPersisted);
+            Assert.False(operations.CleanupCalled);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void LoaderLaunchManualClosureIsPropagatedAndSkipsCleanup()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var operations = new SuccessfulLifecycleOperations
+            {
+                LoaderLaunchResult = new LoaderModeExecutionEvidence(
+                    false,
+                    LifecycleExperimentFailureCategories.ManualClosureRequired,
+                    LoaderApplied: true,
+                    LoaderTransactionStatus: LoaderTransactionStatus.Applied.ToString(),
+                    ActiveProcess: true,
+                    RequiresManualClosure: true),
+                LoaderApplied = true,
+                PluginDeployed = false
+            };
+
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                operations.ExperimentId,
+                Fingerprint,
+                operations).Run();
+
+            Assert.Equal("Inconclusive", result.OverallResult);
+            Assert.Equal(LifecycleExperimentStage.LoaderLaunch, result.PrimaryFailedStage);
+            Assert.Equal(LifecycleExperimentFailureCategories.ManualClosureRequired, result.PrimaryFailureCategory);
+            Assert.True(result.ProcessActive);
+            Assert.True(result.RecoveryMarkerPersisted);
+            Assert.False(operations.CleanupCalled);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void FailedReportDoesNotClaimQuittingWasObserved()
     {
         var root = CreateRoot();
@@ -326,6 +399,7 @@ public sealed class LifecycleOrchestrationTests
         public bool PluginDeployed { get; init; } = true;
         public bool LoaderApplied { get; init; } = true;
         public LifecycleStageEvidence? LoaderInstallResult { get; init; }
+        public LifecycleStageEvidence? BaselineLaunchResult { get; init; }
         public LifecycleStageEvidence? LoaderLaunchResult { get; init; }
         public LifecycleStageEvidence? AdmitAndDeployResult { get; init; }
         public LifecycleStageEvidence? LifecycleVerificationResult { get; init; }
@@ -341,7 +415,8 @@ public sealed class LifecycleOrchestrationTests
             => new(true, "game/Thronefall.exe", context.ExpectedFingerprint, true, true);
 
         public LifecycleStageEvidence DisposablePrepare(LifecycleExperimentContext context) => new(true);
-        public LifecycleStageEvidence BaselineLaunch(LifecycleExperimentContext context) => new(true);
+        public LifecycleStageEvidence BaselineLaunch(LifecycleExperimentContext context)
+            => BaselineLaunchResult ?? new(true);
 
         public LifecycleStageEvidence LoaderInstall(LifecycleExperimentContext context)
             => LoaderInstallResult ?? new(true, LoaderTransactionStatus: "Applied", LoaderApplied: LoaderApplied);

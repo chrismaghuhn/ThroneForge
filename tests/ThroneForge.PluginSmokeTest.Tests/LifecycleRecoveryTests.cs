@@ -59,6 +59,99 @@ public sealed class LifecycleRecoveryTests
         }
     }
 
+    [Fact]
+    public void PluginDeployedRecoveryRemovesOwnedPluginBeforeRuntimeDriftCheck()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var roots = CreateRoots(root);
+            Directory.CreateDirectory(roots.RepositoryRoot);
+            Directory.CreateDirectory(roots.OriginalGameRoot);
+            Directory.CreateDirectory(roots.CleanGameRoot);
+            File.WriteAllText(Path.Combine(roots.OriginalGameRoot, "game.dat"), "baseline");
+            File.WriteAllText(Path.Combine(roots.CleanGameRoot, "game.dat"), "baseline");
+
+            var originalManifest = InstallationCopyService.CaptureManifest(roots.OriginalGameRoot);
+            var disposableManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+            DisposableProfileBaselineService.Save(
+                LoaderSmokeTestStatePaths.GetBaselinePath(roots),
+                new DisposableProfileBaseline(
+                    DisposableProfileBaselineService.SchemaVersion,
+                    DisposableProfileBaselineService.TaskVersion,
+                    Fingerprint,
+                    originalManifest,
+                    disposableManifest));
+
+            var loaderFile = Path.Combine(roots.CleanGameRoot, "BepInEx", "core.dll");
+            Directory.CreateDirectory(Path.GetDirectoryName(loaderFile)!);
+            File.WriteAllText(loaderFile, "loader");
+            Directory.CreateDirectory(Path.Combine(roots.CleanGameRoot, "BepInEx", "plugins"));
+            var loaderOnlyManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+            var loaderHash = loaderOnlyManifest.Files.Single(item => item.RelativePath == "BepInEx/core.dll").Sha256;
+            var pluginRoot = Path.Combine(roots.CleanGameRoot, "BepInEx", "plugins", "dev.throneforge.m1.lifecycle-smoke");
+            Directory.CreateDirectory(pluginRoot);
+            foreach (var fileName in new[]
+            {
+                "ThroneForge.M1.LifecycleSmoke.dll",
+                "ThroneForge.API.dll",
+                "ThroneForge.Contracts.dll"
+            })
+            {
+                File.WriteAllText(Path.Combine(pluginRoot, fileName), fileName);
+            }
+
+            var transaction = new LoaderTransactionState(
+                LoaderTransactionStateService.SchemaVersion,
+                LoaderTransactionStateService.TaskVersion,
+                Fingerprint,
+                InstallationCopyService.ComputeManifestIdentity(disposableManifest),
+                "BepInEx_win_x64_5.4.23.5.zip",
+                new string('a', 64),
+                LoaderTransactionStatus.RollbackRequired,
+                loaderOnlyManifest,
+                [new TransactionEntry("BepInEx/core.dll", TransactionChangeKind.NewFile, null, loaderHash, null)],
+                [],
+                [],
+                null);
+            LoaderTransactionStateService.SaveAtomic(
+                LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
+                transaction);
+            Task6ExperimentStateService.SaveAtomic(
+                roots.ExperimentRoot,
+                new Task6ExperimentState(
+                    Task6ExperimentStateService.SchemaVersion,
+                    Task6ExperimentStateService.TaskVersion,
+                    Fingerprint,
+                    Guid.NewGuid().ToString("N"),
+                    RepositoryCommit,
+                    Task6ExperimentStateService.CleanGameRelativePath,
+                    Task6ExperimentStatus.Failed,
+                    PluginRelativeRoot: Task6ExperimentStateService.LifecyclePluginRelativeRoot,
+                    LoaderTransactionStatus: LoaderTransactionStatus.RollbackRequired.ToString(),
+                    LoaderOnlyManifest: loaderOnlyManifest));
+
+            var result = LifecycleExperimentRecoveryService.Rollback(new LifecycleExperimentRecoveryOptions(
+                roots.RepositoryRoot,
+                roots.OriginalGameRoot,
+                roots.ExperimentRoot,
+                Fingerprint,
+                Path.Combine(root, "BepInEx_win_x64_5.4.23.5.zip"),
+                new string('a', 64)));
+
+            Assert.False(Directory.Exists(pluginRoot));
+            Assert.Equal(CleanupOperationStatus.Passed, result.PluginRemovalStatus);
+            Assert.NotEqual(LifecycleExperimentFailureCategories.RecoveryRuntimeDrift, result.FailureCategory);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private static string CreateRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "throneforge-task7-recovery", Guid.NewGuid().ToString("N"));

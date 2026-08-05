@@ -20,7 +20,9 @@ public sealed record LifecycleExperimentProductionOptions(
     string AdapterId = "throneforge.adapter",
     string AdapterVersion = "1.0.0",
     string RepositoryBaselineCommit = "unknown",
-    string DotnetPath = "dotnet");
+    string DotnetPath = "dotnet",
+    Func<SmokeTestMode, SmokeTestExecutionResult>? LoaderModeRunner = null,
+    Func<SmokeTestRoots, LoaderTransactionStatus, LoaderStageVerificationEvidence>? LoaderStateVerifier = null);
 
 /// <summary>
 /// Production adapter for the real Task-7 CLI. It calls the existing Task-3/Task-6 services and
@@ -224,7 +226,7 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
                 LoaderTransactionStatus = LoaderTransactionStatus.Applied.ToString()
             };
             Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, ownership);
-            var evidence = LoaderStageVerificationService.Verify(
+            var evidence = VerifyLoaderStage(
                 roots.RepositoryRoot,
                 roots.OriginalGameRoot,
                 roots.ExperimentRoot,
@@ -246,7 +248,7 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
     {
         try
         {
-            _ = LoaderStageVerificationService.Verify(
+            _ = VerifyLoaderStage(
                 roots.RepositoryRoot,
                 roots.OriginalGameRoot,
                 roots.ExperimentRoot,
@@ -276,7 +278,7 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
                 LoaderTransactionStatus = LoaderTransactionStatus.LaunchObserved.ToString()
             };
             Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, ownership);
-            var evidence = LoaderStageVerificationService.Verify(
+            var evidence = VerifyLoaderStage(
                 roots.RepositoryRoot,
                 roots.OriginalGameRoot,
                 roots.ExperimentRoot,
@@ -298,7 +300,7 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
     {
         try
         {
-            _ = LoaderStageVerificationService.Verify(
+            _ = VerifyLoaderStage(
                 roots.RepositoryRoot,
                 roots.OriginalGameRoot,
                 roots.ExperimentRoot,
@@ -310,7 +312,7 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
                 return new(false, null, false, false, false, result.FailureCategory, true);
             }
 
-            var evidence = LoaderStageVerificationService.Verify(
+            var evidence = VerifyLoaderStage(
                 roots.RepositoryRoot,
                 roots.OriginalGameRoot,
                 roots.ExperimentRoot,
@@ -684,19 +686,45 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
         return RuntimeCompatibilityEvidenceContract.Parse(RuntimeCompatibilityEvidenceContract.Serialize(result), options.ExpectedFingerprint);
     }
 
-    private LifecycleStageEvidence RunLoaderMode(SmokeTestMode mode, string failureCategory)
+    private LoaderStageVerificationEvidence VerifyLoaderStage(
+        string repositoryRoot,
+        string originalGameRoot,
+        string experimentRoot,
+        string expectedFingerprint,
+        LoaderTransactionStatus expectedStatus)
+        => options.LoaderStateVerifier?.Invoke(roots, expectedStatus)
+            ?? LoaderStageVerificationService.Verify(
+                repositoryRoot,
+                originalGameRoot,
+                experimentRoot,
+                expectedFingerprint,
+                expectedStatus);
+
+    private LoaderModeExecutionEvidence RunLoaderMode(SmokeTestMode mode, string failureCategory)
     {
         try
         {
-            var result = SmokeTestOrchestrator.Run(new LoaderSmokeTestRequest(
-                mode,
-                roots.OriginalGameRoot,
-                roots.ExperimentRoot,
-                options.ExpectedFingerprint,
-                roots.RepositoryRoot,
-                options.BepInExArchivePath,
-                null,
-                OfficialAssetDigest: options.ExpectedBepInExDigest));
+            var result = options.LoaderModeRunner?.Invoke(mode)
+                ?? SmokeTestOrchestrator.Run(new LoaderSmokeTestRequest(
+                    mode,
+                    roots.OriginalGameRoot,
+                    roots.ExperimentRoot,
+                    options.ExpectedFingerprint,
+                    roots.RepositoryRoot,
+                    options.BepInExArchivePath,
+                    null,
+                    OfficialAssetDigest: options.ExpectedBepInExDigest));
+            var processActive = result.LaunchObservation?.RequiresManualClosure == true
+                && result.LaunchObservation.Exited == false;
+            if (processActive)
+            {
+                return new LoaderModeExecutionEvidence(
+                    false,
+                    LifecycleExperimentFailureCategories.ManualClosureRequired,
+                    ActiveProcess: true,
+                    RequiresManualClosure: true);
+            }
+
             var succeeded = mode is SmokeTestMode.Prepare or SmokeTestMode.Install
                 ? result.Outcome is not SmokeTestOutcome.Failed
                 : mode == SmokeTestMode.Baseline
@@ -704,14 +732,14 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
                     : result.Outcome is SmokeTestOutcome.Passed or SmokeTestOutcome.PassedWithWarnings;
             if (!succeeded)
             {
-                return new(false, failureCategory);
+                return new LoaderModeExecutionEvidence(false, failureCategory);
             }
 
-            return new(true);
+            return new LoaderModeExecutionEvidence(true);
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
-            return new(false, failureCategory);
+            return new LoaderModeExecutionEvidence(false, failureCategory);
         }
     }
 

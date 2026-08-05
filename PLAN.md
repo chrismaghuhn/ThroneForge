@@ -6,6 +6,10 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 M1 - Task 7 recovery hardening is complete on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. The final authorized lifecycle result remains immutable `Failed` at `LoaderLaunch` with `loader-launch-failed`. The one permitted recovery-only rollback was executed after hosted validation and returned `Failed` with `recovery-runtime-drift`; no retry, lifecycle rerun, or Task 8 work is authorized. The C# `LifecycleExperimentOrchestrator` remains the single owner of stage execution, typed evidence, cleanup/recovery/postchecks, primary-failure persistence, and report generation; PowerShell is only an explicit-input wrapper around the real CLI operations.
 
+PR #7 review correction is active on the same branch. No private lifecycle or recovery execution is permitted in this correction. The work is limited to making plugin-deployed recovery remove the exact owned plugin before rollback drift validation, and propagating typed manual-closure evidence from BaselineLaunch and LoaderLaunch so active profiles never enter cleanup.
+
+The correction also preserves cleanup side-effect results when later rollback work fails and reuses the existing Task-6 state services for recovery. A recovery with no deployed package reports plugin removal as `NotRequired`; a manual-closure result remains `ProcessActive=true` and is persisted for recovery rather than entering cleanup.
+
 ## Milestones
 
 ### M0 - Repository bootstrap and architecture skeleton

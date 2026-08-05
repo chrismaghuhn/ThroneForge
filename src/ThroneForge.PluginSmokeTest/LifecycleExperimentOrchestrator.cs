@@ -15,6 +15,20 @@ public record LifecycleStageEvidence(
     bool? ProcessActive = null,
     string? LoaderTransactionStatus = null);
 
+public sealed record LoaderModeExecutionEvidence(
+    bool Succeeded,
+    string? FailureCategory = null,
+    bool? LoaderApplied = null,
+    string? LoaderTransactionStatus = null,
+    bool ActiveProcess = false,
+    bool RequiresManualClosure = false)
+    : LifecycleStageEvidence(
+        Succeeded,
+        FailureCategory,
+        LoaderApplied,
+        ProcessActive: ActiveProcess,
+        LoaderTransactionStatus: LoaderTransactionStatus);
+
 public sealed record OriginalPreflightEvidence(
     bool Succeeded,
     string? SelectedExecutableRelativePath,
