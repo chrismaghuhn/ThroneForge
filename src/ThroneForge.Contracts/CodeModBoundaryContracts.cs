@@ -57,7 +57,14 @@ public static class CodeModBoundaryValueRules
 
     public static string NormalizeGameFingerprint(GameFingerprint value)
     {
+#if NETSTANDARD2_1
+        if (value is null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+#else
         ArgumentNullException.ThrowIfNull(value);
+#endif
         return new Sha256Digest(value.Value).Value;
     }
 
@@ -145,7 +152,14 @@ public readonly record struct Sha256Digest
 {
     public Sha256Digest(string value)
     {
+#if NETSTANDARD2_1
+        if (value is null)
+        {
+            throw new ArgumentNullException(nameof(value));
+        }
+#else
         ArgumentNullException.ThrowIfNull(value);
+#endif
 
         var canonical = value.Trim().ToLowerInvariant();
         if (canonical.Length != 64 || canonical.Any(character => character is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')))
@@ -382,6 +396,6 @@ public sealed record CodeModAdmissionBinding
             GameFingerprint.Value,
             AdapterId,
             AdapterVersion);
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(canonical))).ToLowerInvariant();
+        return PortableContractUtilities.ToLowerHex(PortableContractUtilities.ComputeSha256(Encoding.UTF8.GetBytes(canonical)));
     }
 }

@@ -64,4 +64,49 @@ public sealed class LoaderLogParserTests
         Assert.False(summary.ConfigurationGenerated);
         Assert.Equal(SmokeTestOutcome.Passed, SmokeTestOutcomeClassifier.Classify(true, true, summary));
     }
+
+    [Fact]
+    public void CompleteBootstrapEvidenceAcceptsAProcessThatExitedDuringObservation()
+    {
+        var summary = LoaderLogParser.Parse("""
+            BepInEx 5.4.23.5
+            Preloader finished
+            Chainloader initialized
+            0 plugins to load
+            """);
+        var launch = new LaunchObservationResult(
+            Started: true,
+            StableInitialized: false,
+            Exited: true,
+            ExitCode: 0,
+            ExecutableWasInsideExperiment: true,
+            RequiresManualClosure: false,
+            Elapsed: TimeSpan.FromMilliseconds(1),
+            FailureCategory: "process-exited-during-observation");
+
+        Assert.True(LoaderBootstrapLaunchCriteria.IsObserved(launch, summary));
+        Assert.Equal(
+            SmokeTestOutcome.Passed,
+            SmokeTestOutcomeClassifier.Classify(true, LoaderBootstrapLaunchCriteria.IsObserved(launch, summary), summary));
+    }
+
+    [Fact]
+    public void IncompleteBootstrapEvidenceDoesNotAcceptAnExitedProcess()
+    {
+        var summary = LoaderLogParser.Parse("BepInEx 5.4.23.5");
+        var launch = new LaunchObservationResult(
+            Started: true,
+            StableInitialized: false,
+            Exited: true,
+            ExitCode: 0,
+            ExecutableWasInsideExperiment: true,
+            RequiresManualClosure: false,
+            Elapsed: TimeSpan.FromMilliseconds(1),
+            FailureCategory: "process-exited-during-observation");
+
+        Assert.False(LoaderBootstrapLaunchCriteria.IsObserved(launch, summary));
+        Assert.Equal(
+            SmokeTestOutcome.Failed,
+            SmokeTestOutcomeClassifier.Classify(true, LoaderBootstrapLaunchCriteria.IsObserved(launch, summary), summary));
+    }
 }

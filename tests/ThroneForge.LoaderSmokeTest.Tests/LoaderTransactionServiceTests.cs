@@ -16,7 +16,7 @@ public sealed class LoaderTransactionServiceTests
             baseline,
             LoaderTransactionStatus.FailedAndRolledBack,
             [new TransactionEntry("BepInEx/core.dll", TransactionChangeKind.NewFile, null, new string('a', 64), null)]);
-        var path = Path.Combine(roots.ManifestsRoot, "transaction-state.json");
+        var path = LoaderSmokeTestStatePaths.GetTransactionStatePath(roots);
         LoaderTransactionStateService.SaveAtomic(path, state);
 
         Assert.Throws<SmokeTestException>(() => LoaderTransactionStateService.LoadAndValidate(
@@ -39,7 +39,7 @@ public sealed class LoaderTransactionServiceTests
             LaunchEvidence = new LoaderBootstrapEvidence("5.4.23.5", true, true, 0, 0, 0, 0)
         };
 
-        var path = Path.Combine(roots.ManifestsRoot, "transaction-state.json");
+        var path = LoaderSmokeTestStatePaths.GetTransactionStatePath(roots);
         LoaderTransactionStateService.SaveAtomic(path, state);
 
         Assert.Throws<SmokeTestException>(() => LoaderTransactionStateService.LoadAndValidate(
@@ -64,7 +64,7 @@ public sealed class LoaderTransactionServiceTests
         LoaderTransactionService.Apply(roots, plan, extracted);
         var expected = LoaderTransactionService.BuildExpectedAppliedManifest(baseline, extracted);
         var state = CreateState(roots, baseline, LoaderTransactionStatus.Applied, plan.Entries, expected);
-        var path = Path.Combine(roots.ManifestsRoot, "transaction-state.json");
+        var path = LoaderSmokeTestStatePaths.GetTransactionStatePath(roots);
         LoaderTransactionStateService.SaveAtomic(path, state);
 
         var loaded = LoaderTransactionStateService.LoadAndValidate(
@@ -75,6 +75,41 @@ public sealed class LoaderTransactionServiceTests
             [LoaderTransactionStatus.Applied]);
 
         LoaderTransactionStateService.VerifyAppliedProfile(roots, loaded);
+    }
+
+    [Fact]
+    public void BootstrapMayCreateKnownEmptyPluginAndPatcherDirectoriesButNotFilesInsideThem()
+    {
+        var applied = new CopyManifest(
+            [new FileManifestEntry("game.txt", 4, new string('a', 64))],
+            ["BepInEx"]);
+        var current = new CopyManifest(
+            [
+                new FileManifestEntry("game.txt", 4, new string('a', 64)),
+                new FileManifestEntry("BepInEx/LogOutput.log", 2, new string('b', 64)),
+                new FileManifestEntry("BepInEx/config/BepInEx.cfg", 3, new string('c', 64)),
+                new FileManifestEntry("BepInEx/cache/chainloader_typeloader.dat", 4, new string('d', 64)),
+                new FileManifestEntry("BepInEx/cache/harmony_interop_cache.dat", 5, new string('e', 64))
+            ],
+            ["BepInEx", "BepInEx/config", "BepInEx/cache", "BepInEx/plugins", "BepInEx/patchers"]);
+
+        var generated = LoaderTransactionStateService.CaptureGeneratedEvidence(
+            applied,
+            current,
+            out var generatedDirectories);
+
+        Assert.Equal(4, generated.Count);
+        Assert.Contains("BepInEx/plugins", generatedDirectories);
+        Assert.Contains("BepInEx/patchers", generatedDirectories);
+
+        var withPluginFile = new CopyManifest(
+            [new FileManifestEntry("game.txt", 4, new string('a', 64)), new FileManifestEntry("BepInEx/plugins/plugin.dll", 1, new string('b', 64))],
+            current.Directories);
+
+        Assert.Throws<SmokeTestException>(() => LoaderTransactionStateService.CaptureGeneratedEvidence(
+            applied,
+            withPluginFile,
+            out _));
     }
 
     [Fact]
@@ -98,7 +133,7 @@ public sealed class LoaderTransactionServiceTests
         {
             LaunchEvidence = new LoaderBootstrapEvidence("5.4.23.5", true, true, 0, 0, 0, 0)
         };
-        var path = Path.Combine(roots.ManifestsRoot, "transaction-state.json");
+        var path = LoaderSmokeTestStatePaths.GetTransactionStatePath(roots);
         LoaderTransactionStateService.SaveAtomic(path, state);
 
         var loaded = LoaderTransactionStateService.LoadAndValidate(
@@ -121,7 +156,7 @@ public sealed class LoaderTransactionServiceTests
         var state = CreateState(roots, baseline, LoaderTransactionStatus.LaunchObserved, [
             new TransactionEntry("BepInEx/core.dll", TransactionChangeKind.NewFile, null, new string('a', 64), null)
         ]);
-        var path = Path.Combine(roots.ManifestsRoot, "transaction-state.json");
+        var path = LoaderSmokeTestStatePaths.GetTransactionStatePath(roots);
         LoaderTransactionStateService.SaveAtomic(path, state);
 
         Assert.Throws<SmokeTestException>(() => LoaderTransactionStateService.LoadAndValidate(
@@ -141,7 +176,7 @@ public sealed class LoaderTransactionServiceTests
         var state = CreateState(roots, baseline, LoaderTransactionStatus.Applied, [
             new TransactionEntry("BepInEx/core.dll", TransactionChangeKind.NewFile, null, new string('a', 64), null)
         ]);
-        var path = Path.Combine(roots.ManifestsRoot, "transaction-state.json");
+        var path = LoaderSmokeTestStatePaths.GetTransactionStatePath(roots);
         LoaderTransactionStateService.SaveAtomic(path, state);
 
         Assert.Throws<SmokeTestException>(() => LoaderTransactionStateService.LoadAndValidate(

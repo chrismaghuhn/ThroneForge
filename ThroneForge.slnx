@@ -17,6 +17,7 @@
   <Project Path="src/ThroneForge.Discovery/ThroneForge.Discovery.csproj" />
   <Project Path="src/ThroneForge.LoaderSmokeTest/ThroneForge.LoaderSmokeTest.csproj" />
   <Project Path="src/ThroneForge.PluginLoadTest/ThroneForge.PluginLoadTest.csproj" />
+  <Project Path="src/ThroneForge.PluginSmokeTest/ThroneForge.PluginSmokeTest.csproj" />
   <Project Path="tests/ThroneForge.ArchitectureTests/ThroneForge.ArchitectureTests.csproj" />
   <Project Path="tests/ThroneForge.Contracts.Tests/ThroneForge.Contracts.Tests.csproj" />
   <Project Path="tests/ThroneForge.Schemas.Tests/ThroneForge.Schemas.Tests.csproj" />
@@ -31,6 +32,7 @@
   <Project Path="tests/ThroneForge.PluginLoadFixture/ThroneForge.PluginLoadFixture.csproj" />
   <Project Path="tests/ThroneForge.PluginLoadDuplicateFixture/ThroneForge.PluginLoadDuplicateFixture.csproj" />
   <Project Path="tests/ThroneForge.PluginLoadTest.Tests/ThroneForge.PluginLoadTest.Tests.csproj" />
+  <Project Path="tests/ThroneForge.PluginSmokeTest.Tests/ThroneForge.PluginSmokeTest.Tests.csproj" />
   <Project Path="tests/ThroneForge.PluginLoadHelperFixture/ThroneForge.PluginLoadHelperFixture.csproj" />
   <Project Path="tests/ThroneForge.PluginLoadHelperDependentFixture/ThroneForge.PluginLoadHelperDependentFixture.csproj" />
   <Project Path="tests/ThroneForge.PluginLoadNativeFixture/ThroneForge.PluginLoadNativeFixture.csproj" />

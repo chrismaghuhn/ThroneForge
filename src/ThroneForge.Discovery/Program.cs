@@ -150,6 +150,7 @@ public static class DiscoveryCli
             stdout.WriteLine($"Runtime compatibility report: {Path.GetFileName(result.ReportPath)}");
             stdout.WriteLine($"Managed runtime profile: {result.ManagedRuntimeProfile}");
             stdout.WriteLine($"Executable architecture: {result.ExecutableArchitecture}");
+            stdout.WriteLine($"Selected executable: {result.SelectedExecutableRelativePath ?? "unknown"}");
             stdout.WriteLine($"Target-framework recommendation: {result.TargetFrameworkRecommendation}");
             stdout.WriteLine($"Recommended candidate: {result.RecommendedCandidate}");
             stdout.WriteLine($"Current clean-profile smoke-test readiness: {result.SmokeTestReadiness.Status}");

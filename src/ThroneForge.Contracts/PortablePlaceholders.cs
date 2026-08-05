@@ -14,7 +14,7 @@ public enum AdapterCompatibility
     InitializationFailed
 }
 
-public sealed record AdapterCapabilities(IReadOnlySet<string> FeatureKeys);
+public sealed record AdapterCapabilities(IReadOnlyCollection<string> FeatureKeys);
 
 public sealed record GameCatalog(string Fingerprint);
 
@@ -25,4 +25,3 @@ public sealed record WaveValidationResult(IReadOnlyList<ValidationIssue> Issues)
 public sealed record WaveHandle(string Value);
 
 public sealed record ValidationIssue(string Code, string Message);
-

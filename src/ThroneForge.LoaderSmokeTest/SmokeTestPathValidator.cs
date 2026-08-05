@@ -134,7 +134,7 @@ public static class SmokeTestPathValidator
         return normalized;
     }
 
-    internal static void EnsureExistingTreeHasNoReparsePoints(string root)
+    public static void EnsureExistingTreeHasNoReparsePoints(string root)
     {
         var normalized = ValidateExistingDirectory(root, "disposable profile");
         EnsureNoReparseOnExistingPath(normalized);
@@ -169,6 +169,9 @@ public static class SmokeTestPathValidator
             throw new SmokeTestException("The disposable profile could not be inspected safely.", exception);
         }
     }
+
+    public static void EnsureNoReparsePointsOnPath(string path)
+        => EnsureNoReparseOnExistingPath(CanonicalizeAbsolute(path, "path"));
 
     private static string ValidateExistingDirectory(string path, string description)
     {

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>ThroneForge.PluginSmokeTest</AssemblyName>
+    <RootNamespace>ThroneForge.PluginSmokeTest</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ThroneForge.API/ThroneForge.API.csproj" />
+    <ProjectReference Include="../ThroneForge.Contracts/ThroneForge.Contracts.csproj" />
+    <ProjectReference Include="../ThroneForge.Runtime/ThroneForge.Runtime.csproj" />
+    <ProjectReference Include="../ThroneForge.LoaderSmokeTest/ThroneForge.LoaderSmokeTest.csproj" />
+    <ProjectReference Include="../ThroneForge.Discovery/ThroneForge.Discovery.csproj" />
+  </ItemGroup>
+</Project>

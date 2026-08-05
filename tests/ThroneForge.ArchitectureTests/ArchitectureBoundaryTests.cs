@@ -26,7 +26,8 @@ public sealed class ArchitectureBoundaryTests
         "ThroneForge.TestKit",
         "ThroneForge.Discovery",
         "ThroneForge.LoaderSmokeTest",
-        "ThroneForge.PluginLoadTest"
+        "ThroneForge.PluginLoadTest",
+        "ThroneForge.PluginSmokeTest"
     ];
 
     private static readonly Dictionary<string, string[]> AllowedProjectReferences =
@@ -92,7 +93,15 @@ public sealed class ArchitectureBoundaryTests
             ],
             ["ThroneForge.Discovery"] = [],
             ["ThroneForge.LoaderSmokeTest"] = ["ThroneForge.Discovery"],
-            ["ThroneForge.PluginLoadTest"] = ["ThroneForge.API", "ThroneForge.Contracts", "ThroneForge.Runtime"]
+            ["ThroneForge.PluginLoadTest"] = ["ThroneForge.API", "ThroneForge.Contracts", "ThroneForge.Runtime"],
+            ["ThroneForge.PluginSmokeTest"] =
+            [
+                "ThroneForge.API",
+                "ThroneForge.Contracts",
+                "ThroneForge.Discovery",
+                "ThroneForge.LoaderSmokeTest",
+                "ThroneForge.Runtime"
+            ]
         };
 
     private static readonly string[] ForbiddenCoreReferenceTokens =

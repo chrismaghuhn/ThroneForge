@@ -7,6 +7,23 @@ namespace ThroneForge.LoaderSmokeTest.Tests;
 public sealed class Task3HardeningTests
 {
     [Fact]
+    public void Task3StatePathsUseOneCanonicalContract()
+    {
+        using var fixture = new SmokeTestFixture();
+        var roots = SmokeTestPathValidator.ValidateRoots(
+            fixture.RepositoryRoot,
+            fixture.GameRoot,
+            fixture.ExperimentRoot);
+
+        Assert.Equal(
+            Path.Combine(roots.ManifestsRoot, LoaderSmokeTestStatePaths.BaselineFileName),
+            LoaderSmokeTestStatePaths.GetBaselinePath(roots));
+        Assert.Equal(
+            Path.Combine(roots.ManifestsRoot, LoaderSmokeTestStatePaths.TransactionStateFileName),
+            LoaderSmokeTestStatePaths.GetTransactionStatePath(roots));
+    }
+
+    [Fact]
     public void OriginalVerificationEvidenceDistinguishesPendingPassedFailedAndDeferredStates()
     {
         var pending = new OriginalInstallationVerificationEvidence(
