@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 7 recovery hardening is active on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. The final authorized lifecycle result remains immutable `Failed` at `LoaderLaunch`; this correction may perform only one recovery-only rollback against the existing external experiment root and must not launch the game or repeat the lifecycle experiment. The C# `LifecycleExperimentOrchestrator` remains the single owner of stage execution, typed evidence, cleanup/recovery/postchecks, primary-failure persistence, and report generation; PowerShell is only an explicit-input wrapper around the real CLI operations.
+M1 - Task 7 recovery hardening is complete on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. The final authorized lifecycle result remains immutable `Failed` at `LoaderLaunch` with `loader-launch-failed`. The one permitted recovery-only rollback was executed after hosted validation and returned `Failed` with `recovery-runtime-drift`; no retry, lifecycle rerun, or Task 8 work is authorized. The C# `LifecycleExperimentOrchestrator` remains the single owner of stage execution, typed evidence, cleanup/recovery/postchecks, primary-failure persistence, and report generation; PowerShell is only an explicit-input wrapper around the real CLI operations.
 
 ## Milestones
 
@@ -38,7 +38,7 @@ The correction consumes only `throneforge-runtime-compatibility-evidence-v1`, ve
 
 Repository-only correction head `dbbcc3a` passed hosted run `31012843103` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 13 TRX files representing 327 tests with zero failures, errors, skips or not-executed tests. No private run was performed.
 
-Task-7 correction baseline: reviewed head `92094c4362f09f73ffdd1bc8807caaf4a904f611` passed hosted run `31005428380` with 13 TRX files and 304 tests per runner using SDK `10.0.100`. Correction head `bdd871fa263d5b97fc4a20160ee110d32f406c99` passed hosted run `31008620029` with 13 TRX files and 313 tests per runner using SDK `10.0.100`; all test counters were zero for failures, errors, skips, not-executed and aborted tests. The single corrective private run stopped at `OriginalPreflight` because the harness expected `Selected executable=...` while the discovery CLI emitted `Selected executable: ...`. No loader transaction, package, deployment or lifecycle marker was produced. The report records the failed result and no further private run is permitted for this correction.
+Task-7 correction baseline: reviewed head `92094c4362f09f73ffdd1bc8807caaf4a904f611` passed hosted run `31005428380` with 13 TRX files and 304 tests per runner using SDK `10.0.100`. Correction head `bdd871fa263d5b97fc4a20160ee110d32f406c99` passed hosted run `31008620029` with 13 TRX files and 313 tests per runner using SDK `10.0.100`; all test counters were zero for failures, errors, skips, not-executed and aborted tests. The first corrective private run stopped at `OriginalPreflight` because the harness expected `Selected executable=...` while the discovery CLI emitted `Selected executable: ...`. The final authorized private run later stopped at `LoaderLaunch` with `loader-launch-failed`; no package, deployment or lifecycle marker was produced. Both results remain immutable historical evidence; no further lifecycle run is permitted.
 
 ### Task-7 orchestration ownership correction
 
@@ -70,7 +70,17 @@ Current correction implementation adds a real C#-owned package-build boundary, T
 - [x] Bind the discovered selected executable to the explicitly supplied executable-relative path and derive the repository baseline commit from `git rev-parse HEAD`.
 - [x] Run the repository validation and exact-SDK hosted matrix, inspect every TRX artifact, and report readiness for one separately authorized private verification.
 
-This correction performs repository-only work. Implementation head `2139d41812b5da09c620a1685a217de1caa3510e` passed hosted run `31025440280`; the sanitized final-report head `e0bfd3958d4f2add190877b436737f7a0946b6e9` passed final hosted run `31028231111` on Windows and Ubuntu with SDK `10.0.100`. Each runner uploaded 13 TRX files representing 350 tests, all passed, with zero errors, skips, aborted, inconclusive or not-executed results and no TRX overwrite warning. Every downloaded TRX artifact was parsed independently. The one separately authorized final private run was performed once and failed at `LoaderLaunch` with `loader-launch-failed`; no lifecycle binding conclusion is claimed and no retry is authorized.
+This correction performs repository-only work. Implementation head `2139d41812b5da09c620a1685a217de1caa3510e` passed hosted run `31025440280`; the sanitized final-report head `e0bfd3958d4f2add190877b436737f7a0946b6e9` passed final hosted run `31028231111` on Windows and Ubuntu with SDK `10.0.100`. The recovery correction head `1549552810e826afc415355f87742faaecafc354` passed hosted run `31032572956` with 13 TRX files and 355 tests per runner; all tests passed and every artifact was parsed independently. The one separately authorized final private run was performed once and failed at `LoaderLaunch` with `loader-launch-failed`. The one permitted recovery-only rollback then failed before loader mutation with `recovery-runtime-drift`; no lifecycle binding conclusion is claimed and no retry is authorized.
+
+### Task-7 recovery closure
+
+- [x] Make cleanup conditional on recorded side effects; pre-deployment failure records plugin removal as `NotRequired`.
+- [x] Accept only a valid `Failed` ownership record with a bound rollback-eligible transaction for recovery.
+- [x] Validate bounded launch-time generated evidence before rollback and preserve exact baseline restoration as the final requirement.
+- [x] Keep experiment failure and recovery outcome separate in the sanitized report.
+- [x] Execute exactly one recovery-only rollback against the existing failed experiment after green hosted CI; it returned `recovery-runtime-drift` before loader mutation. No retry was performed.
+
+The final authorized experiment remains `Failed` at `LoaderLaunch` with no package, admission, deployment, or lifecycle evidence. Recovery did not establish the lifecycle binding and did not complete rollback; the original-installation postcheck from the experiment remains passed. M1 Task 8 must not begin.
 
 ### M2 - Contracts, schemas, validation, and fixtures
 

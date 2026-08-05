@@ -95,25 +95,25 @@
 - Modify: `CHANGELOG.md`
 - Modify: `docs/discovery/README.md`
 
-- [ ] **Step 1: Add recovery-only CLI evidence**
+- [x] **Step 1: Add recovery-only CLI evidence**
 
   Emit `rollback-result`, `loader-rollback-verified`, `disposable-restored`, `original-verified`, and stable recovery category; never emit a lifecycle success claim.
 
-- [ ] **Step 2: Extend the sanitized report**
+- [x] **Step 2: Extend the sanitized report**
 
   Record the immutable final experiment failure separately from recovery status, including `PluginRemoval=NotRequired` for the pre-deployment failure.
 
-- [ ] **Step 3: Update documentation without reclassifying Task 7**
+- [x] **Step 3: Update documentation without reclassifying Task 7**
 
   State that the lifecycle experiment remains `Failed`, recovery is a separate cleanup action, and Task 8 remains blocked.
 
 ### Task 5: Validate and perform the single authorized recovery-only action
 
-- [ ] **Step 1: Run local restore, format, Release build, tests, diff check, and hygiene checks.**
-- [ ] **Step 2: Push the repository-only correction and run exact-SDK hosted CI.**
-- [ ] **Step 3: Download and parse all hosted TRX artifacts; require zero failures, skips, aborts, inconclusive and not-executed results.**
-- [ ] **Step 4: Execute exactly one `-Mode Rollback` against the existing failed experiment root. Do not launch the game and do not create a new experiment.**
-- [ ] **Step 5: Record the recovery result, commit only sanitized documentation, run final hosted CI, and stop.**
+- [x] **Step 1: Run local restore, format, Release build, tests, diff check, and hygiene checks.**
+- [x] **Step 2: Push the repository-only correction and run exact-SDK hosted CI.**
+- [x] **Step 3: Download and parse all hosted TRX artifacts; require zero failures, skips, aborts, inconclusive and not-executed results.**
+- [x] **Step 4: Execute exactly one `-Mode Rollback` against the existing failed experiment root. It returned `recovery-runtime-drift` before loader mutation; no retry was performed.**
+- [x] **Step 5: Record the recovery result, commit only sanitized documentation, run final hosted CI, and stop.**
 
 ## Self-review
 
