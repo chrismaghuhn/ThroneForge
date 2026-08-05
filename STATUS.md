@@ -2,17 +2,17 @@
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is in progress on `agent/m1-disposable-bepinex-plugin-smoke-test`; the final private attempt exposed and safely stopped at a Task-3/Task-6 baseline-state path mismatch. The correction is implemented locally; M1 Task 7 has not started.
+M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is complete on `agent/m1-disposable-bepinex-plugin-smoke-test`; the corrected private run passed in one fresh external profile. M1 Task 7 has not started.
 
 ## State
 
-M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 repository-only hardening is complete and hosted-verified below. M1 Task 6 hardening is implemented and hosted-verified, but the final fresh private attempt failed during deployment-state validation before plugin files were written; M1 overall remains incomplete.
+M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. M1 Task 5 repository-only hardening is complete and hosted-verified below. Task 6 state-path hardening is implemented at `bda540f9f4c97868d2469c0d5f48826269528e8f`, hosted-verified in run `30998768487`, and followed by one corrected private `Passed` run. M1 overall remains incomplete.
 
-The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below. Task 6's earlier private result is retained as limited historical evidence; the hardening implementation and a fresh private rerun are pending.
+The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below. Task 6 retains the earlier failed deployment attempt as historical evidence and records the corrected private pass separately.
 
-Task 6 hardening adds an atomically owned experiment state, derived loader/profile preconditions, exact-byte three-file recapture and admission, transactional deployment rollback, full package metadata validation, runtime API/Contracts identity markers, public-surface parity checks, and owned cleanup/recovery paths. The earlier private run is `PassedWithWarnings` because it did not capture actual runtime identity evidence. The fresh `final15` attempt recaptured the package successfully but `admit-and-deploy` rejected the disposable profile state before writing plugin files; rollback and original post-verification passed. The exact deployment-state rejection remains unresolved.
+Task 6 hardening adds an atomically owned experiment state, derived loader/profile preconditions, exact-byte three-file recapture and admission, transactional deployment rollback, full package metadata validation, runtime API/Contracts identity markers, public-surface parity checks, and owned cleanup/recovery paths. The earlier private run remains limited `PassedWithWarnings` evidence because it did not capture actual runtime identity evidence. The subsequent `final15` attempt remains `Failed` because the legacy baseline path stopped deployment before plugin files were written. The corrected fresh run passed with actual runtime identity evidence, one plugin marker, complete rollback, and unchanged original-installation verification.
 
-The diagnosed mismatch was `baseline.json` in `PluginDeploymentService` versus the canonical `baseline-copy-manifest.json` written by the Task-3 orchestrator. The correction centralizes both Task-3 state paths and validates loader transactions against `baseline.DisposableManifest`. The previous private result remains `Failed`; a fresh private rerun is allowed only after the corrected branch passes hosted synthetic CI. M1 Task 7 remains unstarted.
+The diagnosed mismatch was `baseline.json` in `PluginDeploymentService` versus the canonical `baseline-copy-manifest.json` written by the Task-3 orchestrator. The correction centralizes both Task-3 state paths and validates loader transactions against `baseline.DisposableManifest`. Hosted run `30998768487` validated the corrected head on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files, and 279 tests per runner; the artifacts were downloaded and parsed independently. One fresh corrected private run then passed. M1 Task 7 remains unstarted.
 
 ## Completed
 
@@ -121,7 +121,8 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - `PluginDeploymentService.DeriveContext` now loads the canonical disposable baseline, validates the original manifest against it, and passes `baseline.DisposableManifest` to loader-transaction validation.
 - State-gate failures now expose sanitized stable categories including `baseline-state-missing`, `baseline-state-mismatch`, `transaction-state-missing`, `transaction-state-mismatch`, and `applied-profile-drift`; the CLI does not print paths or inner exception text.
 - Local validation with SDK `10.0.110`: locked restore PASS, format verification PASS, Release build PASS with 0 warnings/errors, full tests PASS with 279 tests, and focused PluginSmokeTest/LoaderSmokeTest suites PASS with 31/70 tests. The committed SDK selection remains `10.0.100`.
-- The corrected branch-head hosted CI and its TRX artifacts are still pending. No corrected private run has been performed yet.
+- Hosted run [30998768487](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30998768487) validated correction head `bda540f9f4c97868d2469c0d5f48826269528e8f`: Windows and Ubuntu each used SDK `10.0.100`, uploaded 13 TRX files representing 279 tests, and reported 0 failures, errors, or skips. Both artifacts were downloaded and parsed independently; no TRX overwrite warning occurred.
+- One corrected private run was performed after that hosted pass in a fresh external profile. It passed with package digest `0193d57e79c3c61057bc3a296f4529d0fda32ba43c34e2d82dc2ca59a67f42a9`, admission binding digest `1fd37cd4e3eebf82a80a3f3ba30017272d99d46f95da7483cff1f086fba47b0f`, exactly three deployed files, one expected plugin and nonce marker, actual API/Contracts identities matching `Version=1.0.0.0`, no lifecycle marker, successful plugin removal and loader rollback, complete disposable restoration, and unchanged original installation. The private run used local SDK `10.0.110` only because `10.0.100` is not installed on this workstation; `global.json` was restored to `10.0.100`.
 
 ## Unverified assumptions
 
@@ -216,16 +217,16 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Local SDK `10.0.110` validation passes restore, format, Release build, the full 244-test suite, 32 focused PluginLoad tests, 12 Architecture tests, and 27 Contracts tests. Exact pinned SDK validation passed in hosted CI below; SDK `10.0.100` is not installed locally.
 - Final hosted validation passed in run [30978672030](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30978672030) for head `a8595e7b56b80ab338e5d148c1ba1f13455598d4`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 244 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were downloaded and independently parsed; no `Overwriting results file` warning occurred.
 
-## M1 Task 6 hardening in progress
+## M1 Task 6 completion evidence
 
 - Historical private result: `PassedWithWarnings` for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`, with BepInEx `5.4.23.5`, one synthetic plugin, nonce marker, preloader, chainloader, rollback, and original post-check evidence. The old run did not measure actual runtime API/Contracts resolution and is not treated as final Task-6 evidence.
 - Current hardening adds an atomically persisted ownership record, derived loader/profile preconditions, exact-byte package recapture/admission/deployment, transactional partial-deployment cleanup, strict three-file metadata validation, actual runtime assembly identity markers, public API/Contracts surface parity, and owned recovery/cleanup.
-- New local synthetic coverage currently includes ownership/schema validation, duplicate-marker rejection, API/Contracts parity, and transactional partial-deployment rollback. The private experiment has not been rerun.
-- The current report remains deliberately limited until exactly one fresh private run is performed after current-head hosted Windows/Linux CI passes. M1 Task 7 remains unstarted.
+- New local synthetic coverage includes ownership/schema validation, duplicate-marker rejection, API/Contracts parity, transactional partial-deployment rollback, canonical state-path integration, and sanitized state-gate categories. The corrected private run is recorded in the fingerprint-specific report.
+- Task 6 is complete for this bounded synthetic-plugin experiment. It does not establish Thronefall API, Harmony, lifecycle, catalog, wave, or production plugin compatibility. M1 Task 7 remains unstarted.
 
 ## Next task
 
-The next task gate is current-head hosted Windows/Linux CI with exact SDK `10.0.100`, followed by inspection of every TRX artifact. Only then may the corrected private Task-6 run be executed exactly once in a fresh external profile. M1 Task 7 remains unstarted.
+The next task is a separately scoped M1 Task 7 plan and review. Do not begin it on this branch or infer game API/lifecycle behavior from the synthetic-plugin result. M1 Task 7 remains unstarted.
 
 ### M1 Task 3 earlier hardening evidence
 

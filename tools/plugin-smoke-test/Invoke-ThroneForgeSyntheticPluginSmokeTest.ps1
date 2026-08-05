@@ -424,15 +424,17 @@ $reportLines = @(
     "- Archive: $expectedArchiveName",
     "- Archive digest status: matched expected supplied SHA-256",
     "- Package digest: $($package.PackageDigest)",
+    "- Admission binding digest: $($package.AdmissionBindingDigest)",
     "- Package files: exactly 3 (synthetic plugin, ThroneForge.API, ThroneForge.Contracts)",
     "- Target framework evidence: $($package.TargetFramework)",
-    "- Plugin marker: $(if ($pluginMarkerVerified) { 'one nonce-bound readiness marker verified; nonce omitted from this report' } else { 'not observed; the synthetic plugin was not deployed or launched' })",
+    "- Plugin marker: $(if ($pluginMarkerVerified) { 'exactly one nonce-bound readiness marker verified; nonce omitted from this report' } else { 'not observed; the synthetic plugin was not deployed or launched' })",
+    "- Historical prior attempt: baseline-state-path mismatch stopped before plugin deployment; no plugin files were written.",
     "- BepInEx evidence: $(if ($pluginMarkerVerified) { "version, preloader, chainloader, one plugin, runtime API identity '$runtimeApiIdentity', runtime Contracts identity '$runtimeContractsIdentity', and zero fatal/errors were required" } elseif ($loaderOnlyVerified) { 'loader-only version, preloader, chainloader, zero-plugin, and zero-fatal bootstrap evidence passed; plugin evidence was not reached' } else { 'no complete loader bootstrap evidence was recorded' })",
     '- Explicit ThroneForge lifecycle calls: none; lifecycle marker would fail the result',
     "- Rollback/recovery state: $(if ($manualClosureRequired) { 'ManualClosureRequired; recovery marker persisted; no files were modified while process remained active.' } elseif ($rollbackOperationVerified) { 'Loader transaction rollback completed and reported verified.' } else { 'Loader transaction rollback was not verified.' })",
     "- Failure or warning summary: $failureSummary",
     '- Privacy statement: no absolute paths, nonce, usernames, machine names, raw logs, binaries, archives, or private manifests are included.',
-    "- Next permitted task: resolve the Task-6 deployment-state validation failure before any further private run; M1 Task 7 remains unstarted."
+    "- Next permitted task: M1 Task 7 remains unstarted; no game API, Harmony, lifecycle, catalog, wave, or production-plugin compatibility is claimed."
 )
 Write-Utf8NoBom $reportPath ($reportLines -join [Environment]::NewLine)
 Write-Output "Smoke-test result: $result"

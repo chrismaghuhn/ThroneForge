@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is in progress on `agent/m1-disposable-bepinex-plugin-smoke-test`; the previous private deployment stopped safely at a baseline-state path mismatch. M1 Task 7 has not started.
+M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is complete on `agent/m1-disposable-bepinex-plugin-smoke-test`; the previous private deployment stopped safely at a baseline-state path mismatch, and one corrected fresh private run passed. M1 Task 7 has not started.
 
 ## Milestones
 
@@ -12,11 +12,11 @@ M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is in progr
 
 Deliver a clean-clone buildable solution skeleton, pinned external-tool SDK, centralized build/package settings, the stable-core/adapter project boundaries, initial ADRs, architecture tests, CI, and honest project status documentation. Use only placeholder interfaces and portable types; do not reference or name unverified Thronefall internals. Acceptance requires a game-free build, passing architecture tests, no forbidden runtime references outside placeholder game-facing projects, and all required validation commands passing.
 
-### M1 - Task 6: disposable BepInEx synthetic-plugin smoke test (hardening blocked; M1 overall incomplete)
+### M1 - Task 6: disposable BepInEx synthetic-plugin smoke test (complete; M1 overall incomplete)
 
-The branch adds an external `ThroneForge.PluginSmokeTest` project, source-only synthetic plugin template, metadata-selected `netstandard2.0`/`netstandard2.1` build path, exact three-file package manifest and digest, immediate Task-4 admission, and a local-only orchestrator that reuses Task-3 copy/transaction/launch/rollback services. The final fresh private attempt recaptured and metadata-validated the package but failed at disposable-profile deployment-state validation before plugin files were written; M1 Task 7 is not started.
+The branch adds an external `ThroneForge.PluginSmokeTest` project, source-only synthetic plugin template, metadata-selected `netstandard2.0`/`netstandard2.1` build path, exact three-file package manifest and digest, immediate Task-4 admission, and a local-only orchestrator that reuses Task-3 copy/transaction/launch/rollback services. The earlier fresh attempt recaptured and metadata-validated the package but failed at disposable-profile deployment-state validation before plugin files were written. After the canonical state-path correction, one fresh private run passed with actual runtime identities, one plugin/nonce marker, successful removal and rollback, complete disposable restoration, and unchanged original verification. M1 Task 7 is not started.
 
-Task-6 completion requires the sanitized report, unchanged original-installation manifest and runtime post-checks, verified loader rollback, and final hosted validation of the current head. It does not claim a real Thronefall plugin, lifecycle, game API, Harmony, catalog, or custom-wave capability.
+Task-6 completion is recorded by the sanitized report, unchanged original-installation manifest and runtime post-checks, verified loader rollback, and hosted run `30998768487` for correction head `bda540f9f4c97868d2469c0d5f48826269528e8f`. It does not claim a real Thronefall plugin, lifecycle, game API, Harmony, catalog, or custom-wave capability.
 
 ### M1 - Thronefall discovery spike
 
@@ -284,7 +284,7 @@ Task-2 merge evidence: PR #2 merged into `main` at `d3f1bb4fde9f77efbb84349f4403
 - [x] Add regression coverage for output protection, renamed installations, crash-handler ordering, ambiguous executables, CLI redaction, and report non-creation after rejected output.
 - [x] Correct status, plan, README, and changelog wording; run local and hosted validation without starting loader/runtime work.
 
-## M1 Task 6 hardening follow-up (state-path correction in progress)
+## M1 Task 6 hardening follow-up (state-path correction complete)
 
 - [x] Add an atomically persisted, fingerprint-bound Task-6 ownership record and reject unowned rollback/cleanup targets.
 - [x] Derive plugin-deployment preconditions from the owned disposable profile, loader transaction state, complete current manifest, process state, and empty custom-plugin root.
@@ -294,9 +294,9 @@ Task-2 merge evidence: PR #2 merged into `main` at `d3f1bb4fde9f77efbb84349f4403
 - [x] Emit runtime API/Contracts identities from the loaded assemblies instead of build-time constants; add metadata-only net10.0/netstandard2.1 public-surface parity checks.
 - [x] Add structured recovery-marker persistence and malformed-marker handling; do not claim recovery when the marker is unavailable.
 - [x] Run local validation with installed SDK 10.0.110, restore `global.json` to committed SDK 10.0.100, push the hardened branch, and inspect green hosted Windows/Linux CI with complete TRX artifact inspection.
-- [x] Perform the required fresh private attempt after hosted CI in an external profile. Package recapture and metadata validation passed, but `admit-and-deploy` rejected disposable-profile state before plugin files were written; rollback and original post-verification passed.
-- [ ] Centralize the canonical Task-3 baseline and transaction-state paths and use them from both the loader orchestrator and Task-6 deployment service.
-- [ ] Bind Task-6 loader-state validation to the saved disposable baseline manifest and expose stable sanitized state-gate failure categories.
-- [ ] Add positive real-service context-derivation coverage plus negative legacy/missing/mismatch state tests.
-- [ ] Perform exactly one fresh private follow-up only after exact-SDK hosted synthetic CI passes.
+- [x] Perform the required fresh private attempt after hosted CI in an external profile. The corrected run passed with exact package recapture/admission, actual runtime identities, one plugin marker, successful plugin removal, loader rollback, complete disposable restoration, and unchanged original verification.
+- [x] Centralize the canonical Task-3 baseline and transaction-state paths and use them from both the loader orchestrator and Task-6 deployment service.
+- [x] Bind Task-6 loader-state validation to the saved disposable baseline manifest and expose stable sanitized state-gate failure categories.
+- [x] Add positive real-service context-derivation coverage plus negative legacy/missing/mismatch state tests.
+- [x] Perform exactly one fresh private follow-up only after exact-SDK hosted synthetic CI passes; hosted run `30998768487` passed with 13 TRX files and 279 tests per runner.
 - [x] Keep M1 Task 7 unstarted.
