@@ -78,6 +78,41 @@ public sealed class LoaderTransactionServiceTests
     }
 
     [Fact]
+    public void BootstrapMayCreateKnownEmptyPluginAndPatcherDirectoriesButNotFilesInsideThem()
+    {
+        var applied = new CopyManifest(
+            [new FileManifestEntry("game.txt", 4, new string('a', 64))],
+            ["BepInEx"]);
+        var current = new CopyManifest(
+            [
+                new FileManifestEntry("game.txt", 4, new string('a', 64)),
+                new FileManifestEntry("BepInEx/LogOutput.log", 2, new string('b', 64)),
+                new FileManifestEntry("BepInEx/config/BepInEx.cfg", 3, new string('c', 64)),
+                new FileManifestEntry("BepInEx/cache/chainloader_typeloader.dat", 4, new string('d', 64)),
+                new FileManifestEntry("BepInEx/cache/harmony_interop_cache.dat", 5, new string('e', 64))
+            ],
+            ["BepInEx", "BepInEx/config", "BepInEx/cache", "BepInEx/plugins", "BepInEx/patchers"]);
+
+        var generated = LoaderTransactionStateService.CaptureGeneratedEvidence(
+            applied,
+            current,
+            out var generatedDirectories);
+
+        Assert.Equal(4, generated.Count);
+        Assert.Contains("BepInEx/plugins", generatedDirectories);
+        Assert.Contains("BepInEx/patchers", generatedDirectories);
+
+        var withPluginFile = new CopyManifest(
+            [new FileManifestEntry("game.txt", 4, new string('a', 64)), new FileManifestEntry("BepInEx/plugins/plugin.dll", 1, new string('b', 64))],
+            current.Directories);
+
+        Assert.Throws<SmokeTestException>(() => LoaderTransactionStateService.CaptureGeneratedEvidence(
+            applied,
+            withPluginFile,
+            out _));
+    }
+
+    [Fact]
     public void ValidLaunchObservedStateRequiresAndRetainsBootstrapEvidence()
     {
         using var fixture = new SmokeTestFixture();

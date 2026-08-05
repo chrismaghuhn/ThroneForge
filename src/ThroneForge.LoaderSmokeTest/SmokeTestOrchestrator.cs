@@ -173,7 +173,10 @@ public static class SmokeTestOrchestrator
         LoaderLogSummary? summary = null;
         try
         {
-            launch = LaunchCopiedExecutable(roots, preflight.Snapshot.SelectedExecutableRelativePath);
+            launch = LaunchCopiedExecutable(
+                roots,
+                preflight.Snapshot.SelectedExecutableRelativePath,
+                TimeSpan.FromSeconds(60));
             summary = LoaderLogParser.Parse(ReadKnownLoaderLog(roots.CleanGameRoot));
             var bootstrapObserved = LoaderBootstrapLaunchCriteria.IsObserved(launch, summary);
             var status = bootstrapObserved
@@ -797,7 +800,10 @@ public static class SmokeTestOrchestrator
         return copied;
     }
 
-    private static LaunchObservationResult LaunchCopiedExecutable(SmokeTestRoots roots, string? relativePath)
+    private static LaunchObservationResult LaunchCopiedExecutable(
+        SmokeTestRoots roots,
+        string? relativePath,
+        TimeSpan? observationWindow = null)
     {
         if (string.IsNullOrWhiteSpace(relativePath))
         {
@@ -809,7 +815,7 @@ public static class SmokeTestOrchestrator
             executable,
             roots.CleanGameRoot,
             roots.ExperimentRoot,
-            TimeSpan.FromSeconds(10),
+            observationWindow ?? TimeSpan.FromSeconds(10),
             TimeSpan.FromSeconds(10));
     }
 

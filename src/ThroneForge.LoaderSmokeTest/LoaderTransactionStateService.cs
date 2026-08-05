@@ -359,7 +359,9 @@ public static class LoaderTransactionStateService
             || path.StartsWith("BepInEx/config/", StringComparison.Ordinal)
             || path.StartsWith("BepInEx/cache/", StringComparison.Ordinal)
             || string.Equals(path, "BepInEx/config", StringComparison.Ordinal)
-            || string.Equals(path, "BepInEx/cache", StringComparison.Ordinal);
+            || string.Equals(path, "BepInEx/cache", StringComparison.Ordinal)
+            || string.Equals(path, "BepInEx/plugins", StringComparison.Ordinal)
+            || string.Equals(path, "BepInEx/patchers", StringComparison.Ordinal);
 
     private static bool IsSha256(string? value)
         => !string.IsNullOrWhiteSpace(value)
