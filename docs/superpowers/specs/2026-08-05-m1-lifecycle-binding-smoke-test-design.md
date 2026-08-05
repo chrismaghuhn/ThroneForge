@@ -12,6 +12,8 @@ The binding is identified as `unity-application-quitting-v1`. No Thronefall-defi
 
 The implementation reuses Task-6 ownership, loader transaction, package capture, admission, deployment, launch, removal, rollback, and complete original/disposable post-verification services. The Task-7 package contains exactly the lifecycle plugin, `ThroneForge.API.dll`, and `ThroneForge.Contracts.dll`. Hosted CI remains source-only; one private run is permitted only after hosted synthetic CI passes and uses a fresh external disposable profile.
 
+The repository correction is fail-closed: machine-readable runtime evidence is a strict versioned JSON contract; loader state is read through the canonical Task-3/Task-6 services; package capture/admission/deployment is reported as one bounded `AdmitAndDeploy` stage; and the final result carries independent plugin-removal, loader-rollback, disposable-restoration and original-postcheck facts. No private experiment is part of this correction.
+
 ## Metadata contract
 
 Before a private run, the exact local `UnityEngine.CoreModule.dll` is inspected with `PEReader` and `MetadataReader`. The validator requires a public static `UnityEngine.Application.quitting` event with handler type `System.Action` and public static add/remove accessors. The Unity assembly is never loaded by the external validator and no Unity binary is committed.

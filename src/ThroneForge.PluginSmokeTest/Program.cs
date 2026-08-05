@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ThroneForge.LoaderSmokeTest;
+using ThroneForge.Runtime;
 
 namespace ThroneForge.PluginSmokeTest;
 
@@ -14,7 +15,7 @@ public static class PluginSmokeCli
     {
         if (args.Length == 0)
         {
-            stderr.WriteLine("Usage: package|lifecycle-package|admit|admit-and-deploy|remove|parse-marker|inspect-lifecycle-binding|verify-lifecycle-log|lifecycle-stage with explicit paths and evidence.");
+            stderr.WriteLine("Usage: package|lifecycle-package|admit|admit-and-deploy|verify-loader-stage|remove|parse-marker|inspect-lifecycle-binding|verify-lifecycle-log|lifecycle-stage with explicit paths and evidence.");
             return 2;
         }
 
@@ -26,6 +27,7 @@ public static class PluginSmokeCli
                 "lifecycle-package" => LifecyclePackage(args, stdout),
                 "admit" => Admit(args, stdout),
                 "admit-and-deploy" => AdmitAndDeploy(args, stdout),
+                "verify-loader-stage" => VerifyLoaderStage(args, stdout),
                 "deploy" => throw new PluginSmokeException("Direct deployment is disabled; use admit-and-deploy with a validated Task-6 ownership record."),
                 "remove" => Remove(args, stdout),
                 "parse-marker" => ParseMarker(args, stdout),
@@ -42,6 +44,11 @@ public static class PluginSmokeCli
                 "lifecycle-stage" => LifecycleStage(args, stdout),
                 _ => throw new PluginSmokeException("The requested plugin smoke-test operation is unsupported.")
             };
+        }
+        catch (PluginSmokePhaseException exception)
+        {
+            stderr.WriteLine($"Plugin smoke test failed: phase={exception.Phase}; phase-failure-category={exception.FailureCategory}.");
+            return 2;
         }
         catch (PluginSmokeStateException exception)
         {
@@ -129,28 +136,69 @@ public static class PluginSmokeCli
 
     private static int AdmitAndDeploy(string[] args, TextWriter stdout)
     {
-        var expected = PluginPackageManifestService.Load(Value(args, "--manifest-path"));
+        PluginPackageManifest expected;
+        try
+        {
+            expected = PluginPackageManifestService.Load(Value(args, "--manifest-path"));
+        }
+        catch (Exception exception)
+        {
+            throw new PluginSmokePhaseException("package-capture", LifecycleExperimentFailureCategories.PackageCaptureFailed, "The expected package manifest could not be loaded safely.", exception);
+        }
         var targetFramework = Value(args, "--target-framework");
-        var captured = IsLifecycle(args)
-            ? LifecyclePluginPackageService.CaptureAndValidate(Value(args, "--package-root"), expected)
-            : PluginAdmissionService.CaptureAndValidate(Value(args, "--package-root"), expected, targetFramework);
+        CapturedPluginPackage captured;
+        try
+        {
+            captured = IsLifecycle(args)
+                ? LifecyclePluginPackageService.CaptureAndValidate(Value(args, "--package-root"), expected)
+                : PluginAdmissionService.CaptureAndValidate(Value(args, "--package-root"), expected, targetFramework);
+        }
+        catch (Exception exception)
+        {
+            throw new PluginSmokePhaseException("metadata-validation", LifecycleExperimentFailureCategories.MetadataValidationFailed, "The captured package did not pass metadata validation.", exception);
+        }
         var fingerprint = new ThroneForge.Contracts.GameFingerprint(Value(args, "--expected-fingerprint"));
-        var decision = PluginAdmissionService.EvaluateApprovedPackage(
-            captured.Manifest,
-            new PluginAdmissionInputs(fingerprint, Value(args, "--adapter-id"), Value(args, "--adapter-version"), DateTimeOffset.UtcNow));
+        CodeModAdmissionDecision decision;
+        try
+        {
+            decision = PluginAdmissionService.EvaluateApprovedPackage(
+                captured.Manifest,
+                new PluginAdmissionInputs(fingerprint, Value(args, "--adapter-id"), Value(args, "--adapter-version"), DateTimeOffset.UtcNow));
+        }
+        catch (Exception exception)
+        {
+            throw new PluginSmokePhaseException("admission", LifecycleExperimentFailureCategories.AdmissionFailed, "The captured package could not be evaluated by the admission gate.", exception);
+        }
         if (decision.Status != ThroneForge.Runtime.CodeModAdmissionStatus.Approved || decision.Binding is null)
         {
-            throw new PluginSmokeException("The current captured package did not pass the admission gate immediately before deployment.");
+            throw new PluginSmokePhaseException("admission", LifecycleExperimentFailureCategories.AdmissionFailed, "The current captured package did not pass the admission gate immediately before deployment.");
         }
 
-        var context = PluginDeploymentService.DeriveContext(
-            Value(args, "--original-game"),
-            Value(args, "--clean-game"),
-            Value(args, "--experiment-root"),
-            Value(args, "--repository-root"),
-            fingerprint.Value,
-            decision.Binding);
-        var receipt = PluginDeploymentService.DeployCaptured(captured, context);
+        PluginDeploymentContext context;
+        try
+        {
+            context = PluginDeploymentService.DeriveContext(
+                Value(args, "--original-game"),
+                Value(args, "--clean-game"),
+                Value(args, "--experiment-root"),
+                Value(args, "--repository-root"),
+                fingerprint.Value,
+                decision.Binding);
+        }
+        catch (Exception exception)
+        {
+            throw new PluginSmokePhaseException("deployment-context", LifecycleExperimentFailureCategories.DeploymentContextFailed, "The disposable deployment context could not be validated.", exception);
+        }
+
+        PluginDeploymentReceipt receipt;
+        try
+        {
+            receipt = PluginDeploymentService.DeployCaptured(captured, context);
+        }
+        catch (Exception exception)
+        {
+            throw new PluginSmokePhaseException("deployment-write", LifecycleExperimentFailureCategories.DeploymentWriteFailed, "The package deployment did not complete transactionally.", exception);
+        }
         var updated = Task6ExperimentStateService.LoadAndValidate(Value(args, "--experiment-root"), fingerprint.Value) with
         {
             Status = Task6ExperimentStatus.PluginDeployed,
@@ -166,6 +214,29 @@ public static class PluginSmokeCli
         stdout.WriteLine($"deployed-file-count={receipt.DeployedRelativePaths.Count}");
         stdout.WriteLine($"deployed-relative-paths={string.Join(',', receipt.DeployedRelativePaths)}");
         stdout.WriteLine($"deployed-sha256={string.Join(',', receipt.DeployedSha256)}");
+        return 0;
+    }
+
+    private static int VerifyLoaderStage(string[] args, TextWriter stdout)
+    {
+        var expectedStatus = Enum.Parse<LoaderTransactionStatus>(Value(args, "--expected-status"), ignoreCase: false);
+        if (expectedStatus is not (LoaderTransactionStatus.Applied or LoaderTransactionStatus.LaunchObserved))
+        {
+            throw new PluginSmokeException("Only Applied and LaunchObserved are valid loader-stage expectations.");
+        }
+
+        var evidence = LoaderStageVerificationService.Verify(
+            Value(args, "--repository-root"),
+            Value(args, "--original-game"),
+            Value(args, "--experiment-root"),
+            Value(args, "--expected-fingerprint"),
+            expectedStatus);
+        stdout.WriteLine($"loader-status={evidence.LoaderStatus}");
+        stdout.WriteLine($"baseline-manifest-identity={evidence.BaselineManifestIdentity}");
+        stdout.WriteLine($"transaction-baseline-matched={evidence.TransactionBaselineMatched}");
+        stdout.WriteLine($"applied-profile-matched={evidence.AppliedProfileMatched}");
+        stdout.WriteLine($"bootstrap-evidence-present={evidence.BootstrapEvidencePresent}");
+        stdout.WriteLine($"bootstrap-criteria={evidence.BootstrapCriteria}");
         return 0;
     }
 

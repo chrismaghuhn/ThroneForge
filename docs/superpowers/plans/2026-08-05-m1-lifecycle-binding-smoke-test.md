@@ -17,6 +17,10 @@
 5. Track plugin removal, loader-only restoration, loader rollback, disposable restoration, and original post-checks independently.
 6. Run local and hosted synthetic validation, then perform the single permitted fresh corrective private experiment and record its sanitized result without claiming unsupported game internals.
 
+## Repository-only orchestration correction
+
+The current correction does not permit another private run. It replaces human CLI parsing with `throneforge-runtime-compatibility-evidence-v1`, verifies Task-3 loader state through shared C# services and the saved disposable baseline, represents package admission and deployment as one `AdmitAndDeploy` stage with internal phase categories, and moves stage progression/result modeling into `LifecycleExperimentOrchestrator`. `LogStability`, `PluginRemoval`, `LoaderRollback`, `DisposablePostcheck` and `OriginalPostcheck` own their respective evidence. A separate private attempt may be considered only after this correction receives a fresh hosted green run and code review.
+
 ## Correction outcome
 
 Correction head `bdd871fa263d5b97fc4a20160ee110d32f406c99` passed hosted run `31008620029` with 13 TRX files and 313 tests per runner on SDK `10.0.100`. The single permitted corrective private run stopped at `OriginalPreflight` with stable category `original-preflight-failed`: the discovery CLI emitted `Selected executable: ...`, while the harness expected an equals-delimited value. No loader transaction, package admission, deployment, or lifecycle evidence was produced. No further private run is permitted for this correction.

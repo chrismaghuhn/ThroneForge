@@ -15,6 +15,7 @@ public enum LifecycleExperimentStage
     UnityMetadataPreflight,
     PackageBuild,
     PackageCapture,
+    AdmitAndDeploy,
     Admission,
     Deployment,
     LifecycleLaunch,
@@ -31,6 +32,8 @@ public static class LifecycleExperimentFailureCategories
 {
     public const string InProgress = "in-progress";
     public const string StageCompleted = "stage-completed";
+    public const string StageOperationMissing = "stage-operation-missing";
+    public const string StageStatePersistenceFailed = "stage-state-persistence-failed";
     public const string OriginalPreflightFailed = "original-preflight-failed";
     public const string DisposablePrepareFailed = "disposable-prepare-failed";
     public const string BaselineLaunchFailed = "baseline-launch-failed";
@@ -43,6 +46,10 @@ public static class LifecycleExperimentFailureCategories
     public const string PackageCaptureFailed = "package-capture-failed";
     public const string AdmissionFailed = "admission-failed";
     public const string DeploymentFailed = "deployment-failed";
+    public const string MetadataValidationFailed = "metadata-validation-failed";
+    public const string DeploymentContextFailed = "deployment-context-failed";
+    public const string DeploymentWriteFailed = "deployment-write-failed";
+    public const string DeploymentVerificationFailed = "deployment-verification-failed";
     public const string LifecycleLaunchFailed = "lifecycle-launch-failed";
     public const string ManualClosureRequired = "manual-closure-required";
     public const string LogMissing = "log-missing";
@@ -59,6 +66,8 @@ public static class LifecycleExperimentFailureCategories
     {
         InProgress,
         StageCompleted,
+        StageOperationMissing,
+        StageStatePersistenceFailed,
         OriginalPreflightFailed,
         DisposablePrepareFailed,
         BaselineLaunchFailed,
@@ -71,6 +80,10 @@ public static class LifecycleExperimentFailureCategories
         PackageCaptureFailed,
         AdmissionFailed,
         DeploymentFailed,
+        MetadataValidationFailed,
+        DeploymentContextFailed,
+        DeploymentWriteFailed,
+        DeploymentVerificationFailed,
         LifecycleLaunchFailed,
         ManualClosureRequired,
         LogMissing,

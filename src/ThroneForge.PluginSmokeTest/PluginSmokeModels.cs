@@ -26,6 +26,20 @@ public class PluginSmokeException : Exception
     }
 }
 
+public sealed class PluginSmokePhaseException : PluginSmokeException
+{
+    public PluginSmokePhaseException(string phase, string failureCategory, string message, Exception? innerException = null)
+        : base(message, innerException ?? new InvalidOperationException(message))
+    {
+        Phase = phase;
+        FailureCategory = failureCategory;
+    }
+
+    public string Phase { get; }
+
+    public string FailureCategory { get; }
+}
+
 public static class PluginSmokeStateFailureCategories
 {
     public const string OwnershipStateInvalid = "ownership-state-invalid";

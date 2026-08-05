@@ -26,6 +26,11 @@ public static class DiscoveryCli
             return RunRuntimeCompatibility(args, stdout, stderr);
         }
 
+        if (args[0].Equals("runtime-compatibility-evidence", StringComparison.OrdinalIgnoreCase))
+        {
+            return RunRuntimeCompatibilityEvidence(args, stdout, stderr);
+        }
+
         stderr.WriteLine($"Unknown command '{args[0]}'.");
         PrintUsage(stderr);
         return 2;
@@ -163,6 +168,68 @@ public static class DiscoveryCli
         }
     }
 
+    private static int RunRuntimeCompatibilityEvidence(string[] args, TextWriter stdout, TextWriter stderr)
+    {
+        var parsed = ParseRuntimeCompatibilityOptions(args, stdout, stderr, includeOutput: false);
+        if (parsed is null)
+        {
+            return 2;
+        }
+
+        try
+        {
+            var result = new RuntimeCompatibilityEngine().Inspect(parsed);
+            stdout.WriteLine(RuntimeCompatibilityEvidenceContract.Serialize(result));
+            return 0;
+        }
+        catch (DiscoveryException exception)
+        {
+            stderr.WriteLine($"Runtime compatibility evidence failed: {exception.Message}");
+            return 2;
+        }
+    }
+
+    private static RuntimeCompatibilityRequest? ParseRuntimeCompatibilityOptions(
+        string[] args,
+        TextWriter stdout,
+        TextWriter stderr,
+        bool includeOutput)
+    {
+        string? gamePath = null;
+        string? fingerprint = null;
+        var outputRoot = Path.Combine("docs", "discovery");
+        var overwrite = false;
+        try
+        {
+            for (var index = 1; index < args.Length; index++)
+            {
+                switch (args[index])
+                {
+                    case "--game-path": gamePath = ReadOptionValue(args, ref index, "--game-path"); break;
+                    case "--fingerprint": fingerprint = ReadOptionValue(args, ref index, "--fingerprint"); break;
+                    case "--output-root": outputRoot = ReadOptionValue(args, ref index, "--output-root"); break;
+                    case "--overwrite": overwrite = true; break;
+                    default: stderr.WriteLine($"Unknown option '{args[index]}'."); PrintUsage(stderr); return null;
+                }
+            }
+        }
+        catch (ArgumentException exception)
+        {
+            stderr.WriteLine(exception.Message);
+            PrintUsage(stderr);
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(gamePath) || string.IsNullOrWhiteSpace(fingerprint))
+        {
+            stderr.WriteLine("--game-path and --fingerprint are required.");
+            PrintUsage(stderr);
+            return null;
+        }
+
+        return new RuntimeCompatibilityRequest(gamePath, fingerprint, outputRoot, overwrite);
+    }
+
     private static string ReadOptionValue(string[] args, ref int index, string option)
     {
         if (index + 1 >= args.Length || string.IsNullOrWhiteSpace(args[index + 1]))
@@ -179,5 +246,6 @@ public static class DiscoveryCli
         stderr.WriteLine("Usage:");
         stderr.WriteLine("  dotnet run --project src/ThroneForge.Discovery -- inspect --game-path <absolute-path> [--output-root <path>] [--overwrite]");
         stderr.WriteLine("  dotnet run --project src/ThroneForge.Discovery -- runtime-compatibility --game-path <absolute-path> --fingerprint <sha256> [--output-root <path>] [--overwrite]");
+        stderr.WriteLine("  dotnet run --project src/ThroneForge.Discovery -- runtime-compatibility-evidence --game-path <absolute-path> --fingerprint <sha256>");
     }
 }

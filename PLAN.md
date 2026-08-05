@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 7 public Unity lifecycle binding and synthetic lifecycle smoke test was implemented on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. Correction head `bdd871fa263d5b97fc4a20160ee110d32f406c99` passed hosted synthetic CI run `31008620029`; the one permitted corrective private run failed at `OriginalPreflight` with `original-preflight-failed` because the harness did not parse the discovery CLI's selected-executable output. No lifecycle binding conclusion is claimed and no further private run was performed.
+M1 - Task 7 orchestration hardening is active on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. The two permitted private results remain historical `Failed`; this correction performs repository-only work and must not run another private experiment. It adds a strict runtime-preflight evidence contract, shared C# loader-state verification, truthful `AdmitAndDeploy` phase reporting, a testable C# stage orchestrator, bounded log-stability ownership, and independent postcheck evidence.
 
 ## Milestones
 
@@ -22,7 +22,7 @@ Task-6 completion is recorded by the sanitized report, unchanged original-instal
 
 Against an explicit local, legally obtained game path, detect executable architecture, Unity version, Mono/IL2CPP backend, loader compatibility, target framework, and a fingerprint. Document the selected BepInEx/Harmony setup, one verified lifecycle binding, the first binding report, catalog feasibility, and legal/distribution constraints. Do not implement custom waves until the M1 acceptance criteria pass.
 
-### M1 Task 7 - public Unity lifecycle binding and smoke test (private verification failed; M1 incomplete)
+### M1 Task 7 - public Unity lifecycle binding and smoke test (orchestration hardening; M1 incomplete)
 
 - [x] Add metadata-only validation for the public `UnityEngine.Application.quitting` event in `UnityEngine.CoreModule`.
 - [x] Add the source-only lifecycle plugin template with exact package identity, synchronous-only lifecycle state machine, and nonce-bound markers.
@@ -33,6 +33,8 @@ Against an explicit local, legally obtained game path, detect executable archite
 - [x] Commit exactly one sanitized fingerprint-specific lifecycle binding report and run final hosted validation.
 
 Task 7 is limited to the public Unity lifecycle source `UnityEngine.Application.quitting` and does not inspect Thronefall-defined types, gameplay state, Harmony hooks, catalogs, or custom waves.
+
+The correction consumes only `throneforge-runtime-compatibility-evidence-v1`, verifies canonical Task-3/Task-6 state through shared C# services using the saved disposable baseline, reports package capture/admission/deployment as one `AdmitAndDeploy` stage with bounded phase categories, and exercises stage progression and postchecks in repository tests. No private game or BepInEx run is authorized in this correction.
 
 Task-7 correction baseline: reviewed head `92094c4362f09f73ffdd1bc8807caaf4a904f611` passed hosted run `31005428380` with 13 TRX files and 304 tests per runner using SDK `10.0.100`. Correction head `bdd871fa263d5b97fc4a20160ee110d32f406c99` passed hosted run `31008620029` with 13 TRX files and 313 tests per runner using SDK `10.0.100`; all test counters were zero for failures, errors, skips, not-executed and aborted tests. The single corrective private run stopped at `OriginalPreflight` because the harness expected `Selected executable=...` while the discovery CLI emitted `Selected executable: ...`. No loader transaction, package, deployment or lifecycle marker was produced. The report records the failed result and no further private run is permitted for this correction.
 

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- M1 Task 7 orchestration hardening: added the strict `throneforge-runtime-compatibility-evidence-v1` contract, removed handwritten PowerShell loader-transaction parsing in favor of shared C# state verification, bound transaction checks to the saved disposable baseline, introduced truthful `AdmitAndDeploy` phase categories, added a repository-testable lifecycle stage orchestrator, and made log stability and original/disposable postchecks explicit. No private game or BepInEx run was performed; both earlier private failures remain historical evidence.
 - M1 Task 7 corrective private verification stopped at `OriginalPreflight` with stable category `original-preflight-failed`: the harness expected an equals-delimited selected-executable value while the discovery CLI emitted a colon-delimited value. No loader transaction, package, plugin deployment, or lifecycle evidence was produced; no further private run was performed. The sanitized report records the failed result.
 - M1 Task 7 correction in progress: added versioned sanitized lifecycle stage state, shared the exact lifecycle host source between repository tests and the private plugin template, corrected synchronous `ValueTask` fault classification, hardened BepInEx-prefixed marker/order parsing, required the exact `UnityEngine.CoreModule` public top-level contract, and separated plugin-removal, loader-rollback, disposable-restoration, and original-postcheck evidence. The prior private run remains failed before loader transaction persistence; no new private run has started.
 
