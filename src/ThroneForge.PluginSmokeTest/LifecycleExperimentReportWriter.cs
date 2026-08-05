@@ -50,7 +50,12 @@ public sealed class LifecycleExperimentReportWriter
         Append(builder, "Report version", "throneforge-lifecycle-binding-v2");
         Append(builder, "Game fingerprint", expectedFingerprint.ToLowerInvariant());
         Append(builder, "Binding ID", LifecycleBindingIds.ApplicationQuittingV1);
-        Append(builder, "Source", "public UnityEngine.Application.quitting event observed while Thronefall was running");
+        var quittingObserved = result.OverallResult == "Passed"
+            && result.QuittingCount == 1
+            && string.Equals(result.MarkerEncounterOrder, "1,2,3", StringComparison.Ordinal);
+        Append(builder, "Source", quittingObserved
+            ? "public UnityEngine.Application.quitting event observed while Thronefall was running"
+            : "planned public UnityEngine.Application.quitting binding; event not verified");
         Append(builder, "Current stage", result.CurrentStage.ToString());
         Append(builder, "Failed stage", result.FailedStage?.ToString() ?? "none");
         Append(builder, "Last completed stage", result.LastCompletedStage?.ToString() ?? "none");
@@ -60,6 +65,9 @@ public sealed class LifecycleExperimentReportWriter
         Append(builder, "Overall result", result.OverallResult);
         Append(builder, "Stable category", result.StableCategory);
         Append(builder, "Stage state persisted", result.StageStatePersisted.ToString());
+        Append(builder, "Loader applied", result.LoaderApplied.ToString());
+        Append(builder, "Plugin deployed", result.PluginDeployed.ToString());
+        Append(builder, "Process active", result.ProcessActive.ToString());
         Append(builder, "Selected executable relative path", SafeRelative(result.SelectedExecutableRelativePath));
         Append(builder, "Unity source assembly identity", SafeToken(result.UnitySourceAssemblyIdentity));
         Append(builder, "Package SHA-256", SafeToken(result.PackageSha256));
@@ -78,6 +86,9 @@ public sealed class LifecycleExperimentReportWriter
         Append(builder, "Original manifest verified", Format(result.OriginalManifestVerified));
         Append(builder, "Original runtime verified", Format(result.OriginalRuntimeVerified));
         Append(builder, "Original loader indicators absent", Format(result.OriginalLoaderIndicatorsAbsent));
+        Append(builder, "Recovery marker persisted", Format(result.RecoveryMarkerPersisted));
+        Append(builder, "Recovery marker failure category", SafeToken(result.RecoveryMarkerFailureCategory));
+        Append(builder, "Rollback command", SafeToken(result.RollbackCommand));
         builder.AppendLine();
         builder.AppendLine("## Historical private attempts");
         builder.AppendLine();

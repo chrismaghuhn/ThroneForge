@@ -15,7 +15,7 @@ public static class PluginSmokeCli
     {
         if (args.Length == 0)
         {
-            stderr.WriteLine("Usage: package|lifecycle-package|admit|admit-and-deploy|verify-loader-stage|run-lifecycle-experiment|remove|parse-marker|inspect-lifecycle-binding|verify-lifecycle-log|lifecycle-stage with explicit paths and evidence.");
+            stderr.WriteLine("Usage: package|lifecycle-package|admit|admit-and-deploy|verify-loader-stage|run-lifecycle-experiment|rollback-lifecycle-experiment|remove|parse-marker|inspect-lifecycle-binding|verify-lifecycle-log|lifecycle-stage with explicit paths and evidence.");
             return 2;
         }
 
@@ -29,6 +29,7 @@ public static class PluginSmokeCli
                 "admit-and-deploy" => AdmitAndDeploy(args, stdout),
                 "verify-loader-stage" => VerifyLoaderStage(args, stdout),
                 "run-lifecycle-experiment" => RunLifecycleExperiment(args, stdout),
+                "rollback-lifecycle-experiment" => RollbackLifecycleExperiment(args, stdout),
                 "deploy" => throw new PluginSmokeException("Direct deployment is disabled; use admit-and-deploy with a validated Task-6 ownership record."),
                 "remove" => Remove(args, stdout),
                 "parse-marker" => ParseMarker(args, stdout),
@@ -256,6 +257,8 @@ public static class PluginSmokeCli
         var packageRoot = Value(args, "--package-root");
         var manifestPath = Value(args, "--manifest-path");
         var unityAssemblyPath = Value(args, "--unity-assembly");
+        var repositoryBaselineCommit = Value(args, "--repository-baseline-commit");
+        var dotnetPath = OptionalValue(args, "--dotnet-path") ?? Environment.ProcessPath ?? "dotnet";
         var nonce = OptionalValue(args, "--nonce") ?? Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)).ToLowerInvariant();
 
         var options = new LifecycleExperimentProductionOptions(
@@ -268,15 +271,18 @@ public static class PluginSmokeCli
             packageRoot,
             manifestPath,
             unityAssemblyPath,
-            OptionalValue(args, "--executable-relative-path") ?? string.Empty,
-            nonce);
+            Value(args, "--executable-relative-path"),
+            nonce,
+            RepositoryBaselineCommit: repositoryBaselineCommit,
+            DotnetPath: dotnetPath);
         var operation = new LifecycleExperimentProductionOperations(options);
         var experimentId = OptionalValue(args, "--experiment-id") ?? Guid.NewGuid().ToString("N");
         var result = new LifecycleExperimentOrchestrator(
             experimentRoot,
             experimentId,
             expectedFingerprint,
-            operation).Run();
+            operation,
+            repositoryBaselineCommit).Run();
         var reportPath = new LifecycleExperimentReportWriter(repositoryRoot, expectedFingerprint).Write(result);
 
         stdout.WriteLine($"result={result.OverallResult}");
@@ -290,6 +296,23 @@ public static class PluginSmokeCli
         stdout.WriteLine($"package-sha256={result.PackageSha256 ?? "not-observed"}");
         stdout.WriteLine($"binding-digest={result.AdmissionBindingDigest ?? "not-observed"}");
         stdout.WriteLine($"report={Path.GetFileName(reportPath)}");
+        return result.OverallResult == "Passed" ? 0 : 1;
+    }
+
+    private static int RollbackLifecycleExperiment(string[] args, TextWriter stdout)
+    {
+        var result = LifecycleExperimentRecoveryService.Rollback(new LifecycleExperimentRecoveryOptions(
+            Value(args, "--repository-root"),
+            Value(args, "--original-game"),
+            Value(args, "--experiment-root"),
+            Value(args, "--expected-fingerprint"),
+            Value(args, "--bepinex-archive"),
+            Value(args, "--official-digest")));
+        stdout.WriteLine($"rollback-result={result.OverallResult}");
+        stdout.WriteLine($"loader-rollback-verified={result.LoaderRollbackVerified}");
+        stdout.WriteLine($"disposable-restored={result.DisposableRestored}");
+        stdout.WriteLine($"original-verified={result.OriginalVerified}");
+        stdout.WriteLine($"failure-category={result.FailureCategory ?? "none"}");
         return result.OverallResult == "Passed" ? 0 : 1;
     }
 

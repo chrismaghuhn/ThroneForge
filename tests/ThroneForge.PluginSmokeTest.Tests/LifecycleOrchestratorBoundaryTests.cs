@@ -65,11 +65,14 @@ public sealed class LifecycleOrchestratorBoundaryTests
         var repositoryRoot = Path.Combine(root, "repository");
         var gameRoot = Path.Combine(root, "game");
         var experimentRoot = Path.Combine(root, "experiment");
-        var packageRoot = Path.Combine(root, "package");
+        var packageRoot = Path.Combine(experimentRoot, "package");
         Directory.CreateDirectory(Path.Combine(repositoryRoot, "docs", "discovery"));
         Directory.CreateDirectory(gameRoot);
         Directory.CreateDirectory(experimentRoot);
         Directory.CreateDirectory(packageRoot);
+        var unityPath = Path.Combine(gameRoot, "Thronefall_Data", "Managed", "UnityEngine.CoreModule.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(unityPath)!);
+        File.WriteAllBytes(unityPath, [0]);
         try
         {
             using var stdout = new StringWriter();
@@ -85,13 +88,45 @@ public sealed class LifecycleOrchestratorBoundaryTests
                 "--official-digest", new string('c', 64),
                 "--package-root", packageRoot,
                 "--manifest-path", Path.Combine(experimentRoot, "package-manifest.json"),
-                "--unity-assembly", Path.Combine(root, "UnityEngine.CoreModule.dll")
+                "--unity-assembly", unityPath,
+                "--executable-relative-path", "Thronefall.exe",
+                "--repository-baseline-commit", "test-baseline"
             ], stdout, stderr);
 
             Assert.Equal(1, exitCode);
             Assert.Contains("result=Failed", stdout.ToString(), StringComparison.Ordinal);
             Assert.Contains("report=", stdout.ToString(), StringComparison.Ordinal);
             Assert.Empty(stderr.ToString());
+            Assert.False(File.Exists(Path.Combine(experimentRoot, "evidence", "lifecycle-stage-state.json")));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void OwnershipFailureDoesNotRewriteAnExistingTask6Owner()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "throneforge-task7-owner-boundary", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var owner = Task6ExperimentStateService.CreatePrepared(root, Fingerprint, "test-baseline");
+            Task6ExperimentStateService.SaveAtomic(root, owner);
+
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                Guid.NewGuid().ToString("N"),
+                Fingerprint,
+                new OwnershipRejectingOperations()).Run();
+
+            Assert.Equal("Failed", result.OverallResult);
+            Assert.Equal(LifecycleExperimentFailureCategories.OwnershipStateInvalid, result.PrimaryFailureCategory);
+            Assert.Equal(Task6ExperimentStatus.Prepared, Task6ExperimentStateService.LoadAndValidate(root, Fingerprint).Status);
         }
         finally
         {
@@ -114,5 +149,32 @@ public sealed class LifecycleOrchestratorBoundaryTests
         Assert.DoesNotContain("Fail-CurrentStage", script, StringComparison.Ordinal);
         Assert.DoesNotContain("admit-and-deploy", script, StringComparison.Ordinal);
         Assert.DoesNotContain("lifecycle-binding.md", script, StringComparison.Ordinal);
+    }
+
+    private sealed class OwnershipRejectingOperations : ILifecycleExperimentOperations
+    {
+        public LifecycleStageEvidence EnsureOwnership(LifecycleExperimentContext context)
+            => new(false, LifecycleExperimentFailureCategories.OwnershipStateInvalid);
+
+        public OriginalPreflightEvidence OriginalPreflight(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public LifecycleStageEvidence DisposablePrepare(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public LifecycleStageEvidence BaselineLaunch(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public LifecycleStageEvidence LoaderInstall(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public LifecycleStageEvidence LoaderLaunch(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public LoaderVerificationEvidence LoaderVerify(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public UnityMetadataEvidence UnityMetadataPreflight(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public PackageEvidence PackageBuild(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public PackageEvidence PackageCapture(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public DeploymentEvidence AdmitAndDeploy(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public LifecycleStageEvidence LifecycleLaunch(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public LogStabilityEvidence LogStability(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public LifecycleVerificationEvidence LifecycleVerification(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public CleanupEvidence PluginRemoval(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public CleanupEvidence LoaderRollback(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public PostcheckEvidence DisposablePostcheck(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public PostcheckEvidence OriginalPostcheck(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public RecoveryEvidence PersistManualClosureRecovery(LifecycleExperimentContext context) => throw new NotSupportedException();
+        public LifecycleStageEvidence FinalizeFailure(LifecycleExperimentContext context)
+            => throw new InvalidOperationException("FinalizeFailure must not run before ownership succeeds.");
     }
 }

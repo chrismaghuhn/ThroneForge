@@ -121,6 +121,8 @@ The disposable plugin is deployed only below `clean-game/BepInEx/plugins/dev.thr
 
 No nonce, absolute path, raw log, binary, archive, complete private manifest, or recovery marker is committed. A pass proves only this synthetic plugin bootstrap for the exact documented fingerprint. It does not prove a real Thronefall plugin, final plugin TFM compatibility beyond the local evidence used for the build, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, or custom waves.
 
+The current Task-7 production-path correction is repository-only. Its C# orchestrator owns the real workflow, including owned experiment state, typed evidence, cleanup/recovery, package and Unity path containment, and independent disposable/original postchecks. The two earlier private Task-7 attempts remain failed historical evidence; no additional private lifecycle run is authorized by this correction.
+
 The private Task-6 run passed for the documented fingerprint. The sanitized result is [the fingerprint-specific report](1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-synthetic-plugin-smoke-test.md). Raw logs, the disposable copy, package files, transaction state, and rollback evidence remain outside the repository.
 
 ## M1 task 7: public Unity lifecycle binding smoke test

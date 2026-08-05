@@ -43,3 +43,7 @@ M0 architecture, hardening, and the final TRX artifact-preservation fix passed h
 ## License
 
 TODO: The repository owner must select and approve a software license before accepting external contributions. No license is granted by this repository yet.
+
+## Current Task-7 production-path correction
+
+The current Task-7 correction keeps the private lifecycle experiment disabled. The production C# orchestrator now owns Task-6 ownership, typed stage evidence, side-effect-preserving cleanup, manual-closure recovery, package/path binding, and independent disposable/original postchecks; the PowerShell entry point is only an argument wrapper. Repository-only validation is required before a separately authorized private run. No new private run is claimed here.

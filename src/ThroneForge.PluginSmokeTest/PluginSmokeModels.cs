@@ -955,6 +955,9 @@ public static class PluginDeploymentService
         return new CopyManifest(files.Values.OrderBy(item => item.RelativePath, StringComparer.Ordinal).ToArray(), directories.Order(StringComparer.Ordinal).ToArray());
     }
 
+    public static bool IsProfileProcessActive(string cleanGameRoot)
+        => FindRunningProcessUnder(cleanGameRoot);
+
     private static bool FindRunningProcessUnder(string cleanGameRoot)
     {
         var root = Path.GetFullPath(cleanGameRoot);

@@ -82,4 +82,31 @@ public sealed class SmokeTestPathValidatorTests
             fixture.GameRoot,
             link));
     }
+
+    [Fact]
+    public void PackageAndManifestPathsMustRemainOwnedByTheExperiment()
+    {
+        using var fixture = new SmokeTestFixture();
+        var roots = SmokeTestPathValidator.ValidateRoots(fixture.RepositoryRoot, fixture.GameRoot, fixture.ExperimentRoot);
+
+        var packageRoot = Path.Combine(roots.ExperimentRoot, "package");
+        var manifest = Path.Combine(roots.ExperimentRoot, "manifests", "package.json");
+        Assert.Equal(packageRoot, SmokeTestPathValidator.ValidateOwnedExperimentDirectory(roots, packageRoot, "package root"));
+        Assert.Equal(manifest, SmokeTestPathValidator.ValidateOwnedExperimentFile(roots, manifest, "package manifest"));
+        Assert.Throws<SmokeTestException>(() => SmokeTestPathValidator.ValidateOwnedExperimentDirectory(roots, roots.CleanGameRoot, "package root"));
+        Assert.Throws<SmokeTestException>(() => SmokeTestPathValidator.ValidateOwnedExperimentFile(roots, fixture.GameRoot, "package manifest"));
+    }
+
+    [Fact]
+    public void UnityMetadataPathMustMatchTheSelectedProfileDataDirectory()
+    {
+        using var fixture = new SmokeTestFixture();
+        var roots = SmokeTestPathValidator.ValidateRoots(fixture.RepositoryRoot, fixture.GameRoot, fixture.ExperimentRoot);
+        var unityPath = Path.Combine(fixture.GameRoot, "Thronefall_Data", "Managed", "UnityEngine.CoreModule.dll");
+        Directory.CreateDirectory(Path.GetDirectoryName(unityPath)!);
+        File.WriteAllBytes(unityPath, [0]);
+
+        Assert.Equal(unityPath, SmokeTestPathValidator.ValidateUnityAssemblyPath(roots, unityPath, "Thronefall.exe"));
+        Assert.Throws<SmokeTestException>(() => SmokeTestPathValidator.ValidateUnityAssemblyPath(roots, Path.Combine(fixture.Root, "UnityEngine.CoreModule.dll"), "Thronefall.exe"));
+    }
 }

@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using ThroneForge.Contracts;
 using ThroneForge.Discovery;
 using ThroneForge.LoaderSmokeTest;
@@ -19,7 +18,9 @@ public sealed record LifecycleExperimentProductionOptions(
     string ExecutableRelativePath,
     string Nonce,
     string AdapterId = "throneforge.adapter",
-    string AdapterVersion = "1.0.0");
+    string AdapterVersion = "1.0.0",
+    string RepositoryBaselineCommit = "unknown",
+    string DotnetPath = "dotnet");
 
 /// <summary>
 /// Production adapter for the real Task-7 CLI. It calls the existing Task-3/Task-6 services and
@@ -29,6 +30,8 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
 {
     private readonly LifecycleExperimentProductionOptions options;
     private readonly SmokeTestRoots roots;
+    private readonly string packageBuildRoot;
+    private readonly ILifecyclePluginPackageBuilder packageBuilder;
     private CopyManifest? originalManifest;
     private CopyManifest? loaderOnlyManifest;
     private DisposableProfileBaseline? baseline;
@@ -37,11 +40,113 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
     private string? packageDigest;
     private string? admissionBindingDigest;
     private string? selectedExecutableRelativePath;
+    private string? expectedApiIdentity;
+    private string? expectedContractsIdentity;
+    private bool disposableRestored;
 
-    public LifecycleExperimentProductionOperations(LifecycleExperimentProductionOptions options)
+    public LifecycleExperimentProductionOperations(
+        LifecycleExperimentProductionOptions options,
+        ILifecyclePluginPackageBuilder? packageBuilder = null)
     {
         this.options = options ?? throw new ArgumentNullException(nameof(options));
         roots = SmokeTestPathValidator.ValidateRoots(options.RepositoryRoot, options.OriginalGameRoot, options.ExperimentRoot);
+        _ = SmokeTestPathValidator.ValidateOwnedExperimentDirectory(roots, options.PackageRoot, "the package root");
+        _ = SmokeTestPathValidator.ValidateOwnedExperimentFile(roots, options.ManifestPath, "the package manifest");
+        _ = SmokeTestPathValidator.ValidateUnityAssemblyPath(roots, options.UnityAssemblyPath, options.ExecutableRelativePath);
+        packageBuildRoot = SmokeTestPathValidator.ValidateOwnedExperimentDirectory(
+            roots,
+            Path.Combine(roots.ExperimentRoot, "package-build"),
+            "the package build root");
+        if (string.IsNullOrWhiteSpace(options.DotnetPath))
+        {
+            throw new SmokeTestException("The .NET executable path is required for the lifecycle package build.");
+        }
+
+        this.packageBuilder = packageBuilder ?? new SourceLifecyclePluginPackageBuilder();
+    }
+
+    public LifecycleStageEvidence EnsureOwnership(LifecycleExperimentContext context)
+    {
+        try
+        {
+            var statePath = Task6ExperimentStateService.GetStatePath(roots.ExperimentRoot);
+            if (File.Exists(statePath))
+            {
+                return new(false, LifecycleExperimentFailureCategories.OwnershipStateInvalid);
+            }
+
+            var state = Task6ExperimentStateService.CreatePrepared(
+                roots.ExperimentRoot,
+                options.ExpectedFingerprint,
+                options.RepositoryBaselineCommit,
+                context.ExperimentId);
+            Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, state);
+            return new(true);
+        }
+        catch (Exception exception) when (IsSanitizedExternalFailure(exception))
+        {
+            return new(false, LifecycleExperimentFailureCategories.OwnershipStateInvalid);
+        }
+    }
+
+    public RecoveryEvidence PersistManualClosureRecovery(LifecycleExperimentContext context)
+    {
+        var markerPersisted = false;
+        try
+        {
+            var ownership = Task6ExperimentStateService.LoadAndValidate(roots.ExperimentRoot, options.ExpectedFingerprint);
+            var loaderStatus = ownership.LoaderTransactionStatus ?? LoaderTransactionStatus.RollbackRequired.ToString();
+            var recovery = new Task6RecoveryState(
+                Task6ExperimentStateService.SchemaVersion,
+                Task6ExperimentStateService.TaskVersion,
+                options.ExpectedFingerprint.ToLowerInvariant(),
+                ownership.ExperimentId,
+                packageDigest ?? ownership.PackageSha256,
+                admissionBindingDigest ?? ownership.AdmissionBindingDigest,
+                ownership.PluginRelativeRoot,
+                loaderStatus,
+                "ManualClosureRequired");
+            Task6ExperimentStateService.SaveRecoveryAtomic(roots.ExperimentRoot, recovery);
+            markerPersisted = true;
+            Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, ownership with
+            {
+                Status = Task6ExperimentStatus.ManualClosureRequired,
+                PackageSha256 = recovery.PackageSha256,
+                AdmissionBindingDigest = recovery.AdmissionBindingDigest,
+                PluginRelativeRoot = recovery.PluginRelativeRoot,
+                LoaderTransactionStatus = recovery.LoaderTransactionStatus
+            });
+            return new(true, true, RollbackCommand: "rollback-lifecycle-experiment --owned-experiment");
+        }
+        catch (Exception exception) when (IsSanitizedExternalFailure(exception))
+        {
+            return new(false, markerPersisted, LifecycleExperimentFailureCategories.ManualClosureRequired);
+        }
+    }
+
+    public LifecycleStageEvidence FinalizeFailure(LifecycleExperimentContext context)
+    {
+        try
+        {
+            var statePath = Task6ExperimentStateService.GetStatePath(roots.ExperimentRoot);
+            if (!File.Exists(statePath))
+            {
+                return new(true);
+            }
+
+            var state = Task6ExperimentStateService.LoadAndValidate(roots.ExperimentRoot, options.ExpectedFingerprint);
+            if (state.Status is Task6ExperimentStatus.Completed or Task6ExperimentStatus.ManualClosureRequired)
+            {
+                return new(true);
+            }
+
+            Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, state with { Status = Task6ExperimentStatus.Failed });
+            return new(true);
+        }
+        catch (Exception exception) when (IsSanitizedExternalFailure(exception))
+        {
+            return new(false, LifecycleExperimentFailureCategories.OwnershipStateInvalid);
+        }
     }
 
     public OriginalPreflightEvidence OriginalPreflight(LifecycleExperimentContext context)
@@ -97,27 +202,32 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
         var result = RunLoaderMode(SmokeTestMode.Install, LifecycleExperimentFailureCategories.LoaderInstallFailed);
         if (!result.Succeeded)
         {
-            return result;
+            return result with { LoaderApplied = InferLoaderMayRequireRollback() };
         }
 
         try
         {
+            var ownership = Task6ExperimentStateService.LoadAndValidate(roots.ExperimentRoot, options.ExpectedFingerprint) with
+            {
+                Status = Task6ExperimentStatus.LoaderApplied,
+                LoaderTransactionStatus = LoaderTransactionStatus.Applied.ToString()
+            };
+            Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, ownership);
             var evidence = LoaderStageVerificationService.Verify(
                 roots.RepositoryRoot,
                 roots.OriginalGameRoot,
                 roots.ExperimentRoot,
                 options.ExpectedFingerprint,
                 LoaderTransactionStatus.Applied);
-            loaderOnlyManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
             return new(true, LoaderTransactionStatus: evidence.LoaderStatus, LoaderApplied: true);
         }
         catch (PluginSmokeStateException exception)
         {
-            return new(false, exception.FailureCategory);
+            return new(false, exception.FailureCategory, LoaderApplied: true, LoaderTransactionStatus: LoaderTransactionStatus.Applied.ToString());
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
-            return new(false, LifecycleExperimentFailureCategories.LoaderTransactionMissing);
+            return new(false, LifecycleExperimentFailureCategories.LoaderTransactionMissing, LoaderApplied: true, LoaderTransactionStatus: LoaderTransactionStatus.Applied.ToString());
         }
     }
 
@@ -134,21 +244,27 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
         }
         catch (PluginSmokeStateException exception)
         {
-            return new(false, exception.FailureCategory);
+            return new(false, exception.FailureCategory, LoaderApplied: true, LoaderTransactionStatus: LoaderTransactionStatus.Applied.ToString());
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
-            return new(false, LifecycleExperimentFailureCategories.LoaderLaunchFailed);
+            return new(false, LifecycleExperimentFailureCategories.LoaderLaunchFailed, LoaderApplied: true, LoaderTransactionStatus: LoaderTransactionStatus.Applied.ToString());
         }
 
         var result = RunLoaderMode(SmokeTestMode.Launch, LifecycleExperimentFailureCategories.LoaderLaunchFailed);
         if (!result.Succeeded)
         {
-            return result;
+            return result with { LoaderApplied = true };
         }
 
         try
         {
+            var ownership = Task6ExperimentStateService.LoadAndValidate(roots.ExperimentRoot, options.ExpectedFingerprint) with
+            {
+                Status = Task6ExperimentStatus.LaunchObserved,
+                LoaderTransactionStatus = LoaderTransactionStatus.LaunchObserved.ToString()
+            };
+            Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, ownership);
             var evidence = LoaderStageVerificationService.Verify(
                 roots.RepositoryRoot,
                 roots.OriginalGameRoot,
@@ -159,11 +275,11 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
         }
         catch (PluginSmokeStateException exception)
         {
-            return new(false, exception.FailureCategory);
+            return new(false, exception.FailureCategory, LoaderApplied: true, LoaderTransactionStatus: LoaderTransactionStatus.LaunchObserved.ToString());
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
-            return new(false, LifecycleExperimentFailureCategories.LoaderLaunchFailed);
+            return new(false, LifecycleExperimentFailureCategories.LoaderLaunchFailed, LoaderApplied: true, LoaderTransactionStatus: LoaderTransactionStatus.LaunchObserved.ToString());
         }
     }
 
@@ -180,7 +296,7 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
             var result = RunLoaderMode(SmokeTestMode.Verify, LifecycleExperimentFailureCategories.LoaderVerifyFailed);
             if (!result.Succeeded)
             {
-                return new(false, null, false, false, false, result.FailureCategory);
+                return new(false, null, false, false, false, result.FailureCategory, true);
             }
 
             var evidence = LoaderStageVerificationService.Verify(
@@ -193,11 +309,11 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
         }
         catch (PluginSmokeStateException exception)
         {
-            return new(false, null, false, false, false, exception.FailureCategory);
+            return new(false, null, false, false, false, exception.FailureCategory, true);
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
-            return new(false, null, false, false, false, LifecycleExperimentFailureCategories.LoaderVerifyFailed);
+            return new(false, null, false, false, false, LifecycleExperimentFailureCategories.LoaderVerifyFailed, true);
         }
     }
 
@@ -218,6 +334,13 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
     {
         try
         {
+            packageBuilder.Build(new LifecyclePluginPackageBuildRequest(
+                roots.RepositoryRoot,
+                roots.CleanGameRoot,
+                packageBuildRoot,
+                options.PackageRoot,
+                options.UnityAssemblyPath,
+                options.DotnetPath));
             var manifest = LifecyclePluginPackageService.CreateManifestFromDirectory(options.PackageRoot);
             PluginPackageManifestService.Save(options.ManifestPath, manifest);
             return new(true, manifest.PackageSha256.Value);
@@ -235,6 +358,8 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
             var expected = PluginPackageManifestService.Load(options.ManifestPath);
             capturedPackage = LifecyclePluginPackageService.CaptureAndValidate(options.PackageRoot, expected);
             packageDigest = capturedPackage.Manifest.PackageSha256.Value;
+            expectedApiIdentity = capturedPackage.Metadata["ThroneForge.API.dll"].AssemblyIdentity;
+            expectedContractsIdentity = capturedPackage.Metadata["ThroneForge.Contracts.dll"].AssemblyIdentity;
             return new(true, packageDigest);
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
@@ -250,8 +375,10 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
             return new(false, LifecycleExperimentFailureCategories.PackageCaptureFailed);
         }
 
+        var deployed = false;
         try
         {
+            loaderOnlyManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
             var gameFingerprint = new GameFingerprint(options.ExpectedFingerprint);
             var decision = PluginAdmissionService.EvaluateApprovedPackage(
                 capturedPackage.Manifest,
@@ -270,32 +397,34 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
                 options.ExpectedFingerprint,
                 decision.Binding);
             var receipt = PluginDeploymentService.DeployCaptured(capturedPackage, contextData);
+            deployed = true;
             var state = Task6ExperimentStateService.LoadAndValidate(roots.ExperimentRoot, options.ExpectedFingerprint) with
             {
                 Status = Task6ExperimentStatus.PluginDeployed,
                 PackageSha256 = receipt.PackageSha256,
                 AdmissionBindingDigest = receipt.AdmissionBindingDigest,
                 PluginRelativeRoot = receipt.RelativeRoot,
-                LoaderTransactionStatus = contextData.LoaderTransaction.Status.ToString()
+                LoaderTransactionStatus = contextData.LoaderTransaction.Status.ToString(),
+                LoaderOnlyManifest = loaderOnlyManifest
             };
             Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, state);
             return new(true, PackageSha256: receipt.PackageSha256, AdmissionBindingDigest: receipt.AdmissionBindingDigest, PluginDeployed: true);
         }
         catch (PluginSmokeStateException exception)
         {
-            return new(false, exception.FailureCategory);
+            return new(false, exception.FailureCategory, packageDigest, admissionBindingDigest, deployed);
         }
         catch (PluginDeploymentVerificationException)
         {
-            return new(false, LifecycleExperimentFailureCategories.DeploymentVerificationFailed);
+            return new(false, LifecycleExperimentFailureCategories.DeploymentVerificationFailed, packageDigest, admissionBindingDigest, deployed);
         }
         catch (PluginSmokeException)
         {
-            return new(false, LifecycleExperimentFailureCategories.DeploymentWriteFailed);
+            return new(false, deployed ? LifecycleExperimentFailureCategories.DeploymentVerificationFailed : LifecycleExperimentFailureCategories.DeploymentWriteFailed, packageDigest, admissionBindingDigest, deployed);
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
-            return new(false, LifecycleExperimentFailureCategories.DeploymentWriteFailed);
+            return new(false, deployed ? LifecycleExperimentFailureCategories.DeploymentVerificationFailed : LifecycleExperimentFailureCategories.DeploymentWriteFailed, packageDigest, admissionBindingDigest, deployed);
         }
     }
 
@@ -377,12 +506,17 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
 
         try
         {
+            if (expectedApiIdentity is null || expectedContractsIdentity is null)
+            {
+                return new(false, LifecycleExperimentFailureCategories.PackageCaptureFailed);
+            }
+
             var loader = LoaderLogParser.Parse(lifecycleLog);
             var marker = LifecycleMarkerParser.Parse(
                 lifecycleLog,
                 options.Nonce,
-                $"ThroneForge.API, Version=1.0.0.0",
-                $"ThroneForge.Contracts, Version=1.0.0.0");
+                expectedApiIdentity,
+                expectedContractsIdentity);
             if (!marker.IsValid)
             {
                 return new(false, marker.FailureCategory ?? LifecycleExperimentFailureCategories.LifecycleMarkerInvalid);
@@ -417,19 +551,22 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
     {
         try
         {
+            var ownership = Task6ExperimentStateService.LoadAndValidate(roots.ExperimentRoot, options.ExpectedFingerprint);
             PluginDeploymentService.Remove(roots.CleanGameRoot, LifecyclePluginPackageService.PluginGuid);
             var pluginPath = Path.Combine(roots.CleanGameRoot, "BepInEx", "plugins", LifecyclePluginPackageService.PluginGuid);
             var removal = !Directory.Exists(pluginPath);
-            var loaderOnly = loaderOnlyManifest is not null && InstallationCopyService.CompareManifests(loaderOnlyManifest, InstallationCopyService.CaptureManifest(roots.CleanGameRoot)).Matches;
+            var expectedLoaderOnly = loaderOnlyManifest ?? ownership.LoaderOnlyManifest;
+            var loaderOnly = expectedLoaderOnly is not null && InstallationCopyService.CompareManifests(expectedLoaderOnly, InstallationCopyService.CaptureManifest(roots.CleanGameRoot)).Matches;
             if (!removal || !loaderOnly)
             {
                 return new(false, LifecycleExperimentFailureCategories.PluginRemovalFailed, removal, loaderOnly);
             }
 
-            var state = Task6ExperimentStateService.LoadAndValidate(roots.ExperimentRoot, options.ExpectedFingerprint) with
+            var state = ownership with
             {
                 Status = Task6ExperimentStatus.LoaderApplied,
-                PluginRelativeRoot = null
+                PluginRelativeRoot = null,
+                LoaderOnlyManifest = expectedLoaderOnly
             };
             Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, state);
             return new(true, null, true, true);
@@ -445,7 +582,30 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
         try
         {
             var result = RunLoaderMode(SmokeTestMode.Rollback, LifecycleExperimentFailureCategories.LoaderRollbackFailed);
-            return new(result.Succeeded, result.FailureCategory, RollbackVerified: result.Succeeded);
+            if (!result.Succeeded || baseline is null)
+            {
+                return new(false, result.FailureCategory ?? LifecycleExperimentFailureCategories.LoaderRollbackFailed, RollbackVerified: false);
+            }
+
+            var transaction = LoaderTransactionStateService.LoadAndValidate(
+                LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
+                roots,
+                options.ExpectedFingerprint,
+                baseline.DisposableManifest,
+                [LoaderTransactionStatus.RolledBack]);
+            if (transaction.Status != LoaderTransactionStatus.RolledBack)
+            {
+                return new(false, LifecycleExperimentFailureCategories.LoaderRollbackFailed, RollbackVerified: false);
+            }
+
+            var state = Task6ExperimentStateService.LoadAndValidate(roots.ExperimentRoot, options.ExpectedFingerprint) with
+            {
+                Status = Task6ExperimentStatus.RolledBack,
+                LoaderTransactionStatus = LoaderTransactionStatus.RolledBack.ToString(),
+                PluginRelativeRoot = null
+            };
+            Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, state);
+            return new(true, null, RollbackVerified: true);
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
@@ -454,7 +614,11 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
     }
 
     public PostcheckEvidence DisposablePostcheck(LifecycleExperimentContext context)
-        => VerifyProfilePostcheck(roots.CleanGameRoot, baseline?.DisposableManifest, LifecycleExperimentFailureCategories.DisposableRestorationFailed);
+    {
+        var result = VerifyProfilePostcheck(roots.CleanGameRoot, baseline?.DisposableManifest, LifecycleExperimentFailureCategories.DisposableRestorationFailed);
+        disposableRestored = result.Succeeded && result.RestorationVerified == true;
+        return result;
+    }
 
     public PostcheckEvidence OriginalPostcheck(LifecycleExperimentContext context)
     {
@@ -464,7 +628,16 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
             var manifestMatches = originalManifest is not null && InstallationCopyService.CompareManifests(originalManifest, current).Matches;
             var runtime = InspectRuntime(roots.OriginalGameRoot, "original-postcheck");
             var passed = manifestMatches && runtime.IsReadyForReversibleTest && runtime.LoaderIndicatorsAbsent;
-            return new(passed, passed ? null : LifecycleExperimentFailureCategories.OriginalPostcheckFailed, manifestMatches, runtime.IsReadyForReversibleTest, runtime.LoaderIndicatorsAbsent, true);
+            if (passed && baseline is not null && disposableRestored)
+            {
+                var state = Task6ExperimentStateService.LoadAndValidate(roots.ExperimentRoot, options.ExpectedFingerprint) with
+                {
+                    Status = Task6ExperimentStatus.Completed
+                };
+                Task6ExperimentStateService.SaveAtomic(roots.ExperimentRoot, state);
+                Task6ExperimentStateService.ClearRecovery(roots.ExperimentRoot);
+            }
+            return new(passed, passed ? null : LifecycleExperimentFailureCategories.OriginalPostcheckFailed, manifestMatches, runtime.IsReadyForReversibleTest, runtime.LoaderIndicatorsAbsent, passed);
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
@@ -484,7 +657,7 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
             var manifestMatches = InstallationCopyService.CompareManifests(expectedManifest, InstallationCopyService.CaptureManifest(profileRoot)).Matches;
             var runtime = InspectRuntime(profileRoot, "disposable-postcheck");
             var passed = manifestMatches && runtime.IsReadyForReversibleTest && runtime.LoaderIndicatorsAbsent;
-            return new(passed, passed ? null : failureCategory, manifestMatches, runtime.IsReadyForReversibleTest, runtime.LoaderIndicatorsAbsent, manifestMatches);
+            return new(passed, passed ? null : failureCategory, manifestMatches, runtime.IsReadyForReversibleTest, runtime.LoaderIndicatorsAbsent, passed);
         }
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
@@ -528,6 +701,33 @@ public sealed class LifecycleExperimentProductionOperations : ILifecycleExperime
         catch (Exception exception) when (IsSanitizedExternalFailure(exception))
         {
             return new(false, failureCategory);
+        }
+    }
+
+    private bool InferLoaderMayRequireRollback()
+    {
+        var transactionPath = LoaderSmokeTestStatePaths.GetTransactionStatePath(roots);
+        if (!File.Exists(transactionPath))
+        {
+            // A missing state after an attempted mutation is not proof that no files changed.
+            return true;
+        }
+
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(transactionPath));
+            if (!document.RootElement.TryGetProperty("Status", out var status))
+            {
+                return true;
+            }
+
+            var value = status.GetString();
+            return !string.Equals(value, LoaderTransactionStatus.FailedAndRolledBack.ToString(), StringComparison.Ordinal)
+                && !string.Equals(value, LoaderTransactionStatus.RolledBack.ToString(), StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            return true;
         }
     }
 

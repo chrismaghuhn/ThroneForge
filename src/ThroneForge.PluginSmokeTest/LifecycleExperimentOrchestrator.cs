@@ -3,7 +3,8 @@ namespace ThroneForge.PluginSmokeTest;
 public sealed record LifecycleExperimentContext(
     string ExperimentRoot,
     string ExperimentId,
-    string ExpectedFingerprint);
+    string ExpectedFingerprint,
+    string RepositoryBaselineCommit);
 
 public record LifecycleStageEvidence(
     bool Succeeded,
@@ -28,8 +29,9 @@ public sealed record LoaderVerificationEvidence(
     bool? TransactionBaselineMatched,
     bool? AppliedProfileMatched,
     bool? BootstrapEvidencePresent,
-    string? FailureCategory = null)
-    : LifecycleStageEvidence(Succeeded, FailureCategory, LoaderTransactionStatus: LoaderStatus);
+    string? FailureCategory = null,
+    bool? LoaderApplied = null)
+    : LifecycleStageEvidence(Succeeded, FailureCategory, LoaderApplied: LoaderApplied, LoaderTransactionStatus: LoaderStatus);
 
 public sealed record UnityMetadataEvidence(
     bool Succeeded,
@@ -89,8 +91,16 @@ public sealed record PostcheckEvidence(
     bool? RestorationVerified = null)
     : LifecycleStageEvidence(Succeeded, FailureCategory);
 
+public sealed record RecoveryEvidence(
+    bool Succeeded,
+    bool MarkerPersisted,
+    string? FailureCategory = null,
+    string? RollbackCommand = null)
+    : LifecycleStageEvidence(Succeeded, FailureCategory, ProcessActive: true);
+
 public interface ILifecycleExperimentOperations
 {
+    LifecycleStageEvidence EnsureOwnership(LifecycleExperimentContext context);
     OriginalPreflightEvidence OriginalPreflight(LifecycleExperimentContext context);
     LifecycleStageEvidence DisposablePrepare(LifecycleExperimentContext context);
     LifecycleStageEvidence BaselineLaunch(LifecycleExperimentContext context);
@@ -108,6 +118,8 @@ public interface ILifecycleExperimentOperations
     CleanupEvidence LoaderRollback(LifecycleExperimentContext context);
     PostcheckEvidence DisposablePostcheck(LifecycleExperimentContext context);
     PostcheckEvidence OriginalPostcheck(LifecycleExperimentContext context);
+    RecoveryEvidence PersistManualClosureRecovery(LifecycleExperimentContext context);
+    LifecycleStageEvidence FinalizeFailure(LifecycleExperimentContext context);
 }
 
 public sealed record LifecycleExperimentResult(
@@ -140,7 +152,13 @@ public sealed record LifecycleExperimentResult(
     bool? DisposableRestorationVerified = null,
     bool? OriginalManifestVerified = null,
     bool? OriginalRuntimeVerified = null,
-    bool? OriginalLoaderIndicatorsAbsent = null);
+    bool? OriginalLoaderIndicatorsAbsent = null,
+    bool? RecoveryMarkerPersisted = null,
+    string? RecoveryMarkerFailureCategory = null,
+    string? RollbackCommand = null,
+    bool LoaderApplied = false,
+    bool PluginDeployed = false,
+    bool ProcessActive = false);
 
 /// <summary>
 /// The single repository and private-experiment owner of Task 7 stage execution.
@@ -172,23 +190,26 @@ public sealed class LifecycleExperimentOrchestrator
     private readonly string experimentRoot;
     private readonly string experimentId;
     private readonly string expectedFingerprint;
+    private readonly string repositoryBaselineCommit;
     private readonly ILifecycleExperimentOperations operations;
 
     public LifecycleExperimentOrchestrator(
         string experimentRoot,
         string experimentId,
         string expectedFingerprint,
-        ILifecycleExperimentOperations operations)
+        ILifecycleExperimentOperations operations,
+        string repositoryBaselineCommit = "test-baseline")
     {
         this.experimentRoot = experimentRoot;
         this.experimentId = experimentId;
         this.expectedFingerprint = expectedFingerprint;
+        this.repositoryBaselineCommit = repositoryBaselineCommit;
         this.operations = operations ?? throw new ArgumentNullException(nameof(operations));
     }
 
     public LifecycleExperimentResult Run()
     {
-        var context = new LifecycleExperimentContext(experimentRoot, experimentId, expectedFingerprint);
+        var context = new LifecycleExperimentContext(experimentRoot, experimentId, expectedFingerprint, repositoryBaselineCommit);
         var accumulator = new LifecycleEvidenceAccumulator();
         var currentStage = RequiredStages[0];
         LifecycleExperimentStage? lastCompleted = null;
@@ -196,60 +217,69 @@ public sealed class LifecycleExperimentOrchestrator
         string? primaryFailureCategory = null;
         string? cleanupFailureCategory = null;
         var statePersisted = false;
+        var ownershipEstablished = false;
         var loaderApplied = false;
         var pluginDeployed = false;
         var cleanupStarted = false;
 
         try
         {
-            try
+            var ownershipEvidence = operations.EnsureOwnership(context);
+            if (!ownershipEvidence.Succeeded || ownershipEvidence.FailureCategory is not null)
             {
-                LifecycleExperimentStageStateService.SaveAtomic(
-                    experimentRoot,
-                    LifecycleExperimentStageStateService.CreatePrepared(experimentId, expectedFingerprint));
-                statePersisted = true;
+                currentStage = LifecycleExperimentStage.DisposablePrepare;
+                primaryFailedStage = LifecycleExperimentStage.DisposablePrepare;
+                primaryFailureCategory = ownershipEvidence.FailureCategory ?? LifecycleExperimentFailureCategories.OwnershipStateInvalid;
             }
-            catch (Exception exception) when (exception is PluginSmokeException or IOException or UnauthorizedAccessException)
+            else
             {
-                return CreateFailure(
-                    currentStage,
-                    null,
-                    LifecycleExperimentFailureCategories.StageStatePersistenceFailed,
-                    statePersisted,
-                    null,
-                    null,
-                    null);
-            }
-
-            foreach (var stage in RequiredStages)
-            {
-                currentStage = stage;
-                Persist(
-                    currentStage,
-                    lastCompleted,
-                    LifecycleExperimentFailureCategories.InProgress,
-                    ref statePersisted,
-                    accumulator,
-                    primaryFailedStage,
-                    primaryFailureCategory,
-                    cleanupFailureCategory);
-
-                var evidence = Execute(stage, context);
-                if (!IsValid(stage, evidence, context, out var category))
+                ownershipEstablished = true;
+                try
                 {
-                    primaryFailedStage ??= currentStage;
-                    primaryFailureCategory ??= category;
-                    Persist(currentStage, lastCompleted, category, ref statePersisted, accumulator, primaryFailedStage, primaryFailureCategory, cleanupFailureCategory);
-                    break;
+                    LifecycleExperimentStageStateService.SaveAtomic(
+                        experimentRoot,
+                        LifecycleExperimentStageStateService.CreatePrepared(experimentId, expectedFingerprint));
+                    statePersisted = true;
+                }
+                catch (Exception exception) when (exception is PluginSmokeException or IOException or UnauthorizedAccessException)
+                {
+                    primaryFailedStage = LifecycleExperimentStage.OriginalPreflight;
+                    primaryFailureCategory = LifecycleExperimentFailureCategories.StageStatePersistenceFailed;
                 }
 
-                accumulator.Apply(stage, evidence);
-                loaderApplied |= evidence.LoaderApplied == true || stage is LifecycleExperimentStage.LoaderInstall or LifecycleExperimentStage.LoaderLaunch or LifecycleExperimentStage.LoaderVerify;
-                pluginDeployed |= evidence.PluginDeployed == true;
-                lastCompleted = stage;
-                var index = RequiredStages.IndexOf(stage);
-                var next = index == RequiredStages.Count - 1 ? LifecycleExperimentStage.Completed : RequiredStages[index + 1];
-                Persist(next, lastCompleted, LifecycleExperimentFailureCategories.StageCompleted, ref statePersisted, accumulator, primaryFailedStage, primaryFailureCategory, cleanupFailureCategory);
+                if (primaryFailedStage is null)
+                {
+                    foreach (var stage in RequiredStages)
+                    {
+                        currentStage = stage;
+                        Persist(
+                            currentStage,
+                            lastCompleted,
+                            LifecycleExperimentFailureCategories.InProgress,
+                            ref statePersisted,
+                            accumulator,
+                            primaryFailedStage,
+                            primaryFailureCategory,
+                            cleanupFailureCategory);
+
+                        var evidence = Execute(stage, context);
+                        accumulator.Apply(stage, evidence);
+                        loaderApplied |= evidence.LoaderApplied == true;
+                        pluginDeployed |= evidence.PluginDeployed == true;
+                        if (!IsValid(stage, evidence, context, out var category))
+                        {
+                            primaryFailedStage ??= currentStage;
+                            primaryFailureCategory ??= category;
+                            Persist(currentStage, lastCompleted, category, ref statePersisted, accumulator, primaryFailedStage, primaryFailureCategory, cleanupFailureCategory);
+                            break;
+                        }
+
+                        lastCompleted = stage;
+                        var index = RequiredStages.IndexOf(stage);
+                        var next = index == RequiredStages.Count - 1 ? LifecycleExperimentStage.Completed : RequiredStages[index + 1];
+                        Persist(next, lastCompleted, LifecycleExperimentFailureCategories.StageCompleted, ref statePersisted, accumulator, primaryFailedStage, primaryFailureCategory, cleanupFailureCategory);
+                    }
+                }
             }
         }
         catch (Exception exception) when (exception is not StackOverflowException and not OutOfMemoryException)
@@ -260,10 +290,44 @@ public sealed class LifecycleExperimentOrchestrator
         }
         finally
         {
-            if (primaryFailedStage is not null && (pluginDeployed || loaderApplied) && !accumulator.ProcessActive)
+            if (primaryFailedStage is not null && accumulator.ProcessActive)
+            {
+                try
+                {
+                    var recovery = operations.PersistManualClosureRecovery(context);
+                    accumulator.Apply(LifecycleExperimentStage.LifecycleLaunch, recovery);
+                    Persist(
+                        LifecycleExperimentStage.LifecycleLaunch,
+                        lastCompleted,
+                        recovery.Succeeded && recovery.MarkerPersisted
+                            ? LifecycleExperimentFailureCategories.ManualClosureRequired
+                            : recovery.FailureCategory ?? LifecycleExperimentFailureCategories.ManualClosureRequired,
+                        ref statePersisted,
+                        accumulator,
+                        primaryFailedStage,
+                        primaryFailureCategory,
+                        cleanupFailureCategory);
+                }
+                catch (Exception exception) when (exception is not StackOverflowException and not OutOfMemoryException)
+                {
+                    accumulator.Apply(
+                        LifecycleExperimentStage.LifecycleLaunch,
+                        new RecoveryEvidence(false, false, LifecycleExperimentFailureCategories.ManualClosureRequired));
+                }
+            }
+            else if (primaryFailedStage is not null && (pluginDeployed || loaderApplied))
             {
                 cleanupStarted = true;
                 RunCleanup(context, currentStage, lastCompleted, ref statePersisted, accumulator, ref cleanupFailureCategory, primaryFailedStage, primaryFailureCategory);
+            }
+
+            if (primaryFailedStage is not null && ownershipEstablished && !accumulator.ProcessActive)
+            {
+                var finalization = operations.FinalizeFailure(context);
+                if (!finalization.Succeeded || finalization.FailureCategory is not null)
+                {
+                    cleanupFailureCategory ??= finalization.FailureCategory ?? LifecycleExperimentFailureCategories.CleanupFailed;
+                }
             }
         }
 
@@ -405,6 +469,7 @@ public sealed class LifecycleExperimentOrchestrator
             var evidence = Execute(stage, context);
             if (!IsValid(stage, evidence, context, out var category))
             {
+                accumulator.Apply(stage, evidence);
                 cleanupFailureCategory ??= category;
                 Persist(stage, cleanupLastCompleted, category, ref statePersisted, accumulator, primaryFailedStage, primaryFailureCategory, cleanupFailureCategory);
                 continue;
@@ -452,25 +517,6 @@ public sealed class LifecycleExperimentOrchestrator
             statePersisted = false;
         }
     }
-
-    private static LifecycleExperimentResult CreateFailure(
-        LifecycleExperimentStage stage,
-        LifecycleExperimentStage? lastCompleted,
-        string category,
-        bool statePersisted,
-        LifecycleEvidenceAccumulator? accumulator,
-        LifecycleExperimentStage? primaryFailedStage,
-        string? primaryFailureCategory)
-        => (accumulator ?? new LifecycleEvidenceAccumulator()).ToResult(
-            "Failed",
-            stage,
-            primaryFailedStage ?? stage,
-            lastCompleted,
-            category,
-            statePersisted,
-            primaryFailedStage ?? stage,
-            primaryFailureCategory ?? category,
-            null);
 
     private static bool IsDigest(string? value)
         => value is not null && value.Length == 64 && value.All(Uri.IsHexDigit);
@@ -521,6 +567,11 @@ public sealed class LifecycleExperimentOrchestrator
         public bool? OriginalManifestVerified { get; private set; }
         public bool? OriginalRuntimeVerified { get; private set; }
         public bool? OriginalLoaderIndicatorsAbsent { get; private set; }
+        public bool? RecoveryMarkerPersisted { get; private set; }
+        public string? RecoveryMarkerFailureCategory { get; private set; }
+        public string? RollbackCommand { get; private set; }
+        public bool LoaderApplied { get; private set; }
+        public bool PluginDeployed { get; private set; }
         public bool ProcessActive { get; private set; }
 
         public bool HasCompleteSuccessEvidence
@@ -534,6 +585,8 @@ public sealed class LifecycleExperimentOrchestrator
         public void Apply(LifecycleExperimentStage stage, LifecycleStageEvidence evidence)
         {
             LoaderTransactionStatus = evidence.LoaderTransactionStatus ?? LoaderTransactionStatus;
+            LoaderApplied |= evidence.LoaderApplied == true;
+            PluginDeployed |= evidence.PluginDeployed == true;
             ProcessActive |= evidence.ProcessActive == true;
             if (evidence is OriginalPreflightEvidence preflight)
             {
@@ -593,6 +646,12 @@ public sealed class LifecycleExperimentOrchestrator
                     OriginalLoaderIndicatorsAbsent = postcheck.LoaderIndicatorsAbsent;
                 }
             }
+            if (evidence is RecoveryEvidence recovery)
+            {
+                RecoveryMarkerPersisted = recovery.MarkerPersisted;
+                RecoveryMarkerFailureCategory = recovery.FailureCategory;
+                RollbackCommand = recovery.RollbackCommand;
+            }
         }
 
         public LifecycleExperimentResult ToResult(
@@ -635,7 +694,13 @@ public sealed class LifecycleExperimentOrchestrator
                 DisposableRestorationVerified,
                 OriginalManifestVerified,
                 OriginalRuntimeVerified,
-                OriginalLoaderIndicatorsAbsent);
+                OriginalLoaderIndicatorsAbsent,
+                RecoveryMarkerPersisted,
+                RecoveryMarkerFailureCategory,
+                RollbackCommand,
+                LoaderApplied,
+                PluginDeployed,
+                ProcessActive);
     }
 }
 

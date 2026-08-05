@@ -95,6 +95,88 @@ public static class SmokeTestPathValidator
         return executable;
     }
 
+    public static string ValidateOwnedExperimentDirectory(
+        SmokeTestRoots roots,
+        string path,
+        string description)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        var normalized = CanonicalizeAbsolute(path, description);
+        if (File.Exists(normalized)
+            || !IsStrictDescendant(roots.ExperimentRoot, normalized)
+            || IsSameOrDescendant(roots.OriginalGameRoot, normalized)
+            || IsSameOrDescendant(roots.CleanGameRoot, normalized))
+        {
+            throw new SmokeTestException($"The {description} must be a directory below the owned experiment root and outside both game profiles.");
+        }
+
+        EnsureNoReparseOnExistingPath(normalized);
+        return normalized;
+    }
+
+    public static string ValidateOwnedExperimentFile(
+        SmokeTestRoots roots,
+        string path,
+        string description)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        var normalized = CanonicalizeAbsolute(path, description);
+        if (!IsStrictDescendant(roots.ExperimentRoot, normalized)
+            || IsSameOrDescendant(roots.OriginalGameRoot, normalized)
+            || IsSameOrDescendant(roots.CleanGameRoot, normalized)
+            || Directory.Exists(normalized))
+        {
+            throw new SmokeTestException($"The {description} must remain below the owned experiment root and outside both game profiles.");
+        }
+
+        EnsureNoReparseOnExistingPath(normalized);
+        return normalized;
+    }
+
+    public static string ValidateUnityAssemblyPath(
+        SmokeTestRoots roots,
+        string unityAssemblyPath,
+        string executableRelativePath)
+    {
+        ArgumentNullException.ThrowIfNull(roots);
+        if (!string.Equals(Path.GetFileName(unityAssemblyPath), "UnityEngine.CoreModule.dll", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new SmokeTestException("The Unity metadata path must name UnityEngine.CoreModule.dll.");
+        }
+
+        if (string.IsNullOrWhiteSpace(executableRelativePath)
+            || Path.IsPathRooted(executableRelativePath)
+            || executableRelativePath.Contains('\\', StringComparison.Ordinal)
+            || executableRelativePath.Split('/').Any(part => part is "" or "." or ".."))
+        {
+            throw new SmokeTestException("The selected executable relative path is invalid for Unity metadata binding.");
+        }
+
+        var normalized = CanonicalizeAbsolute(unityAssemblyPath, "Unity metadata assembly");
+        if (!File.Exists(normalized))
+        {
+            throw new SmokeTestException("The fingerprint-bound Unity metadata assembly does not exist.");
+        }
+
+        var relativeExecutable = executableRelativePath.Replace('/', Path.DirectorySeparatorChar);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        foreach (var profileRoot in new[] { roots.OriginalGameRoot, roots.CleanGameRoot })
+        {
+            var executable = Path.GetFullPath(Path.Combine(profileRoot, relativeExecutable));
+            var managedRoot = Path.Combine(
+                Path.GetDirectoryName(executable) ?? throw new SmokeTestException("The selected executable has no parent directory."),
+                Path.GetFileNameWithoutExtension(executable) + "_Data",
+                "Managed");
+            if (string.Equals(Path.GetDirectoryName(normalized)?.TrimEnd(Path.DirectorySeparatorChar), managedRoot.TrimEnd(Path.DirectorySeparatorChar), comparison))
+            {
+                EnsureNoReparseOnExistingPath(normalized);
+                return normalized;
+            }
+        }
+
+        throw new SmokeTestException("The Unity metadata assembly is outside the fingerprint-bound original or disposable Managed directory.");
+    }
+
     public static string ValidateCommittedReportPath(SmokeTestRoots roots, string expectedFingerprint)
     {
         ArgumentNullException.ThrowIfNull(roots);

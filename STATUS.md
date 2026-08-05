@@ -6,6 +6,8 @@ M1 - Task 7 public Unity lifecycle binding and synthetic lifecycle smoke test re
 
 The earlier orchestration correction head `dbbcc3a` passed hosted run `31012843103` with 327 tests per runner; the current ownership correction supersedes it and is validated by run `31016602789`. No private run was performed for this correction.
 
+This production-path correction adds Task-6 ownership creation before preparation, an owned-root source package builder, side-effect-preserving evidence application, typed manual-closure recovery and C# rollback, post-verification-time loader-only manifest capture, profile-bound package/manifest/Unity paths, and runtime API/Contracts identities derived from captured package metadata. Hosted final validation for this correction is intentionally not claimed until it passes.
+
 ## State
 
 Task 6 was merged through PR #6. Task 7 verifies only the public `UnityEngine.Application.quitting` source with binding ID `unity-application-quitting-v1`. It binds BepInEx `Awake` to one synthetic mod initialization and the public quitting event to one shutdown of the same mod. No Harmony hook, game-defined type, gameplay state, catalog, save data, or custom wave is in scope. The lifecycle experiment is synchronous-only; `OnDestroy` is cleanup fallback and cannot satisfy the pass criteria. The current correction uses one C# orchestrator with typed operation evidence and a C# report writer; PowerShell no longer interprets loader, package, lifecycle, cleanup, or postcheck state. The two private failures remain historical and the public Unity binding remains unverified.

@@ -8,6 +8,8 @@ param(
     [Parameter(Mandatory = $true)] [string]$PackageRoot,
     [Parameter(Mandatory = $true)] [string]$ManifestPath,
     [Parameter(Mandatory = $true)] [string]$UnityAssemblyPath,
+    [Parameter(Mandatory = $true)] [string]$ExecutableRelativePath,
+    [Parameter(Mandatory = $true)] [string]$RepositoryBaselineCommit,
     [string]$Nonce
 )
 
@@ -47,7 +49,10 @@ $arguments = @(
     '--official-digest', $ExpectedBepInExDigest,
     '--package-root', $PackageRoot,
     '--manifest-path', $ManifestPath,
-    '--unity-assembly', $UnityAssemblyPath
+    '--unity-assembly', $UnityAssemblyPath,
+    '--executable-relative-path', $ExecutableRelativePath,
+    '--repository-baseline-commit', $RepositoryBaselineCommit,
+    '--dotnet-path', $dotnetCommand.Source
 )
 if (-not [string]::IsNullOrWhiteSpace($Nonce)) {
     $arguments += @('--nonce', $Nonce)

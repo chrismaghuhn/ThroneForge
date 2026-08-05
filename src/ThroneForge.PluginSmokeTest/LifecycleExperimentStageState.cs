@@ -50,6 +50,7 @@ public static class LifecycleExperimentFailureCategories
     public const string DeploymentVerificationFailed = "deployment-verification-failed";
     public const string LifecycleLaunchFailed = "lifecycle-launch-failed";
     public const string ManualClosureRequired = "manual-closure-required";
+    public const string ProcessActive = PluginSmokeStateFailureCategories.ProcessActive;
     public const string LogMissing = "log-missing";
     public const string LogNotReadable = "log-not-readable";
     public const string LogNotStable = "log-not-stable";

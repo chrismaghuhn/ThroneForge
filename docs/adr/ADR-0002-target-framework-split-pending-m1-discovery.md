@@ -22,3 +22,7 @@ No BepInEx, Harmony/HarmonyX, Unity, or proprietary game package is selected or 
 - A clean clone can build the platform-neutral skeleton without the game installed once the pinned SDK is present.
 - The game-facing target may diverge from shared/external targets after the clean-profile smoke test.
 - The report claims only BepInEx bootstrap compatibility for the documented fingerprint; it does not claim a loadable ThroneForge plugin, plugin TFM compatibility, Harmony compatibility, lifecycle binding, or game API compatibility.
+
+## Task-7 production-path correction
+
+The lifecycle experiment's C# production adapter creates and advances the Task-6 ownership record before preparation, builds the source-only `netstandard2.1` package below that owned root, derives runtime API/Contracts identities from captured package metadata, and keeps manual-closure recovery and rollback explicit. This remains a repository-only correction; no new private lifecycle run is claimed here.

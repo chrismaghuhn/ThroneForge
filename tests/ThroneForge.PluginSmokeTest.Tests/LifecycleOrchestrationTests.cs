@@ -169,6 +169,60 @@ public sealed class LifecycleOrchestrationTests
         }
     }
 
+    [Fact]
+    public void ActiveProcessEvidenceIsAppliedBeforeValidationAndSkipsCleanup()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var operations = new SuccessfulLifecycleOperations
+            {
+                LifecycleLaunchResult = new(false, LifecycleExperimentFailureCategories.ManualClosureRequired, ProcessActive: true)
+            };
+
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                operations.ExperimentId,
+                Fingerprint,
+                operations).Run();
+
+            Assert.Equal("Inconclusive", result.OverallResult);
+            Assert.True(result.RecoveryMarkerPersisted);
+            Assert.False(operations.CleanupCalled);
+            Assert.Equal(LifecycleExperimentFailureCategories.ManualClosureRequired, result.PrimaryFailureCategory);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void FailedReportDoesNotClaimQuittingWasObserved()
+    {
+        var root = CreateRoot();
+        Directory.CreateDirectory(Path.Combine(root, "docs", "discovery"));
+        try
+        {
+            var result = new LifecycleExperimentResult(
+                "Failed",
+                LifecycleExperimentStage.OriginalPreflight,
+                LifecycleExperimentStage.OriginalPreflight,
+                null,
+                LifecycleExperimentFailureCategories.OriginalPreflightFailed,
+                true);
+
+            var reportPath = new LifecycleExperimentReportWriter(root, Fingerprint).Write(result);
+            var report = File.ReadAllText(reportPath);
+            Assert.Contains("planned public UnityEngine.Application.quitting binding; event not verified", report, StringComparison.Ordinal);
+            Assert.DoesNotContain("event observed while Thronefall was running", report, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static string CreateRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "throneforge-task7-orchestrator", Guid.NewGuid().ToString("N"));
@@ -186,6 +240,10 @@ public sealed class LifecycleOrchestrationTests
         public LifecycleStageEvidence? LifecycleVerificationResult { get; init; }
         public LifecycleStageEvidence? PluginRemovalResult { get; init; }
         public LifecycleStageEvidence? OriginalPostcheckResult { get; init; }
+        public LifecycleStageEvidence? LifecycleLaunchResult { get; init; }
+        public bool CleanupCalled { get; private set; }
+
+        public LifecycleStageEvidence EnsureOwnership(LifecycleExperimentContext context) => new(true);
 
         public OriginalPreflightEvidence OriginalPreflight(LifecycleExperimentContext context)
             => new(true, "game/Thronefall.exe", context.ExpectedFingerprint, true, true);
@@ -218,7 +276,8 @@ public sealed class LifecycleOrchestrationTests
                 new string('b', 64),
                 PluginDeployed);
 
-        public LifecycleStageEvidence LifecycleLaunch(LifecycleExperimentContext context) => new(true);
+        public LifecycleStageEvidence LifecycleLaunch(LifecycleExperimentContext context)
+            => LifecycleLaunchResult ?? new(true);
         public LogStabilityEvidence LogStability(LifecycleExperimentContext context) => new(true, "stable log");
 
         public LifecycleVerificationEvidence LifecycleVerification(LifecycleExperimentContext context)
@@ -239,5 +298,14 @@ public sealed class LifecycleOrchestrationTests
             => OriginalPostcheckResult is { } result
                 ? new(result.Succeeded, result.FailureCategory)
                 : new(true, null, true, true, true, true);
+
+        public RecoveryEvidence PersistManualClosureRecovery(LifecycleExperimentContext context)
+            => new(true, true, RollbackCommand: "rollback-lifecycle-experiment");
+
+        public LifecycleStageEvidence FinalizeFailure(LifecycleExperimentContext context)
+        {
+            CleanupCalled = true;
+            return new(true);
+        }
     }
 }
