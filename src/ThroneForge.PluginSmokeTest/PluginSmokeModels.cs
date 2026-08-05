@@ -957,7 +957,9 @@ public static class PluginAssemblyMetadataInspector
         AssemblyDefinition assembly)
     {
         var attributes = new List<(string Guid, string Name, string Version)>();
-        foreach (var handle in assembly.GetCustomAttributes())
+        var handles = assembly.GetCustomAttributes()
+            .Concat(metadata.TypeDefinitions.SelectMany(handle => metadata.GetTypeDefinition(handle).GetCustomAttributes()));
+        foreach (var handle in handles)
         {
             var attribute = metadata.GetCustomAttribute(handle);
             if (!TryGetAttributeTypeName(metadata, attribute.Constructor, out var name)

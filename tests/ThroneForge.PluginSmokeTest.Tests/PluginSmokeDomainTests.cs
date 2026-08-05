@@ -280,6 +280,38 @@ public sealed class PluginSmokeDomainTests
     }
 
     [Fact]
+    public void PackageValidationAcceptsOnlyTheExpectedPluginMetadata()
+    {
+        var metadata = new PluginAssemblyMetadata(
+            "ThroneForge.M1.SyntheticSmoke.dll",
+            1,
+            Digest("synthetic-plugin"),
+            "ThroneForge.M1.SyntheticSmoke, Version=1.0.0.0",
+            ".NETStandard,Version=v2.1",
+            true,
+            true,
+            true,
+            false,
+            false,
+            0,
+            false,
+            ["BepInEx", "ThroneForge.API", "ThroneForge.Contracts", "netstandard"],
+            1,
+            "dev.throneforge.m1.synthetic-smoke",
+            "ThroneForge M1 Synthetic Smoke",
+            "0.0.1",
+            1,
+            true,
+            true,
+            1);
+
+        PluginPackageValidationRules.Validate(
+            "ThroneForge.M1.SyntheticSmoke.dll",
+            metadata,
+            "netstandard2.1");
+    }
+
+    [Fact]
     public void ApiAndContractsPublicSurfaceIsEquivalentAcrossNet10AndNetstandard21()
     {
         var repository = FindRepositoryRoot();
