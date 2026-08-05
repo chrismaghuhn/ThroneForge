@@ -2,17 +2,17 @@
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is in progress on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; M1 Task 7 has not started.
+M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is blocked by the final private deployment attempt on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; M1 Task 7 has not started.
 
 ## State
 
-M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 repository-only hardening is complete and hosted-verified below. M1 Task 6 has completed one private disposable synthetic-plugin run; M1 overall remains incomplete.
+M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 repository-only hardening is complete and hosted-verified below. M1 Task 6 hardening is implemented and hosted-verified, but the final fresh private attempt failed during deployment-state validation before plugin files were written; M1 overall remains incomplete.
 
 The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below. Task 6's earlier private result is retained as limited historical evidence; the hardening implementation and a fresh private rerun are pending.
 
-Task 6 hardening adds an atomically owned experiment state, derived loader/profile preconditions, exact-byte three-file recapture and admission, transactional deployment rollback, full package metadata validation, runtime API/Contracts identity markers, public-surface parity checks, and owned cleanup/recovery paths. The earlier private run is `PassedWithWarnings` because it did not capture actual runtime identity evidence; no new private rerun has been performed.
+Task 6 hardening adds an atomically owned experiment state, derived loader/profile preconditions, exact-byte three-file recapture and admission, transactional deployment rollback, full package metadata validation, runtime API/Contracts identity markers, public-surface parity checks, and owned cleanup/recovery paths. The earlier private run is `PassedWithWarnings` because it did not capture actual runtime identity evidence. The fresh `final15` attempt recaptured the package successfully but `admit-and-deploy` rejected the disposable profile state before writing plugin files; rollback and original post-verification passed. The exact deployment-state rejection remains unresolved.
 
-The next executable gate is current-head hosted Windows/Linux CI with SDK `10.0.100`. Only after both jobs and artifact inspection pass may exactly one fresh private rerun be performed. M1 Task 7 remains unstarted.
+The current blocker is to diagnose and fix the deployment-state rejection without modifying the original installation. No further private run is authorized by this task; M1 Task 7 remains unstarted.
 
 ## Completed
 
@@ -106,6 +106,13 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Private command, with the absolute game path redacted here: `dotnet run --project src/ThroneForge.Discovery --no-restore -- runtime-compatibility --game-path <redacted> --fingerprint 1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d --output-root docs/discovery --overwrite`: PASS.
 - Private report review: PASS; no absolute path, username, machine name, arbitrary listing, binary content, decompiled source, or temporary report remained. The report contains only relative paths and selected compatibility metadata.
 - Baseline hosted Task 2 evidence before hardening: run [30849281168](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30849281168) validated reviewed head `9511e999226c572115762a83d3baf3211c75d9d9`; Windows and Ubuntu each produced 10 TRX files representing 70 tests, including 51 focused Discovery tests, with 0 failed/errors and exact SDK `10.0.100`. Both uploaded artifacts were downloaded and parsed independently, and no `Overwriting results file` warning occurred. This is not the final hardening validation.
+
+### M1 Task 6 hardening validation outcome
+
+- Local validation after the code fix: SDK `10.0.110` used temporarily because `10.0.100` is not installed locally; locked restore PASS, format verification PASS, Release build PASS with 0 warnings/errors, and 272 tests PASS with 0 failures/skips. `global.json` was restored to committed SDK `10.0.100` before reporting.
+- Hosted run [30994830386](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30994830386) validated commit `60760ae99b2b52e05a0bf9a126e7b292c09cf09f`; Windows and Ubuntu each uploaded 13 TRX files representing 271 tests, with 0 failures/errors/skips and SDK `10.0.100`.
+- Hosted run [30995632643](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30995632643) validated commit `a35f579d68dc04085adf431ce8e1df6afa8f1de3`; Windows and Ubuntu each uploaded 13 TRX files representing 272 tests, with 0 failures/errors/skips and SDK `10.0.100`.
+- Fresh private attempt: external profile `final15`, package recapture and metadata validation passed, but `admit-and-deploy` rejected disposable-profile state before writing plugin files. Loader rollback, disposable restoration, original complete-manifest equality, and original runtime post-verification passed. No plugin marker, runtime API/Contracts identity, or plugin deployment pass was claimed. No further private run was performed.
 
 ## Unverified assumptions
 

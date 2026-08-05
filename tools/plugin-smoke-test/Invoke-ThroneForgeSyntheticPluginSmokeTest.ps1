@@ -302,6 +302,8 @@ $failureSummary = 'The private smoke test did not complete.'
 $package = $null
 $runtimeApiIdentity = 'Not observed'
 $runtimeContractsIdentity = 'Not observed'
+$loaderOnlyVerified = $false
+$pluginMarkerVerified = $false
 $nonce = New-Nonce
 try {
     Invoke-Loader Prepare | Out-Null
@@ -314,6 +316,7 @@ try {
     if ($loaderLaunch.ExitCode -ne 0) { Throw-Sanitized "The loader-only bootstrap launch was inconclusive or failed: $(Get-SanitizedOutputSummary $loaderLaunch.Output)" }
     $loaderVerify = Invoke-Loader Verify -AllowFailure
     if ($loaderVerify.ExitCode -ne 0) { Throw-Sanitized "The loader-only bootstrap verification did not pass before plugin deployment: $(Get-SanitizedOutputSummary $loaderVerify.Output)" }
+    $loaderOnlyVerified = $true
     Invoke-PluginTool @('ownership', '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $script:expectedFingerprint, '--status', 'LaunchObserved') | Out-Null
     $package = Invoke-PrivatePluginBuild
     $admission = Invoke-PluginTool @(
@@ -342,6 +345,7 @@ try {
     if ($logVerification.ExitCode -ne 0) { Throw-Sanitized 'The BepInEx log did not prove the exact synthetic plugin bootstrap criteria.' }
     $runtimeApiIdentity = Get-OutputValue $logVerification.Output 'runtime-api-identity'
     $runtimeContractsIdentity = Get-OutputValue $logVerification.Output 'runtime-contracts-identity'
+    $pluginMarkerVerified = $true
     Invoke-PluginTool @('ownership', '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $script:expectedFingerprint, '--status', 'LaunchObserved', '--package-sha256', $package.PackageDigest, '--binding-digest', $package.AdmissionBindingDigest, '--plugin-root', 'BepInEx/plugins/dev.throneforge.m1.synthetic-smoke') | Out-Null
     $pluginDeployed = $true
     $failureSummary = 'The disposable BepInEx profile loaded exactly one approved synthetic plugin and emitted the expected marker.'
@@ -422,13 +426,13 @@ $reportLines = @(
     "- Package digest: $($package.PackageDigest)",
     "- Package files: exactly 3 (synthetic plugin, ThroneForge.API, ThroneForge.Contracts)",
     "- Target framework evidence: $($package.TargetFramework)",
-    '- Plugin marker: one nonce-bound readiness marker verified; nonce omitted from this report',
-    "- BepInEx evidence: version, preloader, chainloader, one plugin, runtime API identity '$runtimeApiIdentity', runtime Contracts identity '$runtimeContractsIdentity', and zero fatal/errors were required",
+    "- Plugin marker: $(if ($pluginMarkerVerified) { 'one nonce-bound readiness marker verified; nonce omitted from this report' } else { 'not observed; the synthetic plugin was not deployed or launched' })",
+    "- BepInEx evidence: $(if ($pluginMarkerVerified) { "version, preloader, chainloader, one plugin, runtime API identity '$runtimeApiIdentity', runtime Contracts identity '$runtimeContractsIdentity', and zero fatal/errors were required" } elseif ($loaderOnlyVerified) { 'loader-only version, preloader, chainloader, zero-plugin, and zero-fatal bootstrap evidence passed; plugin evidence was not reached' } else { 'no complete loader bootstrap evidence was recorded' })",
     '- Explicit ThroneForge lifecycle calls: none; lifecycle marker would fail the result',
     "- Rollback/recovery state: $(if ($manualClosureRequired) { 'ManualClosureRequired; recovery marker persisted; no files were modified while process remained active.' } elseif ($rollbackOperationVerified) { 'Loader transaction rollback completed and reported verified.' } else { 'Loader transaction rollback was not verified.' })",
     "- Failure or warning summary: $failureSummary",
     '- Privacy statement: no absolute paths, nonce, usernames, machine names, raw logs, binaries, archives, or private manifests are included.',
-    '- Next permitted task: review this evidence and plan M1 Task 7; no further plugin or game functionality is claimed.'
+    "- Next permitted task: resolve the Task-6 deployment-state validation failure before any further private run; M1 Task 7 remains unstarted."
 )
 Write-Utf8NoBom $reportPath ($reportLines -join [Environment]::NewLine)
 Write-Output "Smoke-test result: $result"

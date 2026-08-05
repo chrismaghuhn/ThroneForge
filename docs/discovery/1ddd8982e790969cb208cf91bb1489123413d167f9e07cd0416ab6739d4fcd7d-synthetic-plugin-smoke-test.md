@@ -1,94 +1,22 @@
 # Thronefall Synthetic Plugin Smoke-Test Report
 
-## Base game fingerprint
-
-`1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`
-
-Fingerprint algorithm: `throneforge-game-fingerprint-v1`
-
-## Task and timestamp
-
+- Base game fingerprint: 1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d
 - Task version: M1 Task 6
-- Test timestamp UTC: 2026-08-05T08:42:46.7174448+00:00
-- Backend: Mono
-- Executable architecture: x64
-- Unity evidence: 2022.3.62f2
-- Target framework evidence: `netstandard2.1`
-
-## Original installation verification
-
-- Preflight fingerprint: matched the expected fingerprint.
-- Preflight runtime readiness: `ReadyForReversibleTest`.
-- Preflight loader indicators: absent.
-- Postflight complete manifest: unchanged.
-- Postflight fingerprint: matched the expected fingerprint.
-- Postflight runtime/readiness verification: passed.
-- Postflight loader indicators: absent.
-
-The original installation was used as read-only input and was not used as the loader launch target.
-
-## Disposable profile verification
-
-- Copy destination: external disposable profile; absolute location intentionally omitted.
-- Copied baseline fingerprint: matched the expected fingerprint.
-- Copied baseline runtime readiness: `ReadyForReversibleTest`.
-- Copied baseline loader indicators: absent before installation.
-- Baseline launch: passed; the copied executable started and exited within the bounded observation window.
-
-## Loader candidate and official release verification
-
-- Candidate: BepInEx 5 Unity Mono x64 `5.4.23.5`.
-- Official source: `BepInEx/BepInEx`, GitHub release tag `v5.4.23.5`.
-- Asset: `BepInEx_win_x64_5.4.23.5.zip`.
-- Asset ID: `352395699`.
-- Asset size: `639118` bytes.
-- Official vendor digest: `82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4`.
-- Observed SHA-256: `82f9878551030f54657792c0740d9d51a09500eeae1fba21106b0c441e6732c4`.
-- Archive digest status: matched.
-
-## Secure extraction and transaction
-
-- ZIP entry validation: passed; rooted paths, traversal, duplicate destinations, link entries, unsafe names, and excessive expansion were rejected or absent.
-- Extraction target: external validated staging directory.
-- Transaction: loader installation applied and verified in the disposable copy; the synthetic package was admitted and deployed only after exact package/game evidence matched.
-- Package: exactly three files — synthetic plugin, `ThroneForge.API`, and `ThroneForge.Contracts`.
-- Package SHA-256: `54ced96a142040cc96374bbb86d28f5a0e2735271102aff2cf4486a40d549020`.
-
-## Loader-enabled launch and generated evidence
-
-- Launch target: disposable copy only.
-- Process observation: started, remained inside the experiment root, and exited gracefully within the bounded window.
-- BepInEx version observed: `5.4.23.5`.
-- Preloader: initialized.
-- Chainloader: initialized.
-- Plugins discovered during the synthetic-plugin launch: `1`.
-- Synthetic readiness marker: exactly one nonce-bound marker matched; the nonce is omitted from this report.
-- API/Contracts identities: not independently measured by this historical run; the old template emitted build-time identity values. A corrected rerun is required before this can be claimed.
-- Explicit ThroneForge lifecycle calls: none; no lifecycle marker was observed.
-- Warnings: `0`.
-- Errors: `0`.
-- Fatal errors: `0`.
-- No file was added to the original installation.
-
-## Rollback and post-verification
-
-- Synthetic plugin removal: completed.
-- Loader transaction rollback: completed and independently reported verified.
-- Disposable post-rollback fingerprint: matched the expected fingerprint.
-- Disposable complete baseline manifest: restored and matched.
-- Original complete manifest: unchanged.
-- Original runtime/readiness post-verification: passed.
-
-## Overall result
-
-`PassedWithWarnings`
-
-The disposable BepInEx profile loaded exactly one source-generated synthetic plugin and emitted the expected marker. This historical result retains credible bootstrap evidence, but it does not prove current-byte package recapture/admission, actual runtime API/Contracts resolution, or the complete ownership and transactional deployment guarantees added by the Task-6 hardening. A fresh private run is required after hosted synthetic CI passes. It does not prove a real Thronefall plugin, final plugin target-framework compatibility beyond the local evidence used for the build, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, or custom waves.
-
-## Security and privacy statement
-
-No absolute paths, usernames, machine names, nonce, raw logs, binaries, archives, complete private manifests, transaction state, recovery markers, or save-game information are included. Raw experiment evidence remains outside the repository. The original installation was not modified or launched.
-
-## Next permitted task
-
-Plan M1 Task 7 separately. Do not infer game-facing plugin compatibility or begin lifecycle, game API, catalog, Harmony, or custom-wave work from this report alone.
+- Test timestamp UTC: 2026-08-05T10:07:27.9112688+00:00
+- Overall result: Failed
+- Original complete manifest unchanged: True
+- Original runtime post-verification passed: True
+- Disposable rollback verified: True
+- Loader candidate: BepInEx 5 Unity Mono x64 5.4.23.5
+- Archive: BepInEx_win_x64_5.4.23.5.zip
+- Archive digest status: matched expected supplied SHA-256
+- Package digest: `f9b82306f02397b81863ff46c99e28bfd1572cadaea8ef6d4a5eac9664d678a8`
+- Package files: exactly 3 (synthetic plugin, ThroneForge.API, ThroneForge.Contracts)
+- Target framework evidence: netstandard2.1
+- Plugin marker: not observed; the synthetic plugin was not deployed or launched
+- BepInEx evidence: loader-only version, preloader, chainloader, zero-plugin, and zero-fatal bootstrap evidence passed; plugin evidence was not reached
+- Explicit ThroneForge lifecycle calls: none; lifecycle marker would fail the result
+- Rollback/recovery state: Loader transaction rollback completed and reported verified.
+- Failure or warning summary: `admit-and-deploy` rejected the disposable profile state before plugin deployment; no plugin files were written. The exact deployment-state rejection remains to be diagnosed.
+- Privacy statement: no absolute paths, nonce, usernames, machine names, raw logs, binaries, archives, or private manifests are included.
+- Next permitted task: resolve the Task-6 deployment-state validation failure before any further private run; M1 Task 7 remains unstarted.
