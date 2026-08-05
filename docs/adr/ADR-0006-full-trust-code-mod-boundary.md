@@ -31,4 +31,4 @@ Task 4 defines three separate concerns:
 
 ## Task-6 disposable experiment
 
-The private synthetic-plugin experiment reuses this admission boundary immediately before deployment. Its package digest is a versioned canonical digest of exactly three metadata-inspected managed files; approval, integrity, adapter evidence, and the fixed game fingerprint are bound to that digest. This is evidence binding, not a signature or sandbox. The experiment is fully reversible and does not load a Thronefall plugin or invoke a game lifecycle.
+The private synthetic-plugin experiment reuses this admission boundary immediately before deployment. Its package digest is a versioned canonical digest of exactly three metadata-inspected managed files; approval, integrity, adapter evidence, and the fixed game fingerprint are bound to that digest. This is evidence binding, not a signature or sandbox. Task 6 passed for the documented fingerprint in an external disposable profile, loaded exactly one source-generated synthetic plugin, and invoked no ThroneForge lifecycle method. It did not load a Thronefall plugin or establish game compatibility.

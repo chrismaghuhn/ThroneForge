@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke test is in progress on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; no private experiment has started.
+M1 - Task 6 disposable BepInEx synthetic-plugin smoke test is complete on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; M1 Task 7 has not started.
 
 ## Milestones
 
@@ -12,9 +12,11 @@ M1 - Task 6 disposable BepInEx synthetic-plugin smoke test is in progress on `ag
 
 Deliver a clean-clone buildable solution skeleton, pinned external-tool SDK, centralized build/package settings, the stable-core/adapter project boundaries, initial ADRs, architecture tests, CI, and honest project status documentation. Use only placeholder interfaces and portable types; do not reference or name unverified Thronefall internals. Acceptance requires a game-free build, passing architecture tests, no forbidden runtime references outside placeholder game-facing projects, and all required validation commands passing.
 
-### M1 - Task 6: disposable BepInEx synthetic-plugin smoke test (in progress)
+### M1 - Task 6: disposable BepInEx synthetic-plugin smoke test (complete; M1 overall incomplete)
 
-The current branch adds an external `ThroneForge.PluginSmokeTest` project, source-only synthetic plugin template, metadata-selected `netstandard2.0`/`netstandard2.1` build path, exact three-file package manifest and digest, immediate Task-4 admission, and a local-only orchestrator that reuses Task-3 copy/transaction/launch/rollback services. Synthetic tests and canonical local validation must pass before hosted CI and before one private run against the explicit installation. M1 Task 7 is not started.
+The branch adds an external `ThroneForge.PluginSmokeTest` project, source-only synthetic plugin template, metadata-selected `netstandard2.0`/`netstandard2.1` build path, exact three-file package manifest and digest, immediate Task-4 admission, and a local-only orchestrator that reuses Task-3 copy/transaction/launch/rollback services. The private run passed only in the external disposable profile for the documented fingerprint; M1 Task 7 is not started.
+
+Task-6 completion requires the sanitized report, unchanged original-installation manifest and runtime post-checks, verified loader rollback, and final hosted validation of the current head. It does not claim a real Thronefall plugin, lifecycle, game API, Harmony, catalog, or custom-wave capability.
 
 ### M1 - Thronefall discovery spike
 

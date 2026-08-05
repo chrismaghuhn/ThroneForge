@@ -12,7 +12,7 @@ Run one private, reversible BepInEx 5.4.23.5 smoke test in a disposable copy for
 4. Add nonce-bound marker parsing, deployment verification, sanitized reporting, and explicit `Passed`/`Failed`/`Inconclusive` state handling.
 5. Add synthetic tests for all safety and evidence boundaries, then run local validation and hosted CI before any private run.
 6. After CI is green, perform exactly one private run against the explicit local installation and inspect the sanitized report manually.
-7. Commit only the sanitized report and final documentation; run final local/hosted validation and stop before M1 Task 7.
+7. [x] Commit only the sanitized report and final documentation; run final local/hosted validation and stop before M1 Task 7.
 
 ## Planned repository surfaces
 
@@ -33,3 +33,7 @@ Run one private, reversible BepInEx 5.4.23.5 smoke test in a disposable copy for
 ## Safety gates
 
 No private experiment starts until source-only tests, required local checks, and hosted Windows/Linux CI pass. The original installation is read-only, the experiment is external to the repository and game root, and no binary, raw log, nonce, absolute path, or private manifest is committed.
+
+## Recorded private result
+
+The one authorized private run passed for the fixed fingerprint using official BepInEx `5.4.23.5` and the evidence-selected `netstandard2.1` target. Exactly one synthetic plugin was observed with the nonce-bound marker, preloader and chainloader evidence, matching API/Contracts identities, and no lifecycle marker. The plugin was removed, the loader transaction was rolled back, the copied profile was restored, and the original installation's complete manifest and runtime-readiness post-checks matched. M1 Task 7 remains unstarted.

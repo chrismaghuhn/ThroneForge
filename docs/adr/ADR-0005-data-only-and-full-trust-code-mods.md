@@ -19,4 +19,4 @@ Content and logic packages are data-only by default. They may contain validated 
 
 ## Task-6 experiment boundary
 
-The disposable synthetic-plugin smoke test is a private full-trust experiment only. It builds a source-controlled template against locally evidenced BepInEx/Unity/API/Contracts references and deploys exactly one three-file package into an external disposable copy. It does not make BepInEx, Unity, or game references part of portable contracts, schemas, packaging, or production API boundaries. No real Thronefall plugin is loaded by this task.
+The disposable synthetic-plugin smoke test is a private full-trust experiment only. It builds a source-controlled template against locally evidenced BepInEx/Unity/API/Contracts references and deploys exactly one three-file package into an external disposable copy. It does not make BepInEx, Unity, or game references part of portable contracts, schemas, packaging, or production API boundaries. The recorded Task-6 pass loaded only the source-generated synthetic plugin in the disposable profile; no real Thronefall plugin was loaded.

@@ -2,17 +2,17 @@
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke test is in progress on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; no private experiment has started.
+M1 - Task 6 disposable BepInEx synthetic-plugin smoke test is complete on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; M1 Task 7 has not started.
 
 ## State
 
-M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 repository-only hardening is now complete and hosted-verified below. No Thronefall plugin was loaded and M1 overall remains incomplete.
+M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 repository-only hardening is complete and hosted-verified below. M1 Task 6 has completed one private disposable synthetic-plugin run; M1 overall remains incomplete.
 
-The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below. Task 6 has not yet produced hosted or private validation evidence.
+The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below. Task 6's private result is recorded below; current-head hosted validation remains pending until the documentation and harness fix are pushed.
 
-Task 6 implementation is in progress. The repository-only surface now includes the external plugin-smoke project, evidence-driven TFM selection, metadata-only PE inspection, a versioned three-file package manifest/digest, Task-4 admission binding, nonce marker/log parsing, deployment guards, and a PowerShell harness that reuses the Task-3 disposable profile services. No BepInEx archive has been downloaded by this task, no private game run has started, and no report is claimed as passed.
+Task 6 implementation is complete. The repository-only surface includes the external plugin-smoke project, evidence-driven TFM selection, metadata-only PE inspection, a versioned three-file package manifest/digest, Task-4 admission binding, nonce marker/log parsing, deployment guards, and a PowerShell harness that reuses the Task-3 disposable profile services. The private run passed in an external disposable profile; no private artifact was copied into the repository.
 
-The next executable gate is the complete local restore/format/build/test validation, followed by hosted Windows/Linux CI with SDK `10.0.100`. Only after both are green may the single private experiment be run.
+The next executable gate is current-head hosted Windows/Linux CI with SDK `10.0.100`, followed by review of the Task-6 report and merge decision. M1 Task 7 remains unstarted.
 
 ## Completed
 
@@ -200,9 +200,18 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Local SDK `10.0.110` validation passes restore, format, Release build, the full 244-test suite, 32 focused PluginLoad tests, 12 Architecture tests, and 27 Contracts tests. Exact pinned SDK validation passed in hosted CI below; SDK `10.0.100` is not installed locally.
 - Final hosted validation passed in run [30978672030](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30978672030) for head `a8595e7b56b80ab338e5d148c1ba1f13455598d4`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 244 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were downloaded and independently parsed; no `Overwriting results file` warning occurred.
 
+## M1 Task 6 completed evidence
+
+- Private command: the local-only PowerShell `Full` harness was run with explicit original game path, external experiment root, official BepInEx archive, fixed game fingerprint, and fixed archive digest; absolute paths are intentionally omitted here.
+- Private result: `Passed` for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`, backend Mono, x64 executable, Unity `2022.3.62f2`, BepInEx `5.4.23.5`, and evidence-selected `netstandard2.1`.
+- Package: exactly three files (synthetic plugin, `ThroneForge.API`, `ThroneForge.Contracts`); package SHA-256 `54ced96a142040cc96374bbb86d28f5a0e2735271102aff2cf4486a40d549020`; archive digest matched the fixed official SHA-256.
+- Bootstrap evidence: preloader and chainloader initialized, exactly one synthetic plugin was observed, the nonce-bound readiness marker matched, API/Contracts identities matched, and no lifecycle marker, fatal error, or error evidence was present.
+- Safety evidence: original complete manifest unchanged; original runtime/readiness post-verification passed; disposable rollback was verified; no private process remained active; no loader/plugin artifact was committed.
+- The sanitized report is `docs/discovery/1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-synthetic-plugin-smoke-test.md`. Current-head hosted CI evidence is pending and must be added after the push.
+
 ## Next task
 
-After Task 5 is reviewed and merged, the next separately approved experiment may place the synthetic plugin into a disposable, fingerprint-bound BepInEx profile. That experiment must not modify or launch the original installation and must not claim lifecycle or game-API compatibility.
+Task 6 is complete. M1 Task 7 may be planned separately after this branch is reviewed and merged; no lifecycle or game-API compatibility is claimed.
 
 ### M1 Task 3 earlier hardening evidence
 
@@ -225,4 +234,4 @@ After Task 5 is reviewed and merged, the next separately approved experiment may
 
 ## Handoff
 
-After this branch is reviewed and merged, a separately approved disposable-profile synthetic plugin experiment may be planned. It must remain outside the original Thronefall installation and must not claim plugin TFM, BepInEx runtime, lifecycle, or game-API compatibility beyond its recorded evidence. Do not add Harmony, inspect game methods, implement lifecycle bindings, or start custom waves in this branch.
+After this branch is reviewed and merged, M1 Task 7 may be planned separately. This branch must not be extended with Harmony, game-method inspection, lifecycle bindings, or custom waves.

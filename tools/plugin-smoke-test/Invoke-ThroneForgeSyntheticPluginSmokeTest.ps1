@@ -61,6 +61,8 @@ $script:dotnet = $dotnet
 $script:repositoryRoot = $repositoryRoot
 
 function Invoke-DotnetOperation([string[]]$arguments, [switch]$AllowFailure) {
+    $operation = @($arguments | Where-Object { $_ -in @('runtime-compatibility', 'Prepare', 'Install', 'Launch', 'Verify', 'Rollback', 'package', 'admit', 'deploy', 'remove', 'verify-log', 'manifest', 'launch') } | Select-Object -Last 1)
+    $script:lastOperation = if ($operation.Count -eq 0) { 'dotnet' } else { [string]$operation[0] }
     $previousErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
@@ -286,7 +288,7 @@ try {
     $launch = Invoke-PluginTool @('launch', '--clean-game', $cleanGameRoot, '--experiment-root', $script:experimentRoot, '--executable', (Join-Path $cleanGameRoot $selectedExecutableRelative), '--nonce', $nonce) -AllowFailure
     if ($launch.Output -match 'manual-closure-required=True') { $manualClosureRequired = $true; Throw-Sanitized 'The copied process requires manual closure before rollback.' }
     if ($launch.ExitCode -ne 0) { Throw-Sanitized 'The loader-enabled synthetic plugin launch was inconclusive or failed.' }
-    $knownLogs = @((Join-Path $cleanGameRoot 'BepInEx\LogOutput.log'), (Join-Path $cleanGameRoot 'BepInEx\LogOutput.txt')) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+    $knownLogs = @(@((Join-Path $cleanGameRoot 'BepInEx\LogOutput.log'), (Join-Path $cleanGameRoot 'BepInEx\LogOutput.txt')) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
     if ($knownLogs.Count -ne 1) { Throw-Sanitized 'The loader did not produce exactly one recognized BepInEx log file.' }
     $logVerification = Invoke-PluginTool @('verify-log', '--log-path', $knownLogs[0], '--nonce', $nonce, '--api-identity', $package.ApiIdentity, '--contracts-identity', $package.ContractsIdentity)
     if ($logVerification.ExitCode -ne 0) { Throw-Sanitized 'The BepInEx log did not prove the exact synthetic plugin bootstrap criteria.' }
@@ -295,7 +297,7 @@ try {
     $result = 'Passed'
 }
 catch {
-    $failureSummary = $_.Exception.Message -replace 'C:\\[^\r\n ]+', '<redacted-path>'
+    $failureSummary = "Operation '$script:lastOperation': $($_.Exception.Message)" -replace 'C:\\[^\r\n ]+', '<redacted-path>'
     if ($manualClosureRequired) { $result = 'Inconclusive' }
 }
 finally {
