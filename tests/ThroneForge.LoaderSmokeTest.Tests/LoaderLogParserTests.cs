@@ -166,4 +166,27 @@ public sealed class LoaderLogParserTests
         Assert.False(diagnostic.LogPresent);
         Assert.False(diagnostic.LogReadable);
     }
+
+    [Fact]
+    public void ReadableLogWithoutCompleteBootstrapEvidenceIsClassifiedSafely()
+    {
+        var launch = new LaunchObservationResult(
+            Started: true,
+            StableInitialized: false,
+            Exited: true,
+            ExitCode: 0,
+            ExecutableWasInsideExperiment: true,
+            RequiresManualClosure: false,
+            Elapsed: TimeSpan.FromMilliseconds(1),
+            FailureCategory: "process-exited-during-observation");
+        var summary = LoaderLogParser.Parse("BepInEx 5.4.23.5\nPreloader finished\nChainloader initialized\n0 plugins to load");
+
+        var diagnostic = LoaderLaunchDiagnosticEvidence.Create(
+            launch,
+            new LoaderLogReadEvidence(true, true),
+            summary,
+            bootstrapObserved: false);
+
+        Assert.Equal(LoaderLaunchDiagnosticCategories.BootstrapEvidenceInvalid, diagnostic.DiagnosticCategory);
+    }
 }

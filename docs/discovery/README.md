@@ -157,6 +157,8 @@ The recovery-only correction adds conditional plugin removal (`NotRequired` when
 
 Future recovery diagnostics retain only bounded relative paths and difference kinds (`added-file`, `removed-file`, `changed-file`, `added-directory`, or `removed-directory`). The historical recovery did not retain that file-level record, so its exact drift source remains unknown. Absolute paths, manifests, hashes, logs, and private experiment state remain excluded.
 
+The repository-only loader-launch investigation is hosted-validated at implementation commit `c9429c5d56d11531e4c5bfbbf63a793d6d927edc` by run `31045763385` on Windows and Ubuntu with SDK `10.0.100`. Each runner produced 13 TRX files and 371 passing tests; no private lifecycle or recovery execution was performed.
+
 PR #7 review correction is repository-only. When a lifecycle package is recorded as deployed, recovery removes that exact ownership-bound plugin root before evaluating rollback drift and retains the removal result if a later rollback phase fails. BaselineLaunch and LoaderLaunch preserve typed manual-closure/process-active evidence; cleanup and file mutation are not attempted while the copied process remains active. No private lifecycle or recovery execution was performed for this correction.
 
 Correction head `1cd903c0aa1942d793409893d458939660e40c9d` passed hosted run `31039015040` on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files and 360 passing tests per runner. No TRX overwrite warning was reported.
