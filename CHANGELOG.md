@@ -4,6 +4,8 @@ All notable ThroneForge changes are documented here.
 
 ## Unreleased
 
+- Started M1 Task 6 from merged `main@f6416874`: a fingerprint-bound, disposable BepInEx synthetic-plugin smoke-test slice. No private experiment has started.
+- Added the repository-only Task-6 evidence surface: metadata-selected plugin TFM, source-only BepInEx template, exact three-file package manifest/digest, immediate admission evaluation, sanitized nonce marker parsing, deployment guards, and explicit rollback-oriented local harness. No BepInEx or game artifact is committed.
 - Started the final M1 Task 5 native-image/load-context correction from `1649336681fd76cb1f66623d151179015c812fcb`: require CLR `ILOnly`, reject native entry points and missing CLR headers, record pure-managed image evidence, and verify the actual collectible assembly context. No private Thronefall/BepInEx experiment was run.
 - Completed the final M1 Task 5 native-image/load-context correction at `a8595e7b56b80ab338e5d148c1ba1f13455598d4`. Hosted run `30978672030` passed on Windows and Ubuntu with SDK `10.0.100`, 12 TRX files, and 244 tests per runner; no overwrite warning occurred. No private Thronefall/BepInEx experiment was run.
 - Completed M1 Task 5 repository-only hardening at `bb32de1dd211ddd5174f8d8f6e6490164da970db`: strict single-assembly closure, metadata-only module/native/sidecar rejection, public closed contract validation, exact-byte loading, and bounded unload observation. Hosted run `30895225156` passed on Windows and Ubuntu with SDK `10.0.100`, 12 TRX files, and 239 tests per runner; no overwrite warning occurred. No private Thronefall/BepInEx experiment was run.

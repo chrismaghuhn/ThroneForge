@@ -11,7 +11,8 @@ public static class LaunchObservationService
         string cleanGameRoot,
         string experimentRoot,
         TimeSpan observationWindow,
-        TimeSpan gracefulCloseWindow)
+        TimeSpan gracefulCloseWindow,
+        IReadOnlyDictionary<string, string>? environmentVariables = null)
     {
         var executable = SmokeTestPathValidator.ValidateExecutablePath(executablePath, cleanGameRoot, experimentRoot);
         var startedAt = Stopwatch.GetTimestamp();
@@ -27,6 +28,21 @@ public static class LaunchObservationService
                 RedirectStandardError = true
             }
         };
+
+        if (environmentVariables is not null)
+        {
+            foreach (var environmentVariable in environmentVariables)
+            {
+                if (string.IsNullOrWhiteSpace(environmentVariable.Key)
+                    || environmentVariable.Key.Any(char.IsControl)
+                    || environmentVariable.Value.Any(char.IsControl))
+                {
+                    throw new SmokeTestException("The launch environment contains an invalid variable.");
+                }
+
+                process.StartInfo.Environment[environmentVariable.Key] = environmentVariable.Value;
+            }
+        }
 
         try
         {

@@ -2,13 +2,17 @@
 
 ## Current milestone
 
-M1 - Task 5 final native-image and load-context hardening is complete on `agent/m1-plugin-load-smoke-test-hardening` at `a8595e7b56b80ab338e5d148c1ba1f13455598d4`; PR creation/merge remains a repository-owner decision.
+M1 - Task 6 disposable BepInEx synthetic-plugin smoke test is in progress on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; no private experiment has started.
 
 ## State
 
 M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 repository-only hardening is now complete and hosted-verified below. No Thronefall plugin was loaded and M1 overall remains incomplete.
 
-The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below.
+The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below. Task 6 has not yet produced hosted or private validation evidence.
+
+Task 6 implementation is in progress. The repository-only surface now includes the external plugin-smoke project, evidence-driven TFM selection, metadata-only PE inspection, a versioned three-file package manifest/digest, Task-4 admission binding, nonce marker/log parsing, deployment guards, and a PowerShell harness that reuses the Task-3 disposable profile services. No BepInEx archive has been downloaded by this task, no private game run has started, and no report is claimed as passed.
+
+The next executable gate is the complete local restore/format/build/test validation, followed by hosted Windows/Linux CI with SDK `10.0.100`. Only after both are green may the single private experiment be run.
 
 ## Completed
 

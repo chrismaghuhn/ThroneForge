@@ -4,13 +4,17 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 5 final native-image and load-context hardening is complete on `agent/m1-plugin-load-smoke-test-hardening` at `a8595e7b56b80ab338e5d148c1ba1f13455598d4`; no plugin was loaded in Thronefall and no game-facing behavior is claimed.
+M1 - Task 6 disposable BepInEx synthetic-plugin smoke test is in progress on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; no private experiment has started.
 
 ## Milestones
 
 ### M0 - Repository bootstrap and architecture skeleton
 
 Deliver a clean-clone buildable solution skeleton, pinned external-tool SDK, centralized build/package settings, the stable-core/adapter project boundaries, initial ADRs, architecture tests, CI, and honest project status documentation. Use only placeholder interfaces and portable types; do not reference or name unverified Thronefall internals. Acceptance requires a game-free build, passing architecture tests, no forbidden runtime references outside placeholder game-facing projects, and all required validation commands passing.
+
+### M1 - Task 6: disposable BepInEx synthetic-plugin smoke test (in progress)
+
+The current branch adds an external `ThroneForge.PluginSmokeTest` project, source-only synthetic plugin template, metadata-selected `netstandard2.0`/`netstandard2.1` build path, exact three-file package manifest and digest, immediate Task-4 admission, and a local-only orchestrator that reuses Task-3 copy/transaction/launch/rollback services. Synthetic tests and canonical local validation must pass before hosted CI and before one private run against the explicit installation. M1 Task 7 is not started.
 
 ### M1 - Thronefall discovery spike
 

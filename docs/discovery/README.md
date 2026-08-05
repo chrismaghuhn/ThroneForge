@@ -98,3 +98,25 @@ The harness first recomputes fingerprint v1, captures a complete original manife
 The committed report destination is derived internally as `<repository-root>/docs/discovery/<fingerprint>-loader-smoke-test.md`; the CLI does not accept an arbitrary report path. A manual-closure state writes only a local recovery marker under the external experiment root and reports the redacted `Rollback` command needed after graceful closure. No automatic cleanup is performed while a copied process is active.
 
 The bootstrap result is classified as `Passed`, `PassedWithWarnings`, `Failed`, or `Inconclusive`. Preloader/chainloader log evidence can satisfy the initialization-evidence requirement when a separate configuration file is not generated. A pass proves only loader bootstrap for the exact fingerprint; it does not prove plugin target-framework compatibility, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, or custom waves. Raw logs, archives, manifests, and copied files remain in the external experiment root and are never committed.
+
+## M1 task 6: disposable synthetic-plugin smoke test
+
+The Task-6 harness is local-only and requires every path and evidence value explicitly:
+
+```powershell
+./tools/plugin-smoke-test/Invoke-ThroneForgeSyntheticPluginSmokeTest.ps1 `
+  -Mode Full `
+  -GamePath "C:\Path\To\Thronefall" `
+  -ExperimentRoot "D:\ThroneForgeExperiments\<fingerprint>" `
+  -BepInExArchive "D:\ThroneForgeExperiments\downloads\BepInEx_win_x64_5.4.23.5.zip" `
+  -ExpectedFingerprint "<fingerprint>" `
+  -ExpectedBepInExDigest "<official-or-user-supplied-digest>"
+```
+
+`Full` requires a new experiment root; `Plan` performs only read-only preflight, `Rollback` is the explicit recovery operation, and `Cleanup` is separate and limited to the supplied experiment root. The harness never scans for a game, Steam library, archive, or experiment directory.
+
+Before private use, the tool recomputes fingerprint v1 and runtime readiness, verifies the exact official archive digest, builds the source-only template from metadata-selected `netstandard2.0` or `netstandard2.1` evidence, and creates a three-file package manifest. The admission gate binds package identity/hash, approval, adapter evidence, and the fixed game fingerprint immediately before deployment.
+
+The disposable plugin is deployed only below `clean-game/BepInEx/plugins/dev.throneforge.m1.synthetic-smoke/`. The launch uses only the random nonce environment variable. Success requires BepInEx `5.4.23.5`, preloader, chainloader, exactly one plugin, one matching sanitized marker, matching API/Contracts identities, no lifecycle marker, no fatal/error evidence, graceful close, plugin removal, loader rollback, complete manifest restoration, and unchanged original-installation post-checks.
+
+No nonce, absolute path, raw log, binary, archive, complete private manifest, or recovery marker is committed. A pass proves only this synthetic plugin bootstrap for the exact documented fingerprint. It does not prove a real Thronefall plugin, final plugin TFM compatibility beyond the local evidence used for the build, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, or custom waves.
