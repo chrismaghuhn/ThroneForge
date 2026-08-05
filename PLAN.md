@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 7 public Unity lifecycle binding and synthetic lifecycle smoke test is in progress on `agent/m1-lifecycle-binding-smoke-test`, based on merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. No Task-7 lifecycle conclusion has been claimed yet.
+M1 - Task 7 public Unity lifecycle binding and synthetic lifecycle smoke test was implemented on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. Repository-only validation and hosted synthetic CI passed, but the one permitted fresh private run failed before a loader transaction was persisted, so no lifecycle binding conclusion is claimed.
 
 ## Milestones
 
@@ -14,7 +14,7 @@ Deliver a clean-clone buildable solution skeleton, pinned external-tool SDK, cen
 
 ### M1 - Task 6: disposable BepInEx synthetic-plugin smoke test (complete; M1 overall incomplete)
 
-The branch adds an external `ThroneForge.PluginSmokeTest` project, source-only synthetic plugin template, metadata-selected `netstandard2.0`/`netstandard2.1` build path, exact three-file package manifest and digest, immediate Task-4 admission, and a local-only orchestrator that reuses Task-3 copy/transaction/launch/rollback services. The earlier fresh attempt recaptured and metadata-validated the package but failed at disposable-profile deployment-state validation before plugin files were written. After the canonical state-path correction, one fresh private run passed with actual runtime identities, one plugin/nonce marker, successful removal and rollback, complete disposable restoration, and unchanged original verification. M1 Task 7 is not started.
+The branch adds an external `ThroneForge.PluginSmokeTest` project, source-only synthetic plugin template, metadata-selected `netstandard2.0`/`netstandard2.1` build path, exact three-file package manifest and digest, immediate Task-4 admission, and a local-only orchestrator that reuses Task-3 copy/transaction/launch/rollback services. The earlier fresh attempt recaptured and metadata-validated the package but failed at disposable-profile deployment-state validation before plugin files were written. After the canonical state-path correction, one fresh private run passed with actual runtime identities, one plugin/nonce marker, successful removal and rollback, complete disposable restoration, and unchanged original verification. M1 Task 7 is now the active bounded follow-up; its private lifecycle run is recorded separately as failed before loader transaction/package deployment.
 
 Task-6 completion is recorded by the sanitized report, unchanged original-installation manifest and runtime post-checks, verified loader rollback, and hosted run `30998768487` for correction head `bda540f9f4c97868d2469c0d5f48826269528e8f`. It does not claim a real Thronefall plugin, lifecycle, game API, Harmony, catalog, or custom-wave capability.
 
@@ -22,15 +22,15 @@ Task-6 completion is recorded by the sanitized report, unchanged original-instal
 
 Against an explicit local, legally obtained game path, detect executable architecture, Unity version, Mono/IL2CPP backend, loader compatibility, target framework, and a fingerprint. Document the selected BepInEx/Harmony setup, one verified lifecycle binding, the first binding report, catalog feasibility, and legal/distribution constraints. Do not implement custom waves until the M1 acceptance criteria pass.
 
-### M1 Task 7 - public Unity lifecycle binding and smoke test (in progress)
+### M1 Task 7 - public Unity lifecycle binding and smoke test (implementation complete; private result failed)
 
-- [ ] Add metadata-only validation for the public `UnityEngine.Application.quitting` event in `UnityEngine.CoreModule`.
-- [ ] Add the source-only lifecycle plugin template with exact package identity, synchronous-only lifecycle state machine, and nonce-bound markers.
-- [ ] Add repository-only lifecycle, marker, log-stability, package, and architecture tests.
-- [ ] Reuse Task-6 ownership, package capture, admission, deployment, launch, removal, rollback, and post-verification services.
-- [ ] Run local validation and hosted Windows/Linux synthetic CI before any private run.
-- [ ] Perform at most one fresh private disposable-profile experiment after hosted CI passes.
-- [ ] Commit exactly one sanitized fingerprint-specific lifecycle binding report and run final hosted validation.
+- [x] Add metadata-only validation for the public `UnityEngine.Application.quitting` event in `UnityEngine.CoreModule`.
+- [x] Add the source-only lifecycle plugin template with exact package identity, synchronous-only lifecycle state machine, and nonce-bound markers.
+- [x] Add repository-only lifecycle, marker, log-stability, package, and architecture tests.
+- [x] Reuse Task-6 ownership, package capture, admission, deployment, launch, removal, rollback, and post-verification services.
+- [x] Run local validation and hosted Windows/Linux synthetic CI before any private run.
+- [x] Perform the one permitted fresh private disposable-profile experiment after hosted CI passed; it failed before loader transaction/package deployment.
+- [x] Commit exactly one sanitized fingerprint-specific lifecycle binding report and run final hosted validation.
 
 Task 7 is limited to the public Unity lifecycle source `UnityEngine.Application.quitting` and does not inspect Thronefall-defined types, gameplay state, Harmony hooks, catalogs, or custom waves.
 
@@ -311,4 +311,4 @@ Task-2 merge evidence: PR #2 merged into `main` at `d3f1bb4fde9f77efbb84349f4403
 - [x] Bind Task-6 loader-state validation to the saved disposable baseline manifest and expose stable sanitized state-gate failure categories.
 - [x] Add positive real-service context-derivation coverage plus negative legacy/missing/mismatch state tests.
 - [x] Perform exactly one fresh private follow-up only after exact-SDK hosted synthetic CI passes; hosted run `30998768487` passed with 13 TRX files and 279 tests per runner.
-- [x] Keep M1 Task 7 unstarted.
+- [x] Keep M1 Task 7 out of scope for the Task-6 implementation.

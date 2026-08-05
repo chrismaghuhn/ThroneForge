@@ -2,11 +2,7 @@
 
 ## Unreleased
 
-- Started M1 Task 7: a bounded public Unity `Application.quitting` lifecycle-binding smoke test for the documented fingerprint. No private lifecycle result is claimed yet.
-
-All notable ThroneForge changes are documented here.
-
-## Unreleased
+- Implemented M1 Task 7's bounded public Unity `Application.quitting` lifecycle-binding smoke test, including metadata-only event validation, a synchronous exactly-once synthetic lifecycle host, nonce-bound markers, and Task-6 package/deployment reuse. Hosted run `31004703784` passed on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files, and 304 tests per runner. The one permitted fresh private run failed before a loader transaction was persisted; no lifecycle binding conclusion is claimed.
 
 - Corrected the Task-6 deployment-state contract: `LoaderSmokeTestStatePaths` now owns the canonical `baseline-copy-manifest.json` and `transaction-state.json` paths, and plugin deployment validates the loader transaction against the saved disposable baseline manifest. Added sanitized state-gate categories and positive/negative integration coverage. Pre-private hosted run `30998768487` and final hosted run `30999995802` passed on Windows and Ubuntu with SDK `10.0.100`, 13 TRX files, and 279 tests per runner. One fresh corrected private run passed with exact package recapture/admission, actual runtime API/Contracts identities, one plugin/nonce marker, successful plugin removal and loader rollback, complete disposable restoration, and unchanged original verification.
 - Task-6 hardening is hosted-verified in runs `30994830386` (271 tests) and `30995632643` (272 tests) on Windows and Ubuntu with SDK `10.0.100`. It adds fingerprint-bound ownership state, derived disposable-loader deployment preconditions, exact-byte package recapture/admission, transactional three-file deployment cleanup, strict package metadata validation, runtime API/Contracts identity markers, public target-surface parity checks, and owned recovery/cleanup.
