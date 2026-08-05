@@ -64,7 +64,11 @@ function Invoke-DotnetOperation([string[]]$arguments, [switch]$AllowFailure) {
     $output = (& $script:dotnet @arguments 2>&1 | Out-String).Trim()
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0 -and -not $AllowFailure) {
-        Throw-Sanitized "A required .NET operation failed (exit code $exitCode)."
+        $diagnosticLines = @($output -split '\r?\n' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Last 3)
+        $diagnostic = ($diagnosticLines -join ' ') -replace '(?i)([A-Z]:\\|/)[^\s"'']+', '<redacted-path>'
+        if ($diagnostic.Length -gt 400) { $diagnostic = $diagnostic.Substring(0, 400) }
+        if ([string]::IsNullOrWhiteSpace($diagnostic)) { $diagnostic = 'No sanitized diagnostic was returned.' }
+        Throw-Sanitized "A required .NET operation failed (exit code $exitCode): $diagnostic"
     }
     return [pscustomobject]@{ ExitCode = $exitCode; Output = $output }
 }
