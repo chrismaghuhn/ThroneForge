@@ -75,13 +75,27 @@ public sealed record LifecycleVerificationEvidence(
     int? FatalErrorCount = null)
     : LifecycleStageEvidence(Succeeded, FailureCategory);
 
+public enum CleanupOperationStatus
+{
+    NotRequired,
+    NotAttempted,
+    Passed,
+    Failed
+}
+
 public sealed record CleanupEvidence(
     bool Succeeded,
     string? FailureCategory = null,
     bool? RemovalVerified = null,
     bool? LoaderOnlyManifestVerified = null,
-    bool? RollbackVerified = null)
-    : LifecycleStageEvidence(Succeeded, FailureCategory);
+    bool? RollbackVerified = null,
+    CleanupOperationStatus? OperationStatus = null)
+    : LifecycleStageEvidence(Succeeded, FailureCategory)
+{
+    public CleanupOperationStatus Status => OperationStatus ?? (Succeeded
+        ? CleanupOperationStatus.Passed
+        : CleanupOperationStatus.Failed);
+}
 
 public sealed record PostcheckEvidence(
     bool Succeeded,
@@ -159,7 +173,9 @@ public sealed record LifecycleExperimentResult(
     string? RollbackCommand = null,
     bool LoaderApplied = false,
     bool PluginDeployed = false,
-    bool ProcessActive = false);
+    bool ProcessActive = false,
+    CleanupOperationStatus? PluginRemovalStatus = null,
+    CleanupOperationStatus? LoaderRollbackStatus = null);
 
 /// <summary>
 /// The single repository and private-experiment owner of Task 7 stage execution.
@@ -431,9 +447,11 @@ public sealed class LifecycleExperimentOrchestrator
                     && lifecycle.ErrorCount == 0
                     && lifecycle.FatalErrorCount == 0;
             case LifecycleExperimentStage.PluginRemoval when evidence is CleanupEvidence removal:
-                return removal.RemovalVerified == true && removal.LoaderOnlyManifestVerified == true;
+                return removal.Status == CleanupOperationStatus.NotRequired
+                    || removal.RemovalVerified == true && removal.LoaderOnlyManifestVerified == true;
             case LifecycleExperimentStage.LoaderRollback when evidence is CleanupEvidence rollback:
-                return rollback.RollbackVerified == true;
+                return rollback.Status == CleanupOperationStatus.NotRequired
+                    || rollback.RollbackVerified == true;
             case LifecycleExperimentStage.DisposablePostcheck or LifecycleExperimentStage.OriginalPostcheck when evidence is PostcheckEvidence postcheck:
                 return postcheck.ManifestVerified == true
                     && postcheck.RuntimeVerified == true
@@ -472,11 +490,22 @@ public sealed class LifecycleExperimentOrchestrator
                 continue;
             }
 
-            var evidence = Execute(stage, context);
+            LifecycleStageEvidence evidence = stage switch
+            {
+                LifecycleExperimentStage.PluginRemoval when !accumulator.PluginDeployed
+                    => new CleanupEvidence(true, OperationStatus: CleanupOperationStatus.NotRequired),
+                LifecycleExperimentStage.LoaderRollback when !accumulator.LoaderApplied
+                    => new CleanupEvidence(true, OperationStatus: CleanupOperationStatus.NotRequired),
+                _ => Execute(stage, context)
+            };
             if (!IsValid(stage, evidence, context, out var category))
             {
                 accumulator.Apply(stage, evidence);
-                cleanupFailureCategory ??= category;
+                if (evidence is not CleanupEvidence cleanupEvidence
+                    || cleanupEvidence.Status != CleanupOperationStatus.NotRequired)
+                {
+                    cleanupFailureCategory ??= category;
+                }
                 Persist(stage, cleanupLastCompleted, category, ref statePersisted, accumulator, primaryFailedStage, primaryFailureCategory, cleanupFailureCategory);
                 continue;
             }
@@ -569,6 +598,8 @@ public sealed class LifecycleExperimentOrchestrator
         public int? FatalErrorCount { get; private set; }
         public bool? PluginRemovalVerified { get; private set; }
         public bool? LoaderRollbackVerified { get; private set; }
+        public CleanupOperationStatus? PluginRemovalStatus { get; private set; }
+        public CleanupOperationStatus? LoaderRollbackStatus { get; private set; }
         public bool? DisposableRestorationVerified { get; private set; }
         public bool? OriginalManifestVerified { get; private set; }
         public bool? OriginalRuntimeVerified { get; private set; }
@@ -581,7 +612,9 @@ public sealed class LifecycleExperimentOrchestrator
         public bool ProcessActive { get; private set; }
 
         public bool HasCompleteSuccessEvidence
-            => PluginRemovalVerified == true
+            => PluginRemovalStatus == CleanupOperationStatus.Passed
+                && LoaderRollbackStatus == CleanupOperationStatus.Passed
+                && PluginRemovalVerified == true
                 && LoaderRollbackVerified == true
                 && DisposableRestorationVerified == true
                 && OriginalManifestVerified == true
@@ -633,10 +666,12 @@ public sealed class LifecycleExperimentOrchestrator
                 if (stage == LifecycleExperimentStage.PluginRemoval)
                 {
                     PluginRemovalVerified = cleanup.RemovalVerified;
+                    PluginRemovalStatus = cleanup.Status;
                 }
                 if (stage == LifecycleExperimentStage.LoaderRollback)
                 {
                     LoaderRollbackVerified = cleanup.RollbackVerified;
+                    LoaderRollbackStatus = cleanup.Status;
                 }
             }
             if (evidence is PostcheckEvidence postcheck)
@@ -706,7 +741,9 @@ public sealed class LifecycleExperimentOrchestrator
                 RollbackCommand,
                 LoaderApplied,
                 PluginDeployed,
-                ProcessActive);
+                ProcessActive,
+                PluginRemovalStatus,
+                LoaderRollbackStatus);
     }
 
     private static bool RelativePathsEqual(string left, string right)

@@ -69,6 +69,16 @@ public static class LifecycleExperimentFailureCategories
     public const string TransactionStateMismatch = PluginSmokeStateFailureCategories.TransactionStateMismatch;
     public const string AppliedProfileDrift = PluginSmokeStateFailureCategories.AppliedProfileDrift;
     public const string BootstrapEvidenceInvalid = PluginSmokeStateFailureCategories.BootstrapEvidenceInvalid;
+    public const string RecoveryOwnershipInvalid = "recovery-ownership-invalid";
+    public const string RecoveryTransactionMissing = "recovery-transaction-missing";
+    public const string RecoveryTransactionMismatch = "recovery-transaction-mismatch";
+    public const string RecoveryProcessActive = "recovery-process-active";
+    public const string RecoveryRuntimeDrift = "recovery-runtime-drift";
+    public const string RecoveryPluginRemovalFailed = "recovery-plugin-removal-failed";
+    public const string RecoveryLoaderRollbackFailed = "recovery-loader-rollback-failed";
+    public const string RecoveryBaselineRestoreFailed = "recovery-baseline-restore-failed";
+    public const string RecoveryDisposableReadinessFailed = "recovery-disposable-readiness-failed";
+    public const string RecoveryOriginalPostcheckFailed = "recovery-original-postcheck-failed";
 
     public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -87,7 +97,11 @@ public static class LifecycleExperimentFailureCategories
         PluginSmokeStateFailureCategories.TransactionStateMissing,
         PluginSmokeStateFailureCategories.TransactionStateMismatch,
         PluginSmokeStateFailureCategories.AppliedProfileDrift,
-        PluginSmokeStateFailureCategories.BootstrapEvidenceInvalid
+        PluginSmokeStateFailureCategories.BootstrapEvidenceInvalid,
+        RecoveryOwnershipInvalid, RecoveryTransactionMissing, RecoveryTransactionMismatch,
+        RecoveryProcessActive, RecoveryRuntimeDrift, RecoveryPluginRemovalFailed,
+        RecoveryLoaderRollbackFailed, RecoveryBaselineRestoreFailed,
+        RecoveryDisposableReadinessFailed, RecoveryOriginalPostcheckFailed
     };
 }
 

@@ -280,7 +280,7 @@ public static class SmokeTestOrchestrator
             ],
             verifyApplied: false);
         var currentManifest = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
-        var generatedFiles = LoaderTransactionStateService.CaptureGeneratedEvidence(
+        var generatedFiles = LoaderTransactionStateService.CaptureRollbackGeneratedEvidence(
             state.ExpectedAppliedManifest,
             currentManifest,
             out var generatedDirectories);
@@ -745,7 +745,7 @@ public static class SmokeTestOrchestrator
             throw new SmokeTestException("The disposable copy does not exist; run Prepare first.");
         }
 
-        DisposableProfileBaselineService.LoadAndValidateInstalledProfile(
+        var baseline = DisposableProfileBaselineService.LoadAndValidateSavedBaseline(
             baselinePath,
             request.ExpectedFingerprint,
             preflight.OriginalManifest);
@@ -759,7 +759,7 @@ public static class SmokeTestOrchestrator
             LoaderSmokeTestStatePaths.GetTransactionStatePath(roots),
             roots,
             request.ExpectedFingerprint,
-            preflight.OriginalManifest,
+            baseline.DisposableManifest,
             allowedStatuses);
         if (verifyApplied && state.Status is (LoaderTransactionStatus.Applied or LoaderTransactionStatus.LaunchObserved))
         {

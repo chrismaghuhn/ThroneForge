@@ -165,6 +165,44 @@ public static class LoaderTransactionStateService
             .ToArray();
     }
 
+    public static IReadOnlyList<FileManifestEntry> CaptureRollbackGeneratedEvidence(
+        CopyManifest appliedManifest,
+        CopyManifest currentManifest,
+        out IReadOnlyList<string> generatedDirectories)
+    {
+        var comparison = InstallationCopyService.CompareManifests(appliedManifest, currentManifest);
+        if (comparison.RemovedFiles.Count > 0 || comparison.MissingDirectories.Count > 0)
+        {
+            throw new SmokeTestException("The rollback profile is missing an expected loader file or directory.");
+        }
+
+        if (comparison.ChangedFiles.Any(item => !IsAllowedGeneratedPath(item.RelativePath)))
+        {
+            throw new SmokeTestException("The rollback profile changed a file outside the approved generated evidence set.");
+        }
+
+        if (comparison.AddedFiles.Any(item => !IsAllowedGeneratedPath(item.RelativePath)))
+        {
+            throw new SmokeTestException("The rollback profile contains an unapproved added file.");
+        }
+
+        if (comparison.UnexpectedDirectories.Any(path => !IsAllowedGeneratedPath(path)))
+        {
+            throw new SmokeTestException("The rollback profile contains an unapproved added directory.");
+        }
+
+        generatedDirectories = comparison.UnexpectedDirectories
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        return comparison.AddedFiles
+            .Concat(comparison.ChangedFiles)
+            .Select(item => item.Actual)
+            .Where(item => item is not null)
+            .Select(item => item!)
+            .OrderBy(item => item.RelativePath, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     private static void ValidateStateMetadata(
         LoaderTransactionState state,
         string expectedFingerprint,

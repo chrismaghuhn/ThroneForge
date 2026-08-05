@@ -315,7 +315,13 @@ public static class PluginSmokeCli
         stdout.WriteLine($"loader-rollback-verified={result.LoaderRollbackVerified}");
         stdout.WriteLine($"disposable-restored={result.DisposableRestored}");
         stdout.WriteLine($"original-verified={result.OriginalVerified}");
+        stdout.WriteLine($"plugin-removal-status={result.PluginRemovalStatus}");
+        stdout.WriteLine($"loader-rollback-status={result.LoaderRollbackStatus}");
         stdout.WriteLine($"failure-category={result.FailureCategory ?? "none"}");
+        var reportPath = new LifecycleExperimentReportWriter(
+            Value(args, "--repository-root"),
+            Value(args, "--expected-fingerprint")).AppendRecovery(result);
+        stdout.WriteLine($"report={Path.GetFileName(reportPath)}");
         return result.OverallResult == "Passed" ? 0 : 1;
     }
 

@@ -220,6 +220,37 @@ public sealed class LifecycleOrchestrationTests
     }
 
     [Fact]
+    public void LoaderLaunchFailureBeforeDeploymentSkipsPluginRemoval()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var operations = new SuccessfulLifecycleOperations
+            {
+                LoaderLaunchResult = new(false, LifecycleExperimentFailureCategories.LoaderLaunchFailed, LoaderApplied: true),
+                LoaderApplied = true,
+                PluginDeployed = false
+            };
+
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                operations.ExperimentId,
+                Fingerprint,
+                operations).Run();
+
+            Assert.False(operations.PluginRemovalCalled);
+            Assert.NotEqual(LifecycleExperimentFailureCategories.PluginRemovalFailed, result.CleanupFailureCategory);
+            Assert.Equal(LifecycleExperimentFailureCategories.LoaderLaunchFailed, result.PrimaryFailureCategory);
+            Assert.Equal(CleanupOperationStatus.NotRequired, result.PluginRemovalStatus);
+            Assert.Equal(CleanupOperationStatus.Passed, result.LoaderRollbackStatus);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void FailedReportDoesNotClaimQuittingWasObserved()
     {
         var root = CreateRoot();
@@ -245,6 +276,43 @@ public sealed class LifecycleOrchestrationTests
         }
     }
 
+    [Fact]
+    public void RecoveryReportSeparatesCleanupFromTheFailedExperiment()
+    {
+        var root = CreateRoot();
+        Directory.CreateDirectory(Path.Combine(root, "docs", "discovery"));
+        try
+        {
+            var writer = new LifecycleExperimentReportWriter(root, Fingerprint);
+            writer.Write(new LifecycleExperimentResult(
+                "Failed",
+                LifecycleExperimentStage.LoaderLaunch,
+                LifecycleExperimentStage.LoaderLaunch,
+                LifecycleExperimentStage.LoaderInstall,
+                LifecycleExperimentFailureCategories.LoaderLaunchFailed,
+                true,
+                PrimaryFailedStage: LifecycleExperimentStage.LoaderLaunch,
+                PrimaryFailureCategory: LifecycleExperimentFailureCategories.LoaderLaunchFailed));
+
+            var report = File.ReadAllText(writer.AppendRecovery(new LifecycleExperimentRollbackResult(
+                "Passed",
+                true,
+                true,
+                true,
+                PluginRemovalStatus: CleanupOperationStatus.NotRequired,
+                LoaderRollbackStatus: CleanupOperationStatus.Passed)));
+
+            Assert.Contains("Overall result: Failed", report, StringComparison.Ordinal);
+            Assert.Contains("Recovery result: Passed", report, StringComparison.Ordinal);
+            Assert.Contains("Plugin removal: NotRequired", report, StringComparison.Ordinal);
+            Assert.DoesNotContain("Application.quitting event observed while Thronefall was running", report, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static string CreateRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), "throneforge-task7-orchestrator", Guid.NewGuid().ToString("N"));
@@ -258,12 +326,14 @@ public sealed class LifecycleOrchestrationTests
         public bool PluginDeployed { get; init; } = true;
         public bool LoaderApplied { get; init; } = true;
         public LifecycleStageEvidence? LoaderInstallResult { get; init; }
+        public LifecycleStageEvidence? LoaderLaunchResult { get; init; }
         public LifecycleStageEvidence? AdmitAndDeployResult { get; init; }
         public LifecycleStageEvidence? LifecycleVerificationResult { get; init; }
         public LifecycleStageEvidence? PluginRemovalResult { get; init; }
         public LifecycleStageEvidence? OriginalPostcheckResult { get; init; }
         public LifecycleStageEvidence? LifecycleLaunchResult { get; init; }
         public bool CleanupCalled { get; private set; }
+        public bool PluginRemovalCalled { get; private set; }
 
         public LifecycleStageEvidence EnsureOwnership(LifecycleExperimentContext context) => new(true);
 
@@ -277,7 +347,7 @@ public sealed class LifecycleOrchestrationTests
             => LoaderInstallResult ?? new(true, LoaderTransactionStatus: "Applied", LoaderApplied: LoaderApplied);
 
         public LifecycleStageEvidence LoaderLaunch(LifecycleExperimentContext context)
-            => new(true, LoaderTransactionStatus: "LaunchObserved", LoaderApplied: true);
+            => LoaderLaunchResult ?? new(true, LoaderTransactionStatus: "LaunchObserved", LoaderApplied: true);
 
         public LoaderVerificationEvidence LoaderVerify(LifecycleExperimentContext context)
             => new(true, "LaunchObserved", true, true, true);
@@ -308,7 +378,10 @@ public sealed class LifecycleOrchestrationTests
                 : new(true, null, 1, 1, 1, "1,2,3", "ThroneForge.API, Version=1.0.0.0", "ThroneForge.Contracts, Version=1.0.0.0", 1, 0, 0, 0);
 
         public CleanupEvidence PluginRemoval(LifecycleExperimentContext context)
-            => new(PluginRemovalResult?.Succeeded ?? true, PluginRemovalResult?.FailureCategory, true, true);
+        {
+            PluginRemovalCalled = true;
+            return new(PluginRemovalResult?.Succeeded ?? true, PluginRemovalResult?.FailureCategory, true, true);
+        }
 
         public CleanupEvidence LoaderRollback(LifecycleExperimentContext context)
             => new(true, null, null, null, true);

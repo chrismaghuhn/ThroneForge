@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 7 production-path hardening is active on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. The two permitted private results remain historical `Failed`; this correction performs repository-only work and must not run another private experiment. The C# `LifecycleExperimentOrchestrator` remains the single owner of stage execution, typed evidence, cleanup/recovery/postchecks, primary-failure persistence, and report generation; PowerShell is only an explicit-input wrapper around the real CLI operations.
+M1 - Task 7 recovery hardening is active on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. The final authorized lifecycle result remains immutable `Failed` at `LoaderLaunch`; this correction may perform only one recovery-only rollback against the existing external experiment root and must not launch the game or repeat the lifecycle experiment. The C# `LifecycleExperimentOrchestrator` remains the single owner of stage execution, typed evidence, cleanup/recovery/postchecks, primary-failure persistence, and report generation; PowerShell is only an explicit-input wrapper around the real CLI operations.
 
 ## Milestones
 

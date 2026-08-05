@@ -23,6 +23,38 @@ public sealed class LifecycleExperimentReportWriter
         Directory.CreateDirectory(parent);
         var content = Build(result);
         var temporary = Path.Combine(parent, $".{Path.GetFileName(reportPath)}.{Guid.NewGuid():N}.tmp");
+        return WriteAtomic(reportPath, content, temporary);
+    }
+
+    public string AppendRecovery(LifecycleExperimentRollbackResult recovery)
+    {
+        ArgumentNullException.ThrowIfNull(recovery);
+        var reportPath = SmokeTestPathValidator.ValidateLifecycleReportPath(repositoryRoot, expectedFingerprint);
+        if (!File.Exists(reportPath))
+        {
+            throw new PluginSmokeException("The lifecycle report cannot be extended before the experiment report exists.");
+        }
+
+        var builder = new StringBuilder(File.ReadAllText(reportPath, Encoding.UTF8).TrimEnd());
+        builder.AppendLine();
+        builder.AppendLine();
+        builder.AppendLine("## Recovery");
+        builder.AppendLine();
+        Append(builder, "Recovery required", "true");
+        Append(builder, "Plugin removal", recovery.PluginRemovalStatus.ToString());
+        Append(builder, "Loader rollback", recovery.LoaderRollbackStatus.ToString());
+        Append(builder, "Loader rollback verified", recovery.LoaderRollbackVerified.ToString());
+        Append(builder, "Disposable restoration", recovery.DisposableRestored.ToString());
+        Append(builder, "Original verification", recovery.OriginalVerified.ToString());
+        Append(builder, "Recovery result", recovery.OverallResult);
+        Append(builder, "Recovery category", SafeToken(recovery.FailureCategory));
+        return WriteAtomic(reportPath, builder.ToString(), null);
+    }
+
+    private static string WriteAtomic(string reportPath, string content, string? temporaryPath)
+    {
+        var parent = Path.GetDirectoryName(reportPath) ?? throw new PluginSmokeException("The lifecycle report has no safe parent.");
+        var temporary = temporaryPath ?? Path.Combine(parent, $".{Path.GetFileName(reportPath)}.{Guid.NewGuid():N}.tmp");
         try
         {
             File.WriteAllText(temporary, content, new UTF8Encoding(false));
@@ -81,7 +113,9 @@ public sealed class LifecycleExperimentReportWriter
         Append(builder, "Plugin count", result.PluginCount?.ToString(CultureInfo.InvariantCulture) ?? "not-observed");
         Append(builder, "Loader warnings/errors/fatal", result.WarningCount is null ? "not-observed" : $"{result.WarningCount}/{result.ErrorCount}/{result.FatalErrorCount}");
         Append(builder, "Plugin removal verified", Format(result.PluginRemovalVerified));
+        Append(builder, "Plugin removal status", result.PluginRemovalStatus?.ToString() ?? "not-observed");
         Append(builder, "Loader rollback verified", Format(result.LoaderRollbackVerified));
+        Append(builder, "Loader rollback status", result.LoaderRollbackStatus?.ToString() ?? "not-observed");
         Append(builder, "Disposable restoration verified", Format(result.DisposableRestorationVerified));
         Append(builder, "Original manifest verified", Format(result.OriginalManifestVerified));
         Append(builder, "Original runtime verified", Format(result.OriginalRuntimeVerified));
