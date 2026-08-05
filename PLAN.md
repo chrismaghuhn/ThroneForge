@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 7 orchestration hardening is active on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. The two permitted private results remain historical `Failed`; this correction performs repository-only work and must not run another private experiment. It adds a strict runtime-preflight evidence contract, shared C# loader-state verification, truthful `AdmitAndDeploy` phase reporting, a testable C# stage orchestrator, bounded log-stability ownership, and independent postcheck evidence.
+M1 - Task 7 orchestration hardening is active on `agent/m1-lifecycle-binding-smoke-test` from merged `main@9c90657f35406b353b495f0889e1cacf571668e0`. The two permitted private results remain historical `Failed`; this correction performs repository-only work and must not run another private experiment. The C# `LifecycleExperimentOrchestrator` is the single owner of stage execution, typed evidence, cleanup/postchecks, primary-failure persistence, and report generation; PowerShell is only an explicit-input wrapper around the real CLI operation.
 
 ## Milestones
 
@@ -39,6 +39,14 @@ The correction consumes only `throneforge-runtime-compatibility-evidence-v1`, ve
 Repository-only correction head `dbbcc3a` passed hosted run `31012843103` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 13 TRX files representing 327 tests with zero failures, errors, skips or not-executed tests. No private run was performed.
 
 Task-7 correction baseline: reviewed head `92094c4362f09f73ffdd1bc8807caaf4a904f611` passed hosted run `31005428380` with 13 TRX files and 304 tests per runner using SDK `10.0.100`. Correction head `bdd871fa263d5b97fc4a20160ee110d32f406c99` passed hosted run `31008620029` with 13 TRX files and 313 tests per runner using SDK `10.0.100`; all test counters were zero for failures, errors, skips, not-executed and aborted tests. The single corrective private run stopped at `OriginalPreflight` because the harness expected `Selected executable=...` while the discovery CLI emitted `Selected executable: ...`. No loader transaction, package, deployment or lifecycle marker was produced. The report records the failed result and no further private run is permitted for this correction.
+
+### Task-7 orchestration ownership correction
+
+- [ ] Replace the PowerShell stage machine with the real `run-lifecycle-experiment` C# CLI operation.
+- [ ] Use `ILifecycleExperimentOperations` and stage-specific evidence; missing evidence must fail closed.
+- [ ] Persist immutable primary failure stage/category and separate cleanup failures.
+- [ ] Run cleanup, disposable runtime/readiness/indicator verification, original postchecks, and sanitized report generation in C#.
+- [ ] Validate the full repository-only implementation and hosted Windows/Linux CI; do not run another private experiment in this slice.
 
 ### M2 - Contracts, schemas, validation, and fixtures
 

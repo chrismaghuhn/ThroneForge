@@ -8,16 +8,7 @@ public sealed class LifecycleOrchestrationTests
     private const string Fingerprint = "1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d";
 
     [Fact]
-    public void RequiredStagesUseTruthfulAdmitAndDeployPhase()
-    {
-        Assert.Contains(LifecycleExperimentStage.AdmitAndDeploy, LifecycleExperimentOrchestrator.RequiredStages);
-        Assert.DoesNotContain(LifecycleExperimentStage.Admission, LifecycleExperimentOrchestrator.RequiredStages);
-        Assert.DoesNotContain(LifecycleExperimentStage.Deployment, LifecycleExperimentOrchestrator.RequiredStages);
-        Assert.Equal(LifecycleExperimentStage.OriginalPostcheck, LifecycleExperimentOrchestrator.RequiredStages[^1]);
-    }
-
-    [Fact]
-    public void AllStagesAdvanceToCompletedAndPersistState()
+    public void TypedEvidenceDrivesACompleteResult()
     {
         var root = CreateRoot();
         try
@@ -26,14 +17,19 @@ public sealed class LifecycleOrchestrationTests
                 root,
                 Guid.NewGuid().ToString("N"),
                 Fingerprint,
-                LifecycleExperimentHooks.All(_ => new LifecycleStageOperationResult(true)))
-                .Run();
+                new SuccessfulLifecycleOperations()).Run();
 
             Assert.Equal("Passed", result.OverallResult);
-            Assert.Equal(LifecycleExperimentStage.Completed, result.CurrentStage);
-            Assert.Equal(LifecycleExperimentStage.OriginalPostcheck, result.LastCompletedStage);
-            Assert.True(result.StageStatePersisted);
             Assert.Equal(LifecycleExperimentFailureCategories.StageCompleted, result.StableCategory);
+            Assert.True(result.PluginRemovalVerified);
+            Assert.True(result.LoaderRollbackVerified);
+            Assert.True(result.DisposableRestorationVerified);
+            Assert.True(result.OriginalManifestVerified);
+            Assert.True(result.OriginalRuntimeVerified);
+            Assert.True(result.OriginalLoaderIndicatorsAbsent);
+            Assert.Equal("game/Thronefall.exe", result.SelectedExecutableRelativePath);
+            Assert.Equal(new string('a', 64), result.PackageSha256);
+            Assert.Equal(new string('b', 64), result.AdmissionBindingDigest);
         }
         finally
         {
@@ -42,33 +38,19 @@ public sealed class LifecycleOrchestrationTests
     }
 
     [Fact]
-    public void LoaderInstallFailureStopsBeforeLaterStages()
+    public void MissingRequiredEvidenceCannotProducePassed()
     {
         var root = CreateRoot();
-        var called = new List<LifecycleExperimentStage>();
         try
         {
-            var operations = LifecycleExperimentOrchestrator.RequiredStages.ToDictionary(
-                stage => stage,
-                stage => new Func<LifecycleExperimentStageContext, LifecycleStageOperationResult>(_ =>
-                {
-                    called.Add(stage);
-                    return stage == LifecycleExperimentStage.LoaderInstall
-                        ? new(false, LifecycleExperimentFailureCategories.LoaderInstallFailed)
-                        : new(true);
-                }));
-
             var result = new LifecycleExperimentOrchestrator(
                 root,
                 Guid.NewGuid().ToString("N"),
                 Fingerprint,
-                LifecycleExperimentHooks.Create(operations))
-                .Run();
+                new SuccessfulLifecycleOperations { OriginalPostcheckResult = new(true) }).Run();
 
-            Assert.Equal("Failed", result.OverallResult);
-            Assert.Equal(LifecycleExperimentStage.LoaderInstall, result.FailedStage);
-            Assert.Equal(LifecycleExperimentFailureCategories.LoaderInstallFailed, result.StableCategory);
-            Assert.DoesNotContain(LifecycleExperimentStage.LoaderLaunch, called);
+            Assert.NotEqual("Passed", result.OverallResult);
+            Assert.Equal(LifecycleExperimentFailureCategories.OriginalPostcheckFailed, result.StableCategory);
         }
         finally
         {
@@ -77,10 +59,114 @@ public sealed class LifecycleOrchestrationTests
     }
 
     [Fact]
-    public void LogAndMarkerFailuresRemainDistinct()
+    public void PrimaryFailureSurvivesCleanupAndPostchecks()
     {
-        Assert.NotEqual(LifecycleExperimentFailureCategories.LogNotStable, LifecycleExperimentFailureCategories.LifecycleMarkerInvalid);
-        Assert.NotEqual(LifecycleExperimentFailureCategories.LogNotReadable, LifecycleExperimentFailureCategories.LifecycleMarkerMissing);
+        var root = CreateRoot();
+        try
+        {
+            var operations = new SuccessfulLifecycleOperations
+            {
+                LifecycleVerificationResult = new(false, LifecycleExperimentFailureCategories.LifecycleMarkerInvalid),
+                PluginDeployed = true,
+                LoaderApplied = true
+            };
+
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                operations.ExperimentId,
+                Fingerprint,
+                operations).Run();
+
+            Assert.Equal(LifecycleExperimentStage.LifecycleVerification, result.PrimaryFailedStage);
+            Assert.Equal(LifecycleExperimentFailureCategories.LifecycleMarkerInvalid, result.PrimaryFailureCategory);
+            var state = LifecycleExperimentStageStateService.LoadAndValidate(root, operations.ExperimentId, Fingerprint);
+            Assert.Equal(LifecycleExperimentStage.LifecycleVerification, state.PrimaryFailedStage);
+            Assert.Equal(LifecycleExperimentFailureCategories.LifecycleMarkerInvalid, state.PrimaryFailureCategory);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void CleanupFailureIsSeparateFromPrimaryFailure()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var operations = new SuccessfulLifecycleOperations
+            {
+                LifecycleVerificationResult = new(false, LifecycleExperimentFailureCategories.LifecycleMarkerInvalid),
+                PluginRemovalResult = new(false, LifecycleExperimentFailureCategories.PluginRemovalFailed),
+                PluginDeployed = true,
+                LoaderApplied = true
+            };
+
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                operations.ExperimentId,
+                Fingerprint,
+                operations).Run();
+
+            Assert.Equal(LifecycleExperimentFailureCategories.LifecycleMarkerInvalid, result.PrimaryFailureCategory);
+            Assert.Equal(LifecycleExperimentFailureCategories.PluginRemovalFailed, result.CleanupFailureCategory);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void LoaderStateFailureCategoryIsRetained()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var operations = new SuccessfulLifecycleOperations
+            {
+                LoaderInstallResult = new(false, LifecycleExperimentFailureCategories.TransactionStateMissing)
+            };
+
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                operations.ExperimentId,
+                Fingerprint,
+                operations).Run();
+
+            Assert.Equal(LifecycleExperimentStage.LoaderInstall, result.PrimaryFailedStage);
+            Assert.Equal(LifecycleExperimentFailureCategories.TransactionStateMissing, result.PrimaryFailureCategory);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void AdmitAndDeployReportsVerificationFailureSeparately()
+    {
+        var root = CreateRoot();
+        try
+        {
+            var operations = new SuccessfulLifecycleOperations
+            {
+                AdmitAndDeployResult = new(false, LifecycleExperimentFailureCategories.DeploymentVerificationFailed)
+            };
+
+            var result = new LifecycleExperimentOrchestrator(
+                root,
+                operations.ExperimentId,
+                Fingerprint,
+                operations).Run();
+
+            Assert.Equal(LifecycleExperimentFailureCategories.DeploymentVerificationFailed, result.PrimaryFailureCategory);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     private static string CreateRoot()
@@ -88,5 +174,70 @@ public sealed class LifecycleOrchestrationTests
         var root = Path.Combine(Path.GetTempPath(), "throneforge-task7-orchestrator", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         return root;
+    }
+
+    private sealed class SuccessfulLifecycleOperations : ILifecycleExperimentOperations
+    {
+        public string ExperimentId { get; } = Guid.NewGuid().ToString("N");
+        public bool PluginDeployed { get; init; } = true;
+        public bool LoaderApplied { get; init; } = true;
+        public LifecycleStageEvidence? LoaderInstallResult { get; init; }
+        public LifecycleStageEvidence? AdmitAndDeployResult { get; init; }
+        public LifecycleStageEvidence? LifecycleVerificationResult { get; init; }
+        public LifecycleStageEvidence? PluginRemovalResult { get; init; }
+        public LifecycleStageEvidence? OriginalPostcheckResult { get; init; }
+
+        public OriginalPreflightEvidence OriginalPreflight(LifecycleExperimentContext context)
+            => new(true, "game/Thronefall.exe", context.ExpectedFingerprint, true, true);
+
+        public LifecycleStageEvidence DisposablePrepare(LifecycleExperimentContext context) => new(true);
+        public LifecycleStageEvidence BaselineLaunch(LifecycleExperimentContext context) => new(true);
+
+        public LifecycleStageEvidence LoaderInstall(LifecycleExperimentContext context)
+            => LoaderInstallResult ?? new(true, LoaderTransactionStatus: "Applied", LoaderApplied: LoaderApplied);
+
+        public LifecycleStageEvidence LoaderLaunch(LifecycleExperimentContext context)
+            => new(true, LoaderTransactionStatus: "LaunchObserved", LoaderApplied: true);
+
+        public LoaderVerificationEvidence LoaderVerify(LifecycleExperimentContext context)
+            => new(true, "LaunchObserved", true, true, true);
+
+        public UnityMetadataEvidence UnityMetadataPreflight(LifecycleExperimentContext context)
+            => new(true, "UnityEngine.CoreModule, Version=1.0.0.0");
+
+        public PackageEvidence PackageBuild(LifecycleExperimentContext context)
+            => new(true, new string('a', 64));
+
+        public PackageEvidence PackageCapture(LifecycleExperimentContext context)
+            => new(true, new string('a', 64));
+
+        public DeploymentEvidence AdmitAndDeploy(LifecycleExperimentContext context)
+            => new(AdmitAndDeployResult?.Succeeded ?? true,
+                AdmitAndDeployResult?.FailureCategory,
+                new string('a', 64),
+                new string('b', 64),
+                PluginDeployed);
+
+        public LifecycleStageEvidence LifecycleLaunch(LifecycleExperimentContext context) => new(true);
+        public LogStabilityEvidence LogStability(LifecycleExperimentContext context) => new(true, "stable log");
+
+        public LifecycleVerificationEvidence LifecycleVerification(LifecycleExperimentContext context)
+            => LifecycleVerificationResult is { } result
+                ? new(result.Succeeded, result.FailureCategory)
+                : new(true, null, 1, 1, 1, "1,2,3", "ThroneForge.API, Version=1.0.0.0", "ThroneForge.Contracts, Version=1.0.0.0", 1, 0, 0, 0);
+
+        public CleanupEvidence PluginRemoval(LifecycleExperimentContext context)
+            => new(PluginRemovalResult?.Succeeded ?? true, PluginRemovalResult?.FailureCategory, true, true);
+
+        public CleanupEvidence LoaderRollback(LifecycleExperimentContext context)
+            => new(true, null, null, null, true);
+
+        public PostcheckEvidence DisposablePostcheck(LifecycleExperimentContext context)
+            => new(true, null, true, true, true, true);
+
+        public PostcheckEvidence OriginalPostcheck(LifecycleExperimentContext context)
+            => OriginalPostcheckResult is { } result
+                ? new(result.Succeeded, result.FailureCategory)
+                : new(true, null, true, true, true, true);
     }
 }

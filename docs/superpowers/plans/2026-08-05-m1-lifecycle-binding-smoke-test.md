@@ -26,3 +26,9 @@ Validation of the correction passed on head `dbbcc3a` in hosted run `31012843103
 ## Correction outcome
 
 Correction head `bdd871fa263d5b97fc4a20160ee110d32f406c99` passed hosted run `31008620029` with 13 TRX files and 313 tests per runner on SDK `10.0.100`. The single permitted corrective private run stopped at `OriginalPreflight` with stable category `original-preflight-failed`: the discovery CLI emitted `Selected executable: ...`, while the harness expected an equals-delimited value. No loader transaction, package admission, deployment, or lifecycle evidence was produced. No further private run is permitted for this correction.
+
+## Final orchestration ownership correction
+
+The current repository-only slice makes `LifecycleExperimentOrchestrator` the single stage owner. `ILifecycleExperimentOperations` returns typed evidence for every external boundary; the result cannot be `Passed` when required evidence is missing. The versioned stage record preserves the first primary failed stage/category and stores cleanup failures separately. Cleanup and both postchecks execute in the orchestrator, while `LifecycleExperimentProductionOperations` uses the existing Task-3/Task-6 services for runtime evidence, loader state, package capture/admission/deployment, removal, rollback, and profile verification.
+
+The PowerShell entry point only validates explicit inputs, locates `dotnet`, invokes `run-lifecycle-experiment`, and forwards its sanitized output/exit code. `LifecycleExperimentReportWriter` derives the fingerprint-specific repository report path and renders only `LifecycleExperimentResult`. No private experiment is authorized in this slice; hosted validation must still be completed before any separately approved private attempt.

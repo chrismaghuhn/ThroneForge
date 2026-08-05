@@ -15,7 +15,7 @@ public static class PluginSmokeCli
     {
         if (args.Length == 0)
         {
-            stderr.WriteLine("Usage: package|lifecycle-package|admit|admit-and-deploy|verify-loader-stage|remove|parse-marker|inspect-lifecycle-binding|verify-lifecycle-log|lifecycle-stage with explicit paths and evidence.");
+            stderr.WriteLine("Usage: package|lifecycle-package|admit|admit-and-deploy|verify-loader-stage|run-lifecycle-experiment|remove|parse-marker|inspect-lifecycle-binding|verify-lifecycle-log|lifecycle-stage with explicit paths and evidence.");
             return 2;
         }
 
@@ -28,6 +28,7 @@ public static class PluginSmokeCli
                 "admit" => Admit(args, stdout),
                 "admit-and-deploy" => AdmitAndDeploy(args, stdout),
                 "verify-loader-stage" => VerifyLoaderStage(args, stdout),
+                "run-lifecycle-experiment" => RunLifecycleExperiment(args, stdout),
                 "deploy" => throw new PluginSmokeException("Direct deployment is disabled; use admit-and-deploy with a validated Task-6 ownership record."),
                 "remove" => Remove(args, stdout),
                 "parse-marker" => ParseMarker(args, stdout),
@@ -195,6 +196,10 @@ public static class PluginSmokeCli
         {
             receipt = PluginDeploymentService.DeployCaptured(captured, context);
         }
+        catch (PluginDeploymentVerificationException exception)
+        {
+            throw new PluginSmokePhaseException("deployment-verification", LifecycleExperimentFailureCategories.DeploymentVerificationFailed, "The complete post-deployment manifest could not be verified.", exception);
+        }
         catch (Exception exception)
         {
             throw new PluginSmokePhaseException("deployment-write", LifecycleExperimentFailureCategories.DeploymentWriteFailed, "The package deployment did not complete transactionally.", exception);
@@ -238,6 +243,54 @@ public static class PluginSmokeCli
         stdout.WriteLine($"bootstrap-evidence-present={evidence.BootstrapEvidencePresent}");
         stdout.WriteLine($"bootstrap-criteria={evidence.BootstrapCriteria}");
         return 0;
+    }
+
+    private static int RunLifecycleExperiment(string[] args, TextWriter stdout)
+    {
+        var repositoryRoot = Value(args, "--repository-root");
+        var originalGameRoot = Value(args, "--original-game");
+        var experimentRoot = Value(args, "--experiment-root");
+        var expectedFingerprint = Value(args, "--expected-fingerprint");
+        var archivePath = Value(args, "--bepinex-archive");
+        var officialDigest = Value(args, "--official-digest");
+        var packageRoot = Value(args, "--package-root");
+        var manifestPath = Value(args, "--manifest-path");
+        var unityAssemblyPath = Value(args, "--unity-assembly");
+        var nonce = OptionalValue(args, "--nonce") ?? Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)).ToLowerInvariant();
+
+        var options = new LifecycleExperimentProductionOptions(
+            repositoryRoot,
+            originalGameRoot,
+            experimentRoot,
+            expectedFingerprint,
+            archivePath,
+            officialDigest,
+            packageRoot,
+            manifestPath,
+            unityAssemblyPath,
+            OptionalValue(args, "--executable-relative-path") ?? string.Empty,
+            nonce);
+        var operation = new LifecycleExperimentProductionOperations(options);
+        var experimentId = OptionalValue(args, "--experiment-id") ?? Guid.NewGuid().ToString("N");
+        var result = new LifecycleExperimentOrchestrator(
+            experimentRoot,
+            experimentId,
+            expectedFingerprint,
+            operation).Run();
+        var reportPath = new LifecycleExperimentReportWriter(repositoryRoot, expectedFingerprint).Write(result);
+
+        stdout.WriteLine($"result={result.OverallResult}");
+        stdout.WriteLine($"current-stage={result.CurrentStage}");
+        stdout.WriteLine($"failed-stage={result.FailedStage?.ToString() ?? "none"}");
+        stdout.WriteLine($"last-completed-stage={result.LastCompletedStage?.ToString() ?? "none"}");
+        stdout.WriteLine($"primary-failed-stage={result.PrimaryFailedStage?.ToString() ?? "none"}");
+        stdout.WriteLine($"primary-failure-category={result.PrimaryFailureCategory ?? "none"}");
+        stdout.WriteLine($"cleanup-failure-category={result.CleanupFailureCategory ?? "none"}");
+        stdout.WriteLine($"stage-state-persisted={result.StageStatePersisted}");
+        stdout.WriteLine($"package-sha256={result.PackageSha256 ?? "not-observed"}");
+        stdout.WriteLine($"binding-digest={result.AdmissionBindingDigest ?? "not-observed"}");
+        stdout.WriteLine($"report={Path.GetFileName(reportPath)}");
+        return result.OverallResult == "Passed" ? 0 : 1;
     }
 
     private static int Remove(string[] args, TextWriter stdout)

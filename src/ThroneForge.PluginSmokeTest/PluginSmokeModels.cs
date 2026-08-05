@@ -26,6 +26,19 @@ public class PluginSmokeException : Exception
     }
 }
 
+public sealed class PluginDeploymentVerificationException : PluginSmokeException
+{
+    public PluginDeploymentVerificationException(string message)
+        : base(message)
+    {
+    }
+
+    public PluginDeploymentVerificationException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 public sealed class PluginSmokePhaseException : PluginSmokeException
 {
     public PluginSmokePhaseException(string phase, string failureCategory, string message, Exception? innerException = null)
@@ -864,7 +877,7 @@ public static class PluginDeploymentService
             var expected = AddDeploymentToManifest(context.PreDeploymentManifest, destinations);
             if (!InstallationCopyService.CompareManifests(expected, after).Matches)
             {
-                throw new PluginSmokeException("The complete disposable manifest did not match the transactional deployment result.");
+                throw new PluginDeploymentVerificationException("The complete disposable manifest did not match the transactional deployment result.");
             }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or PluginSmokeException)

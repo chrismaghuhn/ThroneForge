@@ -16,8 +16,6 @@ public enum LifecycleExperimentStage
     PackageBuild,
     PackageCapture,
     AdmitAndDeploy,
-    Admission,
-    Deployment,
     LifecycleLaunch,
     LogStability,
     LifecycleVerification,
@@ -61,40 +59,33 @@ public static class LifecycleExperimentFailureCategories
     public const string LoaderRollbackFailed = "loader-rollback-failed";
     public const string DisposableRestorationFailed = "disposable-restoration-failed";
     public const string OriginalPostcheckFailed = "original-postcheck-failed";
+    public const string CleanupFailed = "cleanup-failed";
+    public const string OwnershipStateInvalid = PluginSmokeStateFailureCategories.OwnershipStateInvalid;
+    public const string BaselineStateMissing = PluginSmokeStateFailureCategories.BaselineStateMissing;
+    public const string BaselineStateMismatch = PluginSmokeStateFailureCategories.BaselineStateMismatch;
+    public const string TransactionStateMissing = PluginSmokeStateFailureCategories.TransactionStateMissing;
+    public const string TransactionStateMismatch = PluginSmokeStateFailureCategories.TransactionStateMismatch;
+    public const string AppliedProfileDrift = PluginSmokeStateFailureCategories.AppliedProfileDrift;
+    public const string BootstrapEvidenceInvalid = PluginSmokeStateFailureCategories.BootstrapEvidenceInvalid;
 
     public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
-        InProgress,
-        StageCompleted,
-        StageOperationMissing,
-        StageStatePersistenceFailed,
-        OriginalPreflightFailed,
-        DisposablePrepareFailed,
-        BaselineLaunchFailed,
-        LoaderInstallFailed,
-        LoaderTransactionMissing,
-        LoaderLaunchFailed,
-        LoaderVerifyFailed,
-        UnityMetadataPreflightFailed,
-        PackageBuildFailed,
-        PackageCaptureFailed,
-        AdmissionFailed,
-        DeploymentFailed,
-        MetadataValidationFailed,
-        DeploymentContextFailed,
-        DeploymentWriteFailed,
-        DeploymentVerificationFailed,
-        LifecycleLaunchFailed,
-        ManualClosureRequired,
-        LogMissing,
-        LogNotReadable,
-        LogNotStable,
-        LifecycleMarkerMissing,
-        LifecycleMarkerInvalid,
-        PluginRemovalFailed,
-        LoaderRollbackFailed,
-        DisposableRestorationFailed,
-        OriginalPostcheckFailed
+        InProgress, StageCompleted, StageOperationMissing, StageStatePersistenceFailed,
+        OriginalPreflightFailed, DisposablePrepareFailed, BaselineLaunchFailed,
+        LoaderInstallFailed, LoaderTransactionMissing, LoaderLaunchFailed, LoaderVerifyFailed,
+        UnityMetadataPreflightFailed, PackageBuildFailed, PackageCaptureFailed, AdmissionFailed,
+        DeploymentFailed, MetadataValidationFailed, DeploymentContextFailed, DeploymentWriteFailed,
+        DeploymentVerificationFailed, LifecycleLaunchFailed, ManualClosureRequired, LogMissing,
+        LogNotReadable, LogNotStable, LifecycleMarkerMissing, LifecycleMarkerInvalid,
+        PluginRemovalFailed, LoaderRollbackFailed, DisposableRestorationFailed,
+        OriginalPostcheckFailed, CleanupFailed,
+        PluginSmokeStateFailureCategories.OwnershipStateInvalid,
+        PluginSmokeStateFailureCategories.BaselineStateMissing,
+        PluginSmokeStateFailureCategories.BaselineStateMismatch,
+        PluginSmokeStateFailureCategories.TransactionStateMissing,
+        PluginSmokeStateFailureCategories.TransactionStateMismatch,
+        PluginSmokeStateFailureCategories.AppliedProfileDrift,
+        PluginSmokeStateFailureCategories.BootstrapEvidenceInvalid
     };
 }
 
@@ -108,11 +99,14 @@ public sealed record LifecycleExperimentStageState(
     string ResultCategory,
     string? LoaderTransactionStatus = null,
     string? PackageSha256 = null,
-    string? AdmissionBindingDigest = null);
+    string? AdmissionBindingDigest = null,
+    LifecycleExperimentStage? PrimaryFailedStage = null,
+    string? PrimaryFailureCategory = null,
+    string? CleanupFailureCategory = null);
 
 public static class LifecycleExperimentStageStateService
 {
-    public const string SchemaVersion = "throneforge-task7-lifecycle-stage-v1";
+    public const string SchemaVersion = "throneforge-task7-lifecycle-stage-v2";
     public const string TaskVersion = "m1-lifecycle-binding-smoke-test-v1";
     public const string StateRelativePath = "evidence/lifecycle-stage-state.json";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -208,8 +202,17 @@ public static class LifecycleExperimentStageStateService
         string resultCategory,
         string? loaderTransactionStatus = null,
         string? packageSha256 = null,
-        string? admissionBindingDigest = null)
+        string? admissionBindingDigest = null,
+        LifecycleExperimentStage? primaryFailedStage = null,
+        string? primaryFailureCategory = null,
+        string? cleanupFailureCategory = null)
     {
+        var existing = File.Exists(GetStatePath(experimentRoot))
+            ? LoadAndValidate(experimentRoot, experimentId, expectedFingerprint)
+            : null;
+        var primaryStage = existing?.PrimaryFailedStage ?? primaryFailedStage;
+        var primaryCategory = existing?.PrimaryFailureCategory ?? primaryFailureCategory;
+        var cleanupCategory = cleanupFailureCategory ?? existing?.CleanupFailureCategory;
         var state = new LifecycleExperimentStageState(
             SchemaVersion,
             TaskVersion,
@@ -218,9 +221,12 @@ public static class LifecycleExperimentStageStateService
             currentStage,
             lastCompletedStage,
             resultCategory,
-            loaderTransactionStatus,
-            packageSha256,
-            admissionBindingDigest);
+            loaderTransactionStatus ?? existing?.LoaderTransactionStatus,
+            packageSha256 ?? existing?.PackageSha256,
+            admissionBindingDigest ?? existing?.AdmissionBindingDigest,
+            primaryStage,
+            primaryCategory,
+            cleanupCategory);
         SaveAtomic(experimentRoot, state);
         return state;
     }
@@ -231,7 +237,10 @@ public static class LifecycleExperimentStageStateService
             || !string.Equals(state.TaskVersion, TaskVersion, StringComparison.Ordinal)
             || !Enum.IsDefined(state.CurrentStage)
             || state.LastCompletedStage is not null && !Enum.IsDefined(state.LastCompletedStage.Value)
-            || !LifecycleExperimentFailureCategories.All.Contains(state.ResultCategory))
+            || state.PrimaryFailedStage is not null && !Enum.IsDefined(state.PrimaryFailedStage.Value)
+            || !LifecycleExperimentFailureCategories.All.Contains(state.ResultCategory)
+            || state.PrimaryFailureCategory is not null && !LifecycleExperimentFailureCategories.All.Contains(state.PrimaryFailureCategory)
+            || state.CleanupFailureCategory is not null && !LifecycleExperimentFailureCategories.All.Contains(state.CleanupFailureCategory))
         {
             throw new PluginSmokeException("The lifecycle experiment stage state has an unsupported schema, stage, or result category.");
         }

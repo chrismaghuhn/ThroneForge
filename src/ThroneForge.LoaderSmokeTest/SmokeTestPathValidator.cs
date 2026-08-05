@@ -122,6 +122,35 @@ public static class SmokeTestPathValidator
         return normalized;
     }
 
+    public static string ValidateLifecycleReportPath(string repositoryRoot, string expectedFingerprint)
+    {
+        var repository = Path.GetFullPath(repositoryRoot);
+        if (!Directory.Exists(repository))
+        {
+            throw new SmokeTestException("The repository root for the lifecycle report does not exist.");
+        }
+
+        if (string.IsNullOrWhiteSpace(expectedFingerprint)
+            || expectedFingerprint.Length != 64
+            || expectedFingerprint.Any(character => !Uri.IsHexDigit(character)))
+        {
+            throw new SmokeTestException("The expected fingerprint must be a 64-character SHA-256 value.");
+        }
+
+        EnsureNoReparseOnExistingPath(repository);
+        var discoveryRoot = Path.Combine(repository, "docs", "discovery");
+        var reportPath = Path.Combine(discoveryRoot, $"{expectedFingerprint.ToLowerInvariant()}-lifecycle-binding.md");
+        var normalized = Path.GetFullPath(reportPath);
+        if (!normalized.StartsWith(Path.TrimEndingDirectorySeparator(repository) + Path.DirectorySeparatorChar, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
+            || !normalized.StartsWith(Path.TrimEndingDirectorySeparator(discoveryRoot) + Path.DirectorySeparatorChar, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        {
+            throw new SmokeTestException("The lifecycle report path must remain below docs/discovery.");
+        }
+
+        EnsureNoReparseOnExistingPath(normalized);
+        return normalized;
+    }
+
     internal static string ValidateNewDirectoryPath(string path)
     {
         var normalized = CanonicalizeAbsolute(path, "target directory");
