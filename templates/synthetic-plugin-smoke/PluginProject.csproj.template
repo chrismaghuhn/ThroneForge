@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>__TARGET_FRAMEWORK__</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <AssemblyName>ThroneForge.M1.SyntheticSmoke</AssemblyName>
     <RootNamespace>ThroneForge.M1.SyntheticSmoke</RootNamespace>
     <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <ImplicitUsings>disable</ImplicitUsings>
     <Deterministic>true</Deterministic>
     <DebugType>none</DebugType>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>

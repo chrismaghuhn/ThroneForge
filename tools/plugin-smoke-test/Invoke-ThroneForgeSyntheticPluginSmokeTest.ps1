@@ -36,10 +36,14 @@ function Get-NormalizedPath([string]$path) {
     return [IO.Path]::GetFullPath($path).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
 }
 
+function Test-RunningOnWindows {
+    return [string]::Equals($env:OS, 'Windows_NT', [StringComparison]::OrdinalIgnoreCase)
+}
+
 function Test-SameOrDescendant([string]$root, [string]$candidate) {
     $normalizedRoot = Get-NormalizedPath $root
     $normalizedCandidate = Get-NormalizedPath $candidate
-    $comparison = if ([OperatingSystem]::IsWindows()) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    $comparison = if (Test-RunningOnWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
     return $normalizedCandidate.Equals($normalizedRoot, $comparison) -or $normalizedCandidate.StartsWith($normalizedRoot + [IO.Path]::DirectorySeparatorChar, $comparison)
 }
 
@@ -88,9 +92,24 @@ function Invoke-PluginTool([string[]]$toolArguments, [switch]$AllowFailure) {
 }
 
 function Get-OutputValue([string]$output, [string]$key) {
-    $line = $output -split '\r?\n' | Where-Object { $_.StartsWith("$key=", [StringComparison]::Ordinal) } | Select-Object -First 1
+    $line = $null
+    $prefix = $null
+    foreach ($candidate in ($output -split '\r?\n')) {
+        if ($candidate.StartsWith("$key=", [StringComparison]::Ordinal)) {
+            $line = $candidate
+            $prefix = "$key="
+            break
+        }
+
+        if ($candidate.StartsWith($key + ':', [StringComparison]::Ordinal)) {
+            $line = $candidate
+            $prefix = $key + ':'
+            break
+        }
+    }
+
     if ($null -eq $line) { Throw-Sanitized "The operation did not produce required evidence '$key'." }
-    return $line.Substring($key.Length + 1)
+    return $line.Substring($prefix.Length).Trim()
 }
 
 function Write-Utf8NoBom([string]$path, [string]$content) {
@@ -99,8 +118,15 @@ function Write-Utf8NoBom([string]$path, [string]$content) {
 
 function New-Nonce {
     $bytes = New-Object byte[] 24
-    [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
-    return [Convert]::ToHexString($bytes).ToLowerInvariant()
+    $generator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+        $generator.GetBytes($bytes)
+    }
+    finally {
+        $generator.Dispose()
+    }
+
+    return [BitConverter]::ToString($bytes).Replace('-', '').ToLowerInvariant()
 }
 
 function Assert-Archive {
