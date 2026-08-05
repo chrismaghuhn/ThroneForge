@@ -72,22 +72,31 @@ function New-Nonce {
     try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
     [BitConverter]::ToString($bytes).Replace('-', '').ToLowerInvariant()
 }
+function Relative([string]$root, [string]$path) {
+    $normalizedRoot = Normalize $root
+    $normalizedPath = Normalize $path
+    if (-not (Under $normalizedRoot $normalizedPath)) { Fail-Safe 'Manifest path escaped its validated root.' }
+    if ($normalizedPath.Equals($normalizedRoot, [StringComparison]::OrdinalIgnoreCase)) { return '' }
+    $normalizedPath.Substring($normalizedRoot.Length + 1).Replace('\', '/')
+}
 function Complete-ManifestIdentity([string]$root) {
     if (-not (Test-Path -LiteralPath $root -PathType Container)) { Fail-Safe 'A manifest root does not exist.' }
     $lines = [Collections.Generic.List[string]]::new()
     foreach ($directory in (Get-ChildItem -LiteralPath $root -Recurse -Directory -Force | Sort-Object FullName)) {
         if (($directory.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { Fail-Safe 'A reparse point was found in a protected manifest tree.' }
-        $relative = [IO.Path]::GetRelativePath($root, $directory.FullName).Replace('\', '/')
+        $relative = Relative $root $directory.FullName
         $lines.Add("D|$relative")
     }
     foreach ($file in (Get-ChildItem -LiteralPath $root -Recurse -File -Force | Sort-Object FullName)) {
         if (($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { Fail-Safe 'A reparse point was found in a protected manifest tree.' }
-        $relative = [IO.Path]::GetRelativePath($root, $file.FullName).Replace('\', '/')
+        $relative = Relative $root $file.FullName
         $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
         $lines.Add("F|$relative|$($file.Length)|$hash")
     }
     $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($lines | Sort-Object) -join "`n")
-    [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+    $sha = New-Object Security.Cryptography.SHA256Managed
+    try { $digest = $sha.ComputeHash($bytes) } finally { $sha.Dispose() }
+    [BitConverter]::ToString($digest).Replace('-', '').ToLowerInvariant()
 }
 function Build-LifecyclePackage {
     $buildRoot = Join-Path $script:experimentRoot 'lifecycle-package-build'
