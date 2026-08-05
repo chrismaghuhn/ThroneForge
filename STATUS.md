@@ -208,7 +208,7 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Bootstrap evidence: preloader and chainloader initialized, exactly one synthetic plugin was observed, the nonce-bound readiness marker matched, API/Contracts identities matched, and no lifecycle marker, fatal error, or error evidence was present.
 - Safety evidence: original complete manifest unchanged; original runtime/readiness post-verification passed; disposable rollback was verified; no private process remained active; no loader/plugin artifact was committed.
 - The sanitized report is `docs/discovery/1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-synthetic-plugin-smoke-test.md`.
-- Hosted validation for head `99f3d68a12f992cc59a3511ce56c08721c004667` passed in run [30990572415](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30990572415). Windows and Ubuntu each used SDK `10.0.100`, uploaded 13 TRX files representing 265 tests, and reported 0 failures, 0 errors, and 0 skips. Both artifacts were independently parsed; no `Overwriting results file` warning occurred.
+- Hosted validation for documentation baseline head `dea83ef93f5b1d8d04779cf4955bc90490f9b00e` passed in run [30990848363](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30990848363). Windows and Ubuntu each used SDK `10.0.100`, uploaded 13 TRX files representing 265 tests, and reported 0 failures, 0 errors, and 0 skips. Both artifacts were independently parsed; no `Overwriting results file` warning occurred. The current follow-up commit only records this already completed CI result.
 
 ## Next task
 
