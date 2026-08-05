@@ -4,7 +4,7 @@ This living plan follows section 25 of `docs/THRONEFORGE_SPEC.md`. Work proceeds
 
 ## Current milestone
 
-M1 - Task 4 evidence-backed plugin/runtime boundary hardening in progress on `agent/m1-plugin-runtime-boundary-hardening`, based on reviewed head `18f7b1135b6aaba04290198f355e6e9ac6a97b5d`. No plugin is loaded and no game-facing behavior is claimed.
+M1 - Task 5 final native-image and load-context hardening is complete on `agent/m1-plugin-load-smoke-test-hardening` at `a8595e7b56b80ab338e5d148c1ba1f13455598d4`; no plugin was loaded in Thronefall and no game-facing behavior is claimed.
 
 ## Milestones
 
@@ -167,7 +167,7 @@ Task-3 hardening validation: implementation commit `1643cdb4e26f3e5d0890b7b203df
 - [x] Add regression tests for report evidence states, staged-mode baseline gates, baseline immutability, marker-write failure, and sanitized CLI/report messaging.
 - [x] Run the new local validation and hosted Windows/Linux matrix; record the final current-head run before requesting merge.
 
-The review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`, whose pre-fix hosted run was `30860548085` with 11 TRX files and 146 tests per runner. Implementation commit `de3159e85c177526c2dafc6b5a60fa80e38c0bc9` passed hosted run `30864308531` on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, 154 tests, and 0 failures/errors/skips per runner; no overwrite warnings occurred. M1 Task 4 remains unstarted and the private loader experiment is not rerun.
+The review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`, whose pre-fix hosted run was `30860548085` with 11 TRX files and 146 tests per runner. Implementation commit `de3159e85c177526c2dafc6b5a60fa80e38c0bc9` passed hosted run `30864308531` on Windows and Ubuntu with SDK `10.0.100`, 11 TRX files, 154 tests, and 0 failures/errors/skips per runner; no overwrite warnings occurred. At that historical checkpoint M1 Task 4 remained unstarted; the private loader experiment was not rerun.
 
 ### M1 Task 3 final transaction-state correction
 
@@ -180,7 +180,7 @@ The review follow-up started from `e904ae5d6f01558f9e4c837505947938b8985630`, wh
 - [x] Add regression coverage for empty/stale/mismatched transaction state, applied-profile drift, unsafe persisted paths, and bootstrap evidence requirements.
 - [x] Run and independently inspect the final hosted Windows/Linux matrix before requesting merge; do not rerun the private experiment.
 
-This correction continues from reviewed head `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Implementation commit `08940f274d00d6c681c08d36364deedb04474a3d` passed hosted run `30866207996` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 11 TRX files representing 165 tests with 0 failures, errors, and skips, and no overwrite warning occurred. M1 Task 4 remains unstarted.
+This correction continues from reviewed head `c98c35bd333f5a82dd008ede7f02ae9217c4140d`. Implementation commit `08940f274d00d6c681c08d36364deedb04474a3d` passed hosted run `30866207996` on Windows and Ubuntu with SDK `10.0.100`; each runner uploaded 11 TRX files representing 165 tests with 0 failures, errors, and skips, and no overwrite warning occurred. At that historical checkpoint M1 Task 4 remained unstarted.
 
 ## M1 Task 4: evidence-backed plugin/runtime boundary
 
@@ -193,11 +193,52 @@ Task 3 is merged into `main` by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722ac
 - [x] Add regression and architecture tests for the boundary and forbidden dependencies.
 - [x] Run exact local/hosted validation and update `STATUS.md`; keep M1 incomplete and defer actual plugin/runtime integration.
 
-Task-4 bounded-slice validation: final documentation head `5d7c69a66dd431da98e16e6d2e9ea154728d8387` passed hosted run `30868670093` on Windows and Ubuntu with SDK `10.0.100`. Each runner uploaded 11 TRX files representing 175 tests with 0 failures, errors, or skips; no TRX overwrite warning occurred. The implementation head `c680083` had the same green result in run `30868441588`. Local SDK `10.0.110` also passed locked restore, Release build with 0 warnings/errors, and all 175 tests; exact local formatting remained unavailable because SDK `10.0.100` is not installed. M1 remains incomplete: no plugin assembly has been loaded, and plugin TFM, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, and custom waves remain unverified.
+Task-4 bounded-slice validation: final documentation head `5d7c69a66dd431da98e16e6d2e9ea154728d8387` passed hosted run `30868670093` on Windows and Ubuntu with SDK `10.0.100`. Each runner uploaded 11 TRX files representing 175 tests with 0 failures, errors, or skips; no TRX overwrite warning occurred. The implementation head `c680083` had the same green result in run `30868441588`. Local SDK `10.0.110` also passed locked restore, Release build with 0 warnings/errors, and all 175 tests; exact local formatting remained unavailable because SDK `10.0.100` is not installed. Task 4 and its hardening are now merged by PR #4 at `main@5f4b4dd`; final head validation was run `30878236039` with 11 TRX files and 212 tests per runner. M1 remains incomplete: no Thronefall plugin assembly has been loaded, and plugin TFM, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, and custom waves remain unverified.
+
+## M1 Task 5: repository-only synthetic plugin-load probe
+
+Task 4 and its evidence-binding hardening are complete and merged into `main` by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. This task is deliberately narrower than a real Thronefall plugin experiment. It adds an external probe that captures and hashes one explicit synthetic primary assembly, performs metadata-only single-assembly closure preflight, rebuilds verified integrity evidence, re-runs the Task-4 admission gate immediately before loading, and loads one public closed test-only `IThroneForgeMod` implementation into a collectible .NET `AssemblyLoadContext`. It explicitly invokes no plugin constructor or ThroneForge lifecycle method; assembly loading remains full-trust.
+
+- [x] Add the external `ThroneForge.PluginLoadTest` project and a source-only synthetic plugin fixture.
+- [x] Reuse the existing admission gate and bind the exact artifact hash, canonical mod identity, game fingerprint, adapter evidence, and approval before loading.
+- [x] Load only the synthetic fixture in a collectible context; record sanitized assembly/type identities and never invoke the plugin.
+- [x] Add fail-closed tests for hash, approval, compatibility, malformed assembly, contract-shape, unload, sanitization, and architecture boundaries.
+- [x] Run exact hosted Windows/Linux validation; do not run a private Thronefall or BepInEx plugin experiment in this task.
+
+Task-5 final hosted validation: run `30880625516` tested head `15127329aa0fd916438a0404ba51a8dfdfbf59eb`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 226 tests, and reported 0 failures, 0 errors, and 0 skipped tests. The first CI attempt `30880510322` exposed that fixture projects were incorrectly counted as test projects; the workflow now derives expected TRX projects from `IsTestProject=true`. No overwrite warning occurred in the final run. No private loader or game experiment was run.
+
+The detailed design is [`docs/superpowers/specs/2026-08-04-m1-plugin-load-smoke-test-design.md`](docs/superpowers/specs/2026-08-04-m1-plugin-load-smoke-test-design.md), and the execution plan is [`docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test.md`](docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test.md). The next separate experiment, if approved, must use an explicit disposable profile and remain distinct from game lifecycle/API compatibility. Task-5 hashes only the primary assembly; multi-file package closure integrity is not designed.
+
+### M1 Task 5 hardening: single-assembly closure and unload evidence
+
+This follow-up starts from reviewed head `10897f7b03d45f1e470b5930a9dc1341939cde6` on `agent/m1-plugin-load-smoke-test-hardening`. It remains repository-only: no private Thronefall/BepInEx experiment, plugin package, loader binary, game reference, lifecycle invocation, or game API inspection is permitted. The detailed plan is [`docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test-hardening.md`](docs/superpowers/plans/2026-08-04-m1-plugin-load-smoke-test-hardening.md).
+
+- [x] Replace arbitrary sidecar resolution with metadata-only single-assembly closure validation and exact shared API/Contracts resolution.
+- [x] Reject native imports and module initializers before `LoadFromStream`; describe assembly loading as full-trust.
+- [x] Require exactly one public, top-level, non-abstract, closed `IThroneForgeMod` implementation.
+- [x] Preserve one captured byte buffer for size validation, hashing, admission, and loading.
+- [x] Require bounded collectible-context unload observation and test retained-reference failure reporting.
+- [x] Add source-only helper/native/module-initializer/invalid-shape fixtures and sanitized regression tests.
+- [x] Update documentation after the branch-head hosted run and keep M1 overall incomplete.
+
+Task-5 hardening hosted validation: run `30895225156` tested head `bb32de1dd211ddd5174f8d8f6e6490164da970db`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 239 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were independently parsed; no `Overwriting results file` warning occurred. Run `30895090026` was superseded after a formatter import-order failure and is retained only as diagnostic history. No private loader or game experiment was run.
+
+### M1 Task 5 final native-image and load-context correction
+
+This follow-up continues from documentation head `1649336681fd76cb1f66623d151179015c812fcb` and pre-fix hosted run `30895740658`. It remains repository-only and must reject non-IL-only, native-entry-point, missing-CLR-header, and wrong-context images before a successful result.
+
+- [x] Add temporary-PE mutation tests for missing `ILOnly`, present `NativeEntryPoint`, and missing CLR header.
+- [x] Add structured pure-managed image evidence and actual owning-context classification.
+- [x] Require `CorFlags.ILOnly`, reject `CorFlags.NativeEntryPoint`, and reject missing CLR headers before load.
+- [x] Verify `AssemblyLoadContext.GetLoadContext(assembly)` is the expected collectible context.
+- [x] Preserve path sanitization, unload observation, and architecture boundaries.
+- [x] Run the new exact-SDK hosted matrix, inspect every TRX artifact, and update this plan with the final current-head run.
+
+Final Task-5 native-image/load-context validation: run `30978672030` tested head `a8595e7b56b80ab338e5d148c1ba1f13455598d4`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 244 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were independently parsed; no `Overwriting results file` warning occurred. No private loader or game experiment was run.
 
 ### M1 Task 4 hardening: bound trust evidence and admission artifacts
 
-This follow-up starts from reviewed head `18f7b1135b6aaba04290198f355e6e9ac6a97b5d` on `agent/m1-plugin-runtime-boundary-hardening`. It remains a data-only boundary task: no plugin is loaded, no assembly is inspected, and no loader or game dependency is introduced.
+This historical follow-up started from reviewed head `18f7b1135b6aaba04290198f355e6e9ac6a97b5d` on `agent/m1-plugin-runtime-boundary-hardening`. It was a data-only boundary task: no plugin was loaded, no assembly was inspected, and no loader or game dependency was introduced.
 
 - [x] Add canonical, bounded mod identity and version value rules; reject control characters, whitespace, path/device syntax, empty ID components, and invalid version text.
 - [x] Replace integrity and approval booleans with immutable records bound to the canonical mod identity, exact package SHA-256, and exact game fingerprint.

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>ThroneForge.PluginLoadDuplicateContractsFixture</AssemblyName>
+    <RootNamespace>ThroneForge.PluginLoadDuplicateContractsFixture</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ThroneForge.PluginLoadDuplicateContractsDependency/ThroneForge.PluginLoadDuplicateContractsDependency.csproj" />
+  </ItemGroup>
+</Project>
