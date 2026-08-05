@@ -61,8 +61,16 @@ $script:dotnet = $dotnet
 $script:repositoryRoot = $repositoryRoot
 
 function Invoke-DotnetOperation([string[]]$arguments, [switch]$AllowFailure) {
-    $output = (& $script:dotnet @arguments 2>&1 | Out-String).Trim()
-    $exitCode = $LASTEXITCODE
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = (& $script:dotnet @arguments 2>&1 | Out-String).Trim()
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+
     if ($exitCode -ne 0 -and -not $AllowFailure) {
         $diagnosticLines = @($output -split '\r?\n' | Where-Object { $_ -match '(?i)(error|failed|could not|nicht)' } | Select-Object -Last 5)
         if ($diagnosticLines.Count -eq 0) {
