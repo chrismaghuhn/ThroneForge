@@ -119,6 +119,13 @@ function Get-OutputValue([string]$output, [string]$key) {
     return $line.Substring($prefix.Length).Trim()
 }
 
+function Get-SanitizedOutputSummary([string]$output) {
+    $lines = @($output -split '\r?\n' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Last 4)
+    $summary = ($lines -join ' ') -replace '(?i)([A-Z]:\\|/)[^\s"'']+', '<redacted-path>'
+    if ($summary.Length -gt 600) { $summary = $summary.Substring(0, 600) }
+    return $summary
+}
+
 function Write-Utf8NoBom([string]$path, [string]$content) {
     [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
 }
@@ -259,9 +266,9 @@ try {
     Invoke-Loader Install | Out-Null
     $loaderApplied = $true
     $loaderLaunch = Invoke-Loader Launch -AllowFailure
-    if ($loaderLaunch.ExitCode -ne 0) { Throw-Sanitized 'The loader-only bootstrap launch was inconclusive or failed.' }
+    if ($loaderLaunch.ExitCode -ne 0) { Throw-Sanitized "The loader-only bootstrap launch was inconclusive or failed: $(Get-SanitizedOutputSummary $loaderLaunch.Output)" }
     $loaderVerify = Invoke-Loader Verify -AllowFailure
-    if ($loaderVerify.ExitCode -ne 0) { Throw-Sanitized 'The loader-only bootstrap verification did not pass before plugin deployment.' }
+    if ($loaderVerify.ExitCode -ne 0) { Throw-Sanitized "The loader-only bootstrap verification did not pass before plugin deployment: $(Get-SanitizedOutputSummary $loaderVerify.Output)" }
     $package = Invoke-PrivatePluginBuild
     $admission = Invoke-PluginTool @('admit', '--manifest-path', $package.ManifestPath, '--expected-fingerprint', $script:expectedFingerprint, '--adapter-id', 'throneforge.adapter', '--adapter-version', '1.0.0')
     if ((Get-OutputValue $admission.Output 'admission') -ne 'Approved') { Throw-Sanitized 'The exact package/game admission did not approve immediately before deployment.' }
