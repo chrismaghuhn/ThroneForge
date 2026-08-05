@@ -63,7 +63,7 @@ The original installation was used as read-only input and was not used as the lo
 - Chainloader: initialized.
 - Plugins discovered during the synthetic-plugin launch: `1`.
 - Synthetic readiness marker: exactly one nonce-bound marker matched; the nonce is omitted from this report.
-- API/Contracts identities: matched the evidence-selected package assemblies.
+- API/Contracts identities: not independently measured by this historical run; the old template emitted build-time identity values. A corrected rerun is required before this can be claimed.
 - Explicit ThroneForge lifecycle calls: none; no lifecycle marker was observed.
 - Warnings: `0`.
 - Errors: `0`.
@@ -81,9 +81,9 @@ The original installation was used as read-only input and was not used as the lo
 
 ## Overall result
 
-`Passed`
+`PassedWithWarnings`
 
-The disposable BepInEx profile loaded exactly one approved source-generated synthetic plugin and emitted the expected marker. This result proves only the recorded synthetic bootstrap for this fingerprint. It does not prove a real Thronefall plugin, final plugin target-framework compatibility beyond the local evidence used for the build, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, or custom waves.
+The disposable BepInEx profile loaded exactly one source-generated synthetic plugin and emitted the expected marker. This historical result retains credible bootstrap evidence, but it does not prove current-byte package recapture/admission, actual runtime API/Contracts resolution, or the complete ownership and transactional deployment guarantees added by the Task-6 hardening. A fresh private run is required after hosted synthetic CI passes. It does not prove a real Thronefall plugin, final plugin target-framework compatibility beyond the local evidence used for the build, Harmony compatibility, lifecycle bindings, game APIs, catalog extraction, or custom waves.
 
 ## Security and privacy statement
 

@@ -2,17 +2,17 @@
 
 ## Current milestone
 
-M1 - Task 6 disposable BepInEx synthetic-plugin smoke test is complete on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; M1 Task 7 has not started.
+M1 - Task 6 disposable BepInEx synthetic-plugin smoke-test hardening is in progress on `agent/m1-disposable-bepinex-plugin-smoke-test` from merged `main@f6416874c0ca1c0750407a126e515bdefcf84563`; M1 Task 7 has not started.
 
 ## State
 
 M0 and M1 discovery tasks 1 and 2 are complete and merged into protected `main`. M1 task 3 and its reusable harness hardening are complete and were merged by PR #3 at `06554d845a9fe46132c1a19ec0c2f18b8722acf2`; the private experiment was not rerun during hardening. M1 Task 4 and its evidence-binding hardening are complete and were merged by PR #4 at `5f4b4dd0714d0cffaf9f3267b6f0651ecf6e043e`. The final Task-4 head validation was run `30878236039` with SDK `10.0.100`, 11 TRX files, and 212 tests per runner. M1 Task 5 repository-only hardening is complete and hosted-verified below. M1 Task 6 has completed one private disposable synthetic-plugin run; M1 overall remains incomplete.
 
-The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below. Task 6's private result is recorded below; current-head hosted validation remains pending until the documentation and harness fix are pushed.
+The Task 4 bounded slice and hardening passed hosted validation before PR #4 merged: run `30878236039` used SDK `10.0.100` on Windows and Ubuntu, with 11 TRX files and 212 tests per runner, all passing. Task 5 final hosted validation is recorded below. Task 6's earlier private result is retained as limited historical evidence; the hardening implementation and a fresh private rerun are pending.
 
-Task 6 implementation is complete. The repository-only surface includes the external plugin-smoke project, evidence-driven TFM selection, metadata-only PE inspection, a versioned three-file package manifest/digest, Task-4 admission binding, nonce marker/log parsing, deployment guards, and a PowerShell harness that reuses the Task-3 disposable profile services. The private run passed in an external disposable profile; no private artifact was copied into the repository.
+Task 6 hardening adds an atomically owned experiment state, derived loader/profile preconditions, exact-byte three-file recapture and admission, transactional deployment rollback, full package metadata validation, runtime API/Contracts identity markers, public-surface parity checks, and owned cleanup/recovery paths. The earlier private run is `PassedWithWarnings` because it did not capture actual runtime identity evidence; no new private rerun has been performed.
 
-The next executable gate is current-head hosted Windows/Linux CI with SDK `10.0.100`, followed by review of the Task-6 report and merge decision. M1 Task 7 remains unstarted.
+The next executable gate is current-head hosted Windows/Linux CI with SDK `10.0.100`. Only after both jobs and artifact inspection pass may exactly one fresh private rerun be performed. M1 Task 7 remains unstarted.
 
 ## Completed
 
@@ -200,19 +200,16 @@ Both jobs completed locked restore, exact-SDK information, format verification, 
 - Local SDK `10.0.110` validation passes restore, format, Release build, the full 244-test suite, 32 focused PluginLoad tests, 12 Architecture tests, and 27 Contracts tests. Exact pinned SDK validation passed in hosted CI below; SDK `10.0.100` is not installed locally.
 - Final hosted validation passed in run [30978672030](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30978672030) for head `a8595e7b56b80ab338e5d148c1ba1f13455598d4`. Windows and Ubuntu each used SDK `10.0.100`, uploaded 12 TRX files representing 244 tests, and reported 0 failures, 0 errors, and 0 skipped tests. Both artifacts were downloaded and independently parsed; no `Overwriting results file` warning occurred.
 
-## M1 Task 6 completed evidence
+## M1 Task 6 hardening in progress
 
-- Private command: the local-only PowerShell `Full` harness was run with explicit original game path, external experiment root, official BepInEx archive, fixed game fingerprint, and fixed archive digest; absolute paths are intentionally omitted here.
-- Private result: `Passed` for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`, backend Mono, x64 executable, Unity `2022.3.62f2`, BepInEx `5.4.23.5`, and evidence-selected `netstandard2.1`.
-- Package: exactly three files (synthetic plugin, `ThroneForge.API`, `ThroneForge.Contracts`); package SHA-256 `54ced96a142040cc96374bbb86d28f5a0e2735271102aff2cf4486a40d549020`; archive digest matched the fixed official SHA-256.
-- Bootstrap evidence: preloader and chainloader initialized, exactly one synthetic plugin was observed, the nonce-bound readiness marker matched, API/Contracts identities matched, and no lifecycle marker, fatal error, or error evidence was present.
-- Safety evidence: original complete manifest unchanged; original runtime/readiness post-verification passed; disposable rollback was verified; no private process remained active; no loader/plugin artifact was committed.
-- The sanitized report is `docs/discovery/1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d-synthetic-plugin-smoke-test.md`.
-- Hosted validation for documentation baseline head `dea83ef93f5b1d8d04779cf4955bc90490f9b00e` passed in run [30990848363](https://github.com/chrismaghuhn/ThroneForge/actions/runs/30990848363). Windows and Ubuntu each used SDK `10.0.100`, uploaded 13 TRX files representing 265 tests, and reported 0 failures, 0 errors, and 0 skips. Both artifacts were independently parsed; no `Overwriting results file` warning occurred. The current follow-up commit only records this already completed CI result.
+- Historical private result: `PassedWithWarnings` for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`, with BepInEx `5.4.23.5`, one synthetic plugin, nonce marker, preloader, chainloader, rollback, and original post-check evidence. The old run did not measure actual runtime API/Contracts resolution and is not treated as final Task-6 evidence.
+- Current hardening adds an atomically persisted ownership record, derived loader/profile preconditions, exact-byte package recapture/admission/deployment, transactional partial-deployment cleanup, strict three-file metadata validation, actual runtime assembly identity markers, public API/Contracts surface parity, and owned recovery/cleanup.
+- New local synthetic coverage currently includes ownership/schema validation, duplicate-marker rejection, API/Contracts parity, and transactional partial-deployment rollback. The private experiment has not been rerun.
+- The current report remains deliberately limited until exactly one fresh private run is performed after current-head hosted Windows/Linux CI passes. M1 Task 7 remains unstarted.
 
 ## Next task
 
-Task 6 is complete. M1 Task 7 may be planned separately after this branch is reviewed and merged; no lifecycle or game-API compatibility is claimed.
+The next task gate is current-head hosted Windows/Linux CI with exact SDK `10.0.100`, followed by inspection of every TRX artifact. Only then may the corrected private Task-6 run be executed once in a fresh external profile. M1 Task 7 remains unstarted.
 
 ### M1 Task 3 earlier hardening evidence
 

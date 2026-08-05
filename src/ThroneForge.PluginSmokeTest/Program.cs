@@ -1,3 +1,6 @@
+using System.Text.Json;
+using ThroneForge.LoaderSmokeTest;
+
 namespace ThroneForge.PluginSmokeTest;
 
 internal static class Program
@@ -21,7 +24,8 @@ public static class PluginSmokeCli
             {
                 "package" => Package(args, stdout),
                 "admit" => Admit(args, stdout),
-                "deploy" => Deploy(args, stdout),
+                "admit-and-deploy" => AdmitAndDeploy(args, stdout),
+                "deploy" => throw new PluginSmokeException("Direct deployment is disabled; use admit-and-deploy with a validated Task-6 ownership record."),
                 "remove" => Remove(args, stdout),
                 "parse-marker" => ParseMarker(args, stdout),
                 "inspect" => Inspect(args, stdout),
@@ -29,6 +33,9 @@ public static class PluginSmokeCli
                 "launch" => Launch(args, stdout),
                 "verify-log" => VerifyLog(args, stdout),
                 "manifest" => Manifest(args, stdout),
+                "ownership" => Ownership(args, stdout),
+                "recovery" => Recovery(args, stdout),
+                "cleanup-owned" => CleanupOwned(args, stdout),
                 _ => throw new PluginSmokeException("The requested plugin smoke-test operation is unsupported.")
             };
         }
@@ -40,6 +47,16 @@ public static class PluginSmokeCli
         catch (ArgumentException exception)
         {
             stderr.WriteLine($"Invalid plugin smoke-test arguments: {exception.Message}");
+            return 2;
+        }
+        catch (ThroneForge.LoaderSmokeTest.SmokeTestException)
+        {
+            stderr.WriteLine("Plugin smoke test failed: the disposable profile state could not be validated safely.");
+            return 2;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException or JsonException)
+        {
+            stderr.WriteLine("Plugin smoke test failed: the requested evidence could not be read safely.");
             return 2;
         }
     }
@@ -69,10 +86,14 @@ public static class PluginSmokeCli
 
     private static int Admit(string[] args, TextWriter stdout)
     {
-        var manifest = PluginPackageManifestService.Load(Value(args, "--manifest-path"));
+        var expected = PluginPackageManifestService.Load(Value(args, "--manifest-path"));
+        var captured = PluginAdmissionService.CaptureAndValidate(
+            Value(args, "--package-root"),
+            expected,
+            Value(args, "--target-framework"));
         var fingerprint = new ThroneForge.Contracts.GameFingerprint(Value(args, "--expected-fingerprint"));
         var decision = PluginAdmissionService.EvaluateApprovedPackage(
-            manifest,
+            captured.Manifest,
             new PluginAdmissionInputs(
                 fingerprint,
                 Value(args, "--adapter-id"),
@@ -80,7 +101,7 @@ public static class PluginSmokeCli
                 DateTimeOffset.UtcNow));
         stdout.WriteLine($"admission={decision.Status}");
         stdout.WriteLine($"reason={decision.ReasonCode}");
-        stdout.WriteLine($"package-sha256={manifest.PackageSha256.Value}");
+        stdout.WriteLine($"package-sha256={captured.Manifest.PackageSha256.Value}");
         if (decision.Binding is not null)
         {
             stdout.WriteLine($"binding-digest={decision.Binding.BindingDigest}");
@@ -89,21 +110,66 @@ public static class PluginSmokeCli
         return decision.Status == ThroneForge.Runtime.CodeModAdmissionStatus.Approved ? 0 : 1;
     }
 
-    private static int Deploy(string[] args, TextWriter stdout)
+    private static int AdmitAndDeploy(string[] args, TextWriter stdout)
     {
-        var manifest = PluginPackageManifestService.Load(Value(args, "--manifest-path"));
-        var receipt = PluginDeploymentService.Deploy(
-            Value(args, "--package-root"),
+        var expected = PluginPackageManifestService.Load(Value(args, "--manifest-path"));
+        var targetFramework = Value(args, "--target-framework");
+        var captured = PluginAdmissionService.CaptureAndValidate(Value(args, "--package-root"), expected, targetFramework);
+        var fingerprint = new ThroneForge.Contracts.GameFingerprint(Value(args, "--expected-fingerprint"));
+        var decision = PluginAdmissionService.EvaluateApprovedPackage(
+            captured.Manifest,
+            new PluginAdmissionInputs(fingerprint, Value(args, "--adapter-id"), Value(args, "--adapter-version"), DateTimeOffset.UtcNow));
+        if (decision.Status != ThroneForge.Runtime.CodeModAdmissionStatus.Approved || decision.Binding is null)
+        {
+            throw new PluginSmokeException("The current captured package did not pass the admission gate immediately before deployment.");
+        }
+
+        var context = PluginDeploymentService.DeriveContext(
+            Value(args, "--original-game"),
             Value(args, "--clean-game"),
-            manifest,
-            new PluginDeploymentPreconditions(true, true, true, true));
+            Value(args, "--experiment-root"),
+            Value(args, "--repository-root"),
+            fingerprint.Value,
+            decision.Binding);
+        var receipt = PluginDeploymentService.DeployCaptured(captured, context);
+        var updated = Task6ExperimentStateService.LoadAndValidate(Value(args, "--experiment-root"), fingerprint.Value) with
+        {
+            Status = Task6ExperimentStatus.PluginDeployed,
+            PackageSha256 = receipt.PackageSha256,
+            AdmissionBindingDigest = receipt.AdmissionBindingDigest,
+            PluginRelativeRoot = receipt.RelativeRoot,
+            LoaderTransactionStatus = context.LoaderTransaction.Status.ToString()
+        };
+        Task6ExperimentStateService.SaveAtomic(Value(args, "--experiment-root"), updated);
+        stdout.WriteLine($"admission=Approved");
+        stdout.WriteLine($"package-sha256={receipt.PackageSha256}");
+        stdout.WriteLine($"binding-digest={receipt.AdmissionBindingDigest}");
         stdout.WriteLine($"deployed-file-count={receipt.DeployedRelativePaths.Count}");
+        stdout.WriteLine($"deployed-relative-paths={string.Join(',', receipt.DeployedRelativePaths)}");
+        stdout.WriteLine($"deployed-sha256={string.Join(',', receipt.DeployedSha256)}");
         return 0;
     }
 
     private static int Remove(string[] args, TextWriter stdout)
     {
+        var experimentRoot = Value(args, "--experiment-root");
+        var expectedFingerprint = Value(args, "--expected-fingerprint");
+        var state = Task6ExperimentStateService.LoadAndValidate(experimentRoot, expectedFingerprint);
+        if (state.Status is not (Task6ExperimentStatus.PluginDeployed or Task6ExperimentStatus.LaunchObserved or Task6ExperimentStatus.ManualClosureRequired))
+        {
+            throw new PluginSmokeException("The Task-6 ownership record does not describe a deployed plugin that can be removed.");
+        }
+
+        _ = SmokeTestPathValidator.ValidateRoots(
+            Value(args, "--repository-root"),
+            Value(args, "--original-game"),
+            experimentRoot);
         PluginDeploymentService.Remove(Value(args, "--clean-game"), "dev.throneforge.m1.synthetic-smoke");
+        Task6ExperimentStateService.SaveAtomic(experimentRoot, state with
+        {
+            Status = Task6ExperimentStatus.LoaderApplied,
+            PluginRelativeRoot = null
+        });
         stdout.WriteLine("synthetic-plugin-removed=true");
         return 0;
     }
@@ -138,6 +204,7 @@ public static class PluginSmokeCli
         stdout.WriteLine($"managed-native-header={metadata.ManagedNativeHeaderPresent}");
         stdout.WriteLine($"pinvoke-count={metadata.PInvokeEntryCount}");
         stdout.WriteLine($"module-initializer={metadata.ModuleInitializerPresent}");
+        stdout.WriteLine($"assembly-references={string.Join(',', metadata.AssemblyReferences)}");
         stdout.WriteLine($"sha256={metadata.Sha256.Value}");
         return 0;
     }
@@ -203,6 +270,8 @@ public static class PluginSmokeCli
         stdout.WriteLine($"marker={summary.Marker.IsValid}");
         stdout.WriteLine($"marker-count={summary.Marker.MarkerCount}");
         stdout.WriteLine($"lifecycle-marker={summary.Marker.LifecycleMarkerDetected}");
+        stdout.WriteLine($"runtime-api-identity={summary.Marker.Marker?.ApiIdentity ?? "unknown"}");
+        stdout.WriteLine($"runtime-contracts-identity={summary.Marker.Marker?.ContractsIdentity ?? "unknown"}");
         stdout.WriteLine($"smoke-criteria={summary.MeetsCriteria}");
         return summary.MeetsCriteria ? 0 : 1;
     }
@@ -213,6 +282,72 @@ public static class PluginSmokeCli
         stdout.WriteLine($"manifest-identity={ThroneForge.LoaderSmokeTest.InstallationCopyService.ComputeManifestIdentity(manifest)}");
         stdout.WriteLine($"file-count={manifest.Files.Count}");
         stdout.WriteLine($"directory-count={(manifest.Directories ?? []).Count}");
+        return 0;
+    }
+
+    private static int Ownership(string[] args, TextWriter stdout)
+    {
+        var experimentRoot = Value(args, "--experiment-root");
+        var fingerprint = Value(args, "--expected-fingerprint");
+        var status = Enum.Parse<Task6ExperimentStatus>(Value(args, "--status"), ignoreCase: false);
+        var statePath = Task6ExperimentStateService.GetStatePath(experimentRoot);
+        var current = File.Exists(statePath)
+            ? Task6ExperimentStateService.LoadAndValidate(experimentRoot, fingerprint)
+            : Task6ExperimentStateService.CreatePrepared(experimentRoot, fingerprint, Value(args, "--repository-commit"));
+        var updated = current with
+        {
+            Status = status,
+            PackageSha256 = OptionalValue(args, "--package-sha256") ?? current.PackageSha256,
+            AdmissionBindingDigest = OptionalValue(args, "--binding-digest") ?? current.AdmissionBindingDigest,
+            PluginRelativeRoot = OptionalValue(args, "--plugin-root") ?? current.PluginRelativeRoot,
+            LoaderTransactionStatus = OptionalValue(args, "--loader-status") ?? current.LoaderTransactionStatus
+        };
+        Task6ExperimentStateService.SaveAtomic(experimentRoot, updated);
+        stdout.WriteLine($"ownership-status={updated.Status}");
+        stdout.WriteLine($"experiment-id={updated.ExperimentId}");
+        return 0;
+    }
+
+    private static int Recovery(string[] args, TextWriter stdout)
+    {
+        var experimentRoot = Value(args, "--experiment-root");
+        var fingerprint = Value(args, "--expected-fingerprint");
+        var ownership = Task6ExperimentStateService.LoadAndValidate(experimentRoot, fingerprint);
+        var recovery = new Task6RecoveryState(
+            Task6ExperimentStateService.SchemaVersion,
+            Task6ExperimentStateService.TaskVersion,
+            fingerprint.ToLowerInvariant(),
+            ownership.ExperimentId,
+            OptionalValue(args, "--package-sha256") ?? ownership.PackageSha256,
+            OptionalValue(args, "--binding-digest") ?? ownership.AdmissionBindingDigest,
+            "BepInEx/plugins/dev.throneforge.m1.synthetic-smoke",
+            OptionalValue(args, "--loader-status") ?? "RollbackRequired",
+            "ManualClosureRequired");
+        Task6ExperimentStateService.SaveRecoveryAtomic(experimentRoot, recovery);
+        var updated = ownership with { Status = Task6ExperimentStatus.ManualClosureRequired };
+        Task6ExperimentStateService.SaveAtomic(experimentRoot, updated);
+        stdout.WriteLine("recovery-marker=persisted");
+        stdout.WriteLine($"experiment-id={ownership.ExperimentId}");
+        return 0;
+    }
+
+    private static int CleanupOwned(string[] args, TextWriter stdout)
+    {
+        var experimentRoot = Value(args, "--experiment-root");
+        var expectedFingerprint = Value(args, "--expected-fingerprint");
+        var roots = SmokeTestPathValidator.ValidateRoots(
+            Value(args, "--repository-root"),
+            Value(args, "--original-game"),
+            experimentRoot);
+        var state = Task6ExperimentStateService.LoadAndValidate(experimentRoot, expectedFingerprint);
+        if (state.Status is not (Task6ExperimentStatus.RolledBack or Task6ExperimentStatus.Completed or Task6ExperimentStatus.Failed))
+        {
+            throw new PluginSmokeException("Cleanup requires an owned Task-6 experiment that has already been rolled back or failed closed.");
+        }
+
+        SmokeTestPathValidator.EnsureExistingTreeHasNoReparsePoints(roots.ExperimentRoot);
+        Directory.Delete(roots.ExperimentRoot, recursive: true);
+        stdout.WriteLine("owned-cleanup=completed");
         return 0;
     }
 
@@ -264,5 +399,11 @@ public static class PluginSmokeCli
         }
 
         return args[index + 1];
+    }
+
+    private static string? OptionalValue(string[] args, string option)
+    {
+        var index = Array.IndexOf(args, option);
+        return index >= 0 && index + 1 < args.Length ? args[index + 1] : null;
     }
 }

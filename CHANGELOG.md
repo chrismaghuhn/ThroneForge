@@ -4,6 +4,7 @@ All notable ThroneForge changes are documented here.
 
 ## Unreleased
 
+- Started Task-6 hardening: added fingerprint-bound ownership state, derived disposable-loader deployment preconditions, exact-byte package recapture/admission, transactional three-file deployment cleanup, strict package metadata validation, runtime API/Contracts identity markers, public target-surface parity checks, and owned recovery/cleanup. The historical private report is now `PassedWithWarnings`; no corrected private rerun has been performed yet.
 - Completed M1 Task 6 for fingerprint `1ddd8982e790969cb208cf91bb1489123413d167f9e07cd0416ab6739d4fcd7d`: the external disposable profile loaded exactly one approved source-generated synthetic plugin with BepInEx `5.4.23.5`, verified the nonce-bound readiness marker, and then removed the plugin and rolled back the loader. The original installation manifest and runtime post-checks remained unchanged. No real Thronefall plugin or game-facing capability is claimed.
 - Added the repository-only Task-6 evidence surface: metadata-selected plugin TFM, source-only BepInEx template, exact three-file package manifest/digest, immediate admission evaluation, sanitized nonce marker parsing, deployment guards, and explicit rollback-oriented local harness. No BepInEx or game artifact is committed.
 - Fixed the PowerShell single-log-path handling so a one-element recognized-log result remains an array and is passed to the verifier as the complete path; retained only sanitized operation names in failure diagnostics.

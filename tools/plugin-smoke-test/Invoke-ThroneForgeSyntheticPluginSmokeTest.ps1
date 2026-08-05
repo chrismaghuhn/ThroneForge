@@ -61,7 +61,7 @@ $script:dotnet = $dotnet
 $script:repositoryRoot = $repositoryRoot
 
 function Invoke-DotnetOperation([string[]]$arguments, [switch]$AllowFailure) {
-    $operation = @($arguments | Where-Object { $_ -in @('runtime-compatibility', 'Prepare', 'Install', 'Launch', 'Verify', 'Rollback', 'package', 'admit', 'deploy', 'remove', 'verify-log', 'manifest', 'launch') } | Select-Object -Last 1)
+    $operation = @($arguments | Where-Object { $_ -in @('runtime-compatibility', 'Prepare', 'Install', 'Launch', 'Verify', 'Rollback', 'package', 'admit', 'admit-and-deploy', 'deploy', 'remove', 'verify-log', 'manifest', 'launch', 'ownership', 'recovery', 'cleanup-owned') } | Select-Object -Last 1)
     $script:lastOperation = if ($operation.Count -eq 0) { 'dotnet' } else { [string]$operation[0] }
     $previousErrorActionPreference = $ErrorActionPreference
     try {
@@ -194,7 +194,6 @@ function Invoke-PrivatePluginBuild {
     $projectText = Get-Content -LiteralPath (Join-Path $templateRoot 'PluginProject.csproj.template') -Raw
     $sourceText = Get-Content -LiteralPath (Join-Path $sourceRoot 'ThroneForgeSyntheticPlugin.cs') -Raw
     $projectText = $projectText.Replace('__TARGET_FRAMEWORK__', $targetFramework).Replace('__BEPINEX_CORE__', $bepInExCore).Replace('__UNITY_ENGINE__', $unityEngine).Replace('__UNITY_CORE_MODULE__', $unityCore).Replace('__THRONEFORGE_API__', $apiPath).Replace('__THRONEFORGE_CONTRACTS__', $contractsPath)
-    $sourceText = $sourceText.Replace('__THRONEFORGE_API_IDENTITY__', $apiIdentity).Replace('__THRONEFORGE_CONTRACTS_IDENTITY__', $contractsIdentity)
     Write-Utf8NoBom (Join-Path $sourceRoot 'ThroneForge.M1.SyntheticSmoke.csproj') $projectText
     Write-Utf8NoBom (Join-Path $sourceRoot 'ThroneForgeSyntheticPlugin.cs') $sourceText
 
@@ -232,14 +231,34 @@ Assert-Archive
 $cleanGameRoot = Join-Path $script:experimentRoot 'clean-game'
 $script:cleanGameRoot = $cleanGameRoot
 $evidenceRoot = Join-Path $script:experimentRoot 'evidence'
-New-Item -ItemType Directory -Force -Path $evidenceRoot | Out-Null
 
 if ($Mode -eq 'Cleanup') {
-    if (-not (Test-SameOrDescendant $script:experimentRoot (Get-NormalizedPath $script:experimentRoot))) { Throw-Sanitized 'Cleanup target validation failed.' }
-    if (Test-Path -LiteralPath $script:experimentRoot) { Remove-Item -LiteralPath $script:experimentRoot -Recurse -Force }
-    Write-Output 'Cleanup completed inside the explicit experiment root.'
+    Invoke-PluginTool @(
+        'cleanup-owned',
+        '--experiment-root', $script:experimentRoot,
+        '--expected-fingerprint', $script:expectedFingerprint,
+        '--repository-root', $repositoryRoot,
+        '--original-game', $script:gameRoot
+    ) | Out-Null
+    Write-Output 'Owned cleanup completed after validating the Task-6 ownership record.'
     exit 0
 }
+
+if ($Mode -eq 'Full' -and (Test-Path -LiteralPath $script:experimentRoot)) {
+    if (@(Get-ChildItem -LiteralPath $script:experimentRoot -Force).Count -ne 0) { Throw-Sanitized 'Full mode requires a nonexistent or empty experiment root.' }
+}
+
+if ($Mode -eq 'Full') {
+    $repositoryCommit = ((& git -C $repositoryRoot rev-parse HEAD 2>$null) | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or $repositoryCommit -notmatch '^[0-9a-fA-F]{40}$') { Throw-Sanitized 'The repository baseline commit could not be determined safely.' }
+    Invoke-PluginTool @(
+        'ownership', '--experiment-root', $script:experimentRoot,
+        '--expected-fingerprint', $script:expectedFingerprint,
+        '--status', 'Prepared', '--repository-commit', $repositoryCommit
+    ) | Out-Null
+}
+
+New-Item -ItemType Directory -Force -Path $evidenceRoot | Out-Null
 
 $preRuntime = Invoke-DotnetOperation @('run', '--project', (Join-Path $repositoryRoot 'src\ThroneForge.Discovery'), '-c', 'Release', '--no-build', '--', 'runtime-compatibility', '--game-path', $script:gameRoot, '--fingerprint', $script:expectedFingerprint, '--output-root', (Join-Path $evidenceRoot 'original-pre-runtime'), '--overwrite')
 $selectedExecutableRelative = Get-OutputValue $preRuntime.Output 'Selected executable'
@@ -253,8 +272,21 @@ if ($Mode -eq 'Plan' -or $WhatIf) {
 }
 
 if ($Mode -eq 'Rollback') {
-    Invoke-PluginTool @('remove', '--clean-game', $cleanGameRoot) -AllowFailure | Out-Null
+    $statePath = Join-Path $script:experimentRoot 'manifests\task6-experiment-state.json'
+    if (-not (Test-Path -LiteralPath $statePath -PathType Leaf)) { Throw-Sanitized 'Rollback requires the Task-6 ownership record.' }
+    Invoke-PluginTool @(
+        'remove', '--clean-game', $cleanGameRoot,
+        '--experiment-root', $script:experimentRoot,
+        '--expected-fingerprint', $script:expectedFingerprint,
+        '--repository-root', $repositoryRoot,
+        '--original-game', $script:gameRoot
+    ) -AllowFailure | Out-Null
     Invoke-Loader Rollback | Out-Null
+    Invoke-PluginTool @(
+        'ownership', '--experiment-root', $script:experimentRoot,
+        '--expected-fingerprint', $script:expectedFingerprint,
+        '--status', 'RolledBack'
+    ) | Out-Null
     Write-Output 'Explicit rollback completed.'
     exit 0
 }
@@ -268,6 +300,8 @@ $rollbackOperationVerified = $false
 $result = 'Failed'
 $failureSummary = 'The private smoke test did not complete.'
 $package = $null
+$runtimeApiIdentity = 'Not observed'
+$runtimeContractsIdentity = 'Not observed'
 $nonce = New-Nonce
 try {
     Invoke-Loader Prepare | Out-Null
@@ -280,10 +314,24 @@ try {
     if ($loaderLaunch.ExitCode -ne 0) { Throw-Sanitized "The loader-only bootstrap launch was inconclusive or failed: $(Get-SanitizedOutputSummary $loaderLaunch.Output)" }
     $loaderVerify = Invoke-Loader Verify -AllowFailure
     if ($loaderVerify.ExitCode -ne 0) { Throw-Sanitized "The loader-only bootstrap verification did not pass before plugin deployment: $(Get-SanitizedOutputSummary $loaderVerify.Output)" }
+    Invoke-PluginTool @('ownership', '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $script:expectedFingerprint, '--status', 'LaunchObserved') | Out-Null
     $package = Invoke-PrivatePluginBuild
-    $admission = Invoke-PluginTool @('admit', '--manifest-path', $package.ManifestPath, '--expected-fingerprint', $script:expectedFingerprint, '--adapter-id', 'throneforge.adapter', '--adapter-version', '1.0.0')
-    if ((Get-OutputValue $admission.Output 'admission') -ne 'Approved') { Throw-Sanitized 'The exact package/game admission did not approve immediately before deployment.' }
-    Invoke-PluginTool @('deploy', '--package-root', $package.PackageRoot, '--clean-game', $cleanGameRoot, '--manifest-path', $package.ManifestPath) | Out-Null
+    $admission = Invoke-PluginTool @(
+        'admit-and-deploy',
+        '--package-root', $package.PackageRoot,
+        '--manifest-path', $package.ManifestPath,
+        '--target-framework', $package.TargetFramework,
+        '--expected-fingerprint', $script:expectedFingerprint,
+        '--adapter-id', 'throneforge.adapter',
+        '--adapter-version', '1.0.0',
+        '--original-game', $script:gameRoot,
+        '--clean-game', $cleanGameRoot,
+        '--experiment-root', $script:experimentRoot,
+        '--repository-root', $repositoryRoot
+    )
+    if ((Get-OutputValue $admission.Output 'admission') -ne 'Approved') { Throw-Sanitized 'The exact recaptured package/game admission did not approve immediately before deployment.' }
+    $package | Add-Member -NotePropertyName PackageDigest -NotePropertyValue (Get-OutputValue $admission.Output 'package-sha256') -Force
+    $package | Add-Member -NotePropertyName AdmissionBindingDigest -NotePropertyValue (Get-OutputValue $admission.Output 'binding-digest') -Force
     $pluginDeployed = $true
     $launch = Invoke-PluginTool @('launch', '--clean-game', $cleanGameRoot, '--experiment-root', $script:experimentRoot, '--executable', (Join-Path $cleanGameRoot $selectedExecutableRelative), '--nonce', $nonce) -AllowFailure
     if ($launch.Output -match 'manual-closure-required=True') { $manualClosureRequired = $true; Throw-Sanitized 'The copied process requires manual closure before rollback.' }
@@ -292,6 +340,9 @@ try {
     if ($knownLogs.Count -ne 1) { Throw-Sanitized 'The loader did not produce exactly one recognized BepInEx log file.' }
     $logVerification = Invoke-PluginTool @('verify-log', '--log-path', $knownLogs[0], '--nonce', $nonce, '--api-identity', $package.ApiIdentity, '--contracts-identity', $package.ContractsIdentity)
     if ($logVerification.ExitCode -ne 0) { Throw-Sanitized 'The BepInEx log did not prove the exact synthetic plugin bootstrap criteria.' }
+    $runtimeApiIdentity = Get-OutputValue $logVerification.Output 'runtime-api-identity'
+    $runtimeContractsIdentity = Get-OutputValue $logVerification.Output 'runtime-contracts-identity'
+    Invoke-PluginTool @('ownership', '--experiment-root', $script:experimentRoot, '--expected-fingerprint', $script:expectedFingerprint, '--status', 'LaunchObserved', '--package-sha256', $package.PackageDigest, '--binding-digest', $package.AdmissionBindingDigest, '--plugin-root', 'BepInEx/plugins/dev.throneforge.m1.synthetic-smoke') | Out-Null
     $pluginDeployed = $true
     $failureSummary = 'The disposable BepInEx profile loaded exactly one approved synthetic plugin and emitted the expected marker.'
     $result = 'Passed'
@@ -302,7 +353,15 @@ catch {
 }
 finally {
     if (-not $manualClosureRequired) {
-        if ($pluginDeployed) { Invoke-PluginTool @('remove', '--clean-game', $cleanGameRoot) -AllowFailure | Out-Null }
+        if ($pluginDeployed) {
+            Invoke-PluginTool @(
+                'remove', '--clean-game', $cleanGameRoot,
+                '--experiment-root', $script:experimentRoot,
+                '--expected-fingerprint', $script:expectedFingerprint,
+                '--repository-root', $repositoryRoot,
+                '--original-game', $script:gameRoot
+            ) -AllowFailure | Out-Null
+        }
         if ($loaderApplied) {
             $rollbackOperation = Invoke-Loader Rollback -AllowFailure
             $rollbackVerifiedLine = @(
@@ -315,11 +374,28 @@ finally {
                 $rollbackVerifiedLine.Count -eq 1 -and
                 $rollbackVerifiedLine[0] -match '(?i)Rollback verified:\s*True\s*$'
             )
+            if ($rollbackOperationVerified) {
+                Invoke-PluginTool @(
+                    'ownership', '--experiment-root', $script:experimentRoot,
+                    '--expected-fingerprint', $script:expectedFingerprint,
+                    '--status', 'RolledBack'
+                ) -AllowFailure | Out-Null
+            }
         }
     }
     else {
-        $marker = Join-Path $script:experimentRoot 'evidence\recovery-marker.json'
-        Write-Utf8NoBom $marker '{"status":"ManualClosureRequired","markerPersisted":true,"nextOperation":"Rollback"}'
+        $recoveryArguments = @(
+            'recovery', '--experiment-root', $script:experimentRoot,
+            '--expected-fingerprint', $script:expectedFingerprint,
+            '--loader-status', 'RollbackRequired'
+        )
+        if ($null -ne $package -and -not [string]::IsNullOrWhiteSpace($package.PackageDigest)) {
+            $recoveryArguments += @('--package-sha256', $package.PackageDigest, '--binding-digest', $package.AdmissionBindingDigest)
+        }
+        $recovery = Invoke-PluginTool $recoveryArguments -AllowFailure
+        if ($recovery.ExitCode -ne 0) {
+            $failureSummary = "$failureSummary Recovery marker unavailable; explicit Rollback is required after graceful closure."
+        }
     }
 }
 
@@ -347,7 +423,7 @@ $reportLines = @(
     "- Package files: exactly 3 (synthetic plugin, ThroneForge.API, ThroneForge.Contracts)",
     "- Target framework evidence: $($package.TargetFramework)",
     '- Plugin marker: one nonce-bound readiness marker verified; nonce omitted from this report',
-    '- BepInEx evidence: version, preloader, chainloader, one plugin, API/Contracts identities and zero fatal/errors were required',
+    "- BepInEx evidence: version, preloader, chainloader, one plugin, runtime API identity '$runtimeApiIdentity', runtime Contracts identity '$runtimeContractsIdentity', and zero fatal/errors were required",
     '- Explicit ThroneForge lifecycle calls: none; lifecycle marker would fail the result',
     "- Rollback/recovery state: $(if ($manualClosureRequired) { 'ManualClosureRequired; recovery marker persisted; no files were modified while process remained active.' } elseif ($rollbackOperationVerified) { 'Loader transaction rollback completed and reported verified.' } else { 'Loader transaction rollback was not verified.' })",
     "- Failure or warning summary: $failureSummary",

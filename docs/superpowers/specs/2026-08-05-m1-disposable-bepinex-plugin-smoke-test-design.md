@@ -21,3 +21,11 @@ The bounded plugin launch receives only a cryptographically random nonce through
 ## Trust boundary
 
 This is a full-trust plugin experiment, not a sandbox. The synthetic source template contains no game assembly, Harmony, network, process, file, config, reflection, or game-lifecycle code. `IThroneForgeMod.InitializeAsync` and `ShutdownAsync` throw a sanitized synthetic marker if ever called; the smoke test does not call them. No result generalizes to a real Thronefall plugin.
+
+## Task-6 hardening rules
+
+The experiment root is owned by an atomically persisted, schema- and fingerprint-bound state record. Rollback and cleanup refuse unowned, mismatched, reparse-point, repository, original-installation, or unrelated roots. Deployment preconditions are derived from this record, the complete loader transaction state and manifest, the closed-process check, and an empty custom-plugin root; callers cannot assert them with booleans.
+
+The package operation captures the exact three assembly byte streams once, checks the saved manifest and package digest, metadata-inspects those same bytes, evaluates admission, and deploys those same captured bytes transactionally. The package gate requires actual target-framework metadata, CLR/IL-only images, no native/ReadyToRun/P/Invoke/module-initializer evidence, bounded references, exact filenames and identities, one expected BepInEx declaration, and one public closed plugin implementation. Deployment failure removes all created files and directories and verifies the complete pre-deployment manifest.
+
+The runtime marker reads API and Contracts identities from the actual loaded assemblies. The old private report did not contain that measurement and is therefore historical `PassedWithWarnings` evidence until exactly one fresh rerun completes after hosted synthetic CI. No plugin, loader, game binary, raw log, private manifest, or experiment state is committed.

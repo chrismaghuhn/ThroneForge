@@ -14,6 +14,20 @@ Run one private, reversible BepInEx 5.4.23.5 smoke test in a disposable copy for
 6. After CI is green, perform exactly one private run against the explicit local installation and inspect the sanitized report manually.
 7. [x] Commit only the sanitized report and final documentation; run final local/hosted validation and stop before M1 Task 7.
 
+## Task-6 hardening follow-up
+
+The historical private run remains limited evidence because its template emitted build-time API/Contracts identity values and its deployment path did not yet own the experiment or recapture package bytes as one operation. Before Task 6 can be closed:
+
+- [x] Require an atomically written, fingerprint-bound ownership record for Full, rollback, recovery, and cleanup.
+- [x] Derive deployment readiness from the original/disposable roots, loader transaction state, complete loader-profile manifest, process state, and empty plugin root.
+- [x] Capture the exact three package files once, validate metadata and target-framework evidence, compare the current package against its saved manifest, rerun admission, and deploy the captured bytes.
+- [x] Remove partial plugin files/directories on every deployment failure and verify the complete pre-deployment manifest.
+- [x] Enforce exact package shape, managed IL/no-native/no-PInvoke/no-module-initializer rules, expected BepInEx metadata, and one public plugin implementation.
+- [x] Emit runtime API/Contracts identities from actual loaded assemblies and compare them in the log parser.
+- [x] Add metadata-only public API/Contracts net10.0/netstandard2.1 parity checks and structured recovery-marker parsing.
+- [ ] Run current-head hosted CI, inspect every TRX artifact, then perform exactly one fresh private rerun and update the report with actual runtime identity and admit-and-deploy evidence.
+- [ ] Do not begin M1 Task 7.
+
 ## Planned repository surfaces
 
 - `src/ThroneForge.PluginSmokeTest/`

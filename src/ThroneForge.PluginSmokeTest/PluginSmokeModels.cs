@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
@@ -6,6 +7,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using ThroneForge.Contracts;
+using ThroneForge.Discovery;
+using ThroneForge.LoaderSmokeTest;
 using ThroneForge.Runtime;
 
 namespace ThroneForge.PluginSmokeTest;
@@ -14,6 +17,11 @@ public sealed class PluginSmokeException : Exception
 {
     public PluginSmokeException(string message)
         : base(message)
+    {
+    }
+
+    public PluginSmokeException(string message, Exception innerException)
+        : base(message, innerException)
     {
     }
 }
@@ -172,21 +180,40 @@ public static class PluginPackageManifestService
         string targetFramework)
     {
         ArgumentNullException.ThrowIfNull(relativePaths);
+        if (!relativePaths.ToHashSet(StringComparer.Ordinal).SetEquals(PluginAdmissionService.ExpectedPackagePaths)
+            || relativePaths.Count != PluginAdmissionService.ExpectedPackagePaths.Length)
+        {
+            throw new PluginSmokeException("The synthetic plugin package must contain exactly the three Task-6 assembly paths.");
+        }
+
+        var normalizedRoot = Path.GetFullPath(packageRoot);
+        if (!Directory.Exists(normalizedRoot))
+        {
+            throw new PluginSmokeException("The synthetic plugin package directory does not exist.");
+        }
+
+        SmokeTestPathValidator.EnsureExistingTreeHasNoReparsePoints(normalizedRoot);
+        var actualFiles = Directory.EnumerateFiles(normalizedRoot, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(normalizedRoot, path).Replace(Path.DirectorySeparatorChar, '/'))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!actualFiles.SequenceEqual(PluginAdmissionService.ExpectedPackagePaths.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+        {
+            throw new PluginSmokeException("The synthetic plugin package contains additional or renamed files.");
+        }
+
         var files = relativePaths
             .Select(path =>
             {
                 ValidateRelativePath(path);
-                var fullPath = Path.GetFullPath(Path.Combine(packageRoot, path.Replace('/', Path.DirectorySeparatorChar)));
+                var fullPath = Path.GetFullPath(Path.Combine(normalizedRoot, path.Replace('/', Path.DirectorySeparatorChar)));
                 if (!File.Exists(fullPath))
                 {
                     throw new PluginSmokeException("A declared synthetic plugin package file is missing.");
                 }
 
                 var metadata = PluginAssemblyMetadataInspector.Inspect(fullPath, path);
-                if (!metadata.HasManagedMetadata)
-                {
-                    throw new PluginSmokeException("A declared synthetic plugin package file is not a managed assembly.");
-                }
+                PluginPackageValidationRules.Validate(path, metadata, targetFramework);
 
                 return new PluginPackageFile(path, metadata.Size, metadata.Sha256, metadata.AssemblyIdentity, targetFramework);
             })
@@ -276,6 +303,11 @@ public static class PluginPackageManifestService
             throw new PluginSmokeException("The package manifest is missing or malformed.");
         }
 
+        if (!string.Equals(dto.SchemaVersion, SchemaVersion, StringComparison.Ordinal))
+        {
+            throw new PluginSmokeException("The package manifest uses an unsupported schema version.");
+        }
+
         var identity = new ModIdentity(dto.ModId, dto.ModVersion);
         var files = dto.Files.Select(file => new PluginPackageFile(
             file.RelativePath,
@@ -347,82 +379,373 @@ public static class PluginAdmissionService
             approval,
             compatibility));
     }
+
+    public static CapturedPluginPackage CaptureAndValidate(
+        string packageRoot,
+        PluginPackageManifest expectedManifest,
+        string targetFramework)
+    {
+        ArgumentNullException.ThrowIfNull(expectedManifest);
+        var expectedPaths = new HashSet<string>(ExpectedPackagePaths, StringComparer.Ordinal);
+        if (expectedManifest.Files.Count != expectedPaths.Count
+            || expectedManifest.Files.Select(file => file.RelativePath).ToHashSet(StringComparer.Ordinal).SetEquals(expectedPaths) == false)
+        {
+            throw new PluginSmokeException("The persisted package manifest does not contain the exact Task-6 three-file package shape.");
+        }
+
+        var root = Path.GetFullPath(packageRoot);
+        if (!Directory.Exists(root))
+        {
+            throw new PluginSmokeException("The synthetic plugin package directory does not exist.");
+        }
+
+        SmokeTestPathValidator.EnsureExistingTreeHasNoReparsePoints(root);
+        var actualRelativeFiles = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(root, path).Replace(Path.DirectorySeparatorChar, '/'))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (!actualRelativeFiles.SequenceEqual(ExpectedPackagePaths.Order(StringComparer.Ordinal), StringComparer.Ordinal))
+        {
+            throw new PluginSmokeException("The current package contains missing, additional, renamed, or nested files outside the exact Task-6 three-file shape.");
+        }
+
+        var bytes = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        var metadata = new Dictionary<string, PluginAssemblyMetadata>(StringComparer.Ordinal);
+        var files = new List<PluginPackageFile>();
+        foreach (var relativePath in ExpectedPackagePaths)
+        {
+            var fullPath = Path.Combine(root, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(fullPath))
+            {
+                throw new PluginSmokeException("The current package is missing one of the exact required assembly files.");
+            }
+
+            var captured = CaptureFile(fullPath, DefaultMaximumPackageFileBytes);
+            var inspected = PluginAssemblyMetadataInspector.InspectBytes(captured, relativePath);
+            PluginPackageValidationRules.Validate(relativePath, inspected, targetFramework);
+            bytes.Add(relativePath, captured);
+            metadata.Add(relativePath, inspected);
+            files.Add(new PluginPackageFile(relativePath, inspected.Size, inspected.Sha256, inspected.AssemblyIdentity, NormalizeTargetFramework(inspected.TargetFramework!)));
+        }
+
+        var actual = PluginPackageManifestService.Create(expectedManifest.Identity, files);
+        if (!PackageMetadataEquals(expectedManifest, actual))
+        {
+            throw new PluginSmokeException("The current package bytes do not match the saved expected package manifest.");
+        }
+
+        return new CapturedPluginPackage(actual, bytes, metadata);
+    }
+
+    public const long DefaultMaximumPackageFileBytes = 64 * 1024 * 1024;
+    public static readonly string[] ExpectedPackagePaths =
+    [
+        "ThroneForge.M1.SyntheticSmoke.dll",
+        "ThroneForge.API.dll",
+        "ThroneForge.Contracts.dll"
+    ];
+
+    private static byte[] CaptureFile(string path, long maximumBytes)
+    {
+        try
+        {
+            using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, FileOptions.SequentialScan);
+            if (input.Length > maximumBytes)
+            {
+                throw new PluginSmokeException("A package file exceeds the bounded read limit.");
+            }
+
+            using var output = new MemoryStream(checked((int)input.Length));
+            input.CopyTo(output);
+            return output.ToArray();
+        }
+        catch (PluginSmokeException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            throw new PluginSmokeException("A package file could not be captured safely.", exception);
+        }
+    }
+
+    private static bool PackageMetadataEquals(PluginPackageManifest expected, PluginPackageManifest actual)
+        => expected.Identity == actual.Identity
+            && expected.PackageSha256 == actual.PackageSha256
+            && expected.Files.Count == actual.Files.Count
+            && expected.Files.OrderBy(file => file.RelativePath, StringComparer.Ordinal)
+                .Zip(actual.Files.OrderBy(file => file.RelativePath, StringComparer.Ordinal))
+                .All(pair => pair.First == pair.Second);
+
+    private static string NormalizeTargetFramework(string value)
+        => value.Contains(".NETStandard,Version=v2.0", StringComparison.OrdinalIgnoreCase) ? "netstandard2.0"
+            : value.Contains(".NETStandard,Version=v2.1", StringComparison.OrdinalIgnoreCase) ? "netstandard2.1"
+            : value.Trim().ToLowerInvariant();
 }
 
-public sealed record PluginDeploymentPreconditions(
-    bool LoaderTransactionApplied,
-    bool CurrentManifestMatches,
-    bool NoCustomPlugins,
-    bool ProcessClosed);
+public sealed record CapturedPluginPackage(
+    PluginPackageManifest Manifest,
+    IReadOnlyDictionary<string, byte[]> Bytes,
+    IReadOnlyDictionary<string, PluginAssemblyMetadata> Metadata);
+
+public static class PluginPackageValidationRules
+{
+    private static readonly HashSet<string> CommonReferences = new(StringComparer.Ordinal)
+    {
+        "System.Runtime", "System.Threading", "System.Threading.Tasks", "System.Collections", "System.Private.CoreLib", "netstandard"
+        , "System.Linq", "System.ObjectModel", "System.ComponentModel.Primitives", "System.Runtime.InteropServices"
+    };
+
+    public static void Validate(string relativePath, PluginAssemblyMetadata metadata, string targetFramework)
+    {
+        if (!metadata.HasManagedMetadata || !metadata.ClrHeaderPresent || !metadata.IlOnly
+            || metadata.NativeEntryPointPresent || metadata.ManagedNativeHeaderPresent
+            || metadata.PInvokeEntryCount != 0 || metadata.ModuleInitializerPresent)
+        {
+            throw new PluginSmokeException("A package assembly is not a pure managed IL image or contains executable native behavior.");
+        }
+
+        var normalizedTargetFramework = targetFramework.Trim().ToLowerInvariant();
+        var actualTargetFramework = metadata.TargetFramework is null ? null : NormalizeTargetFramework(metadata.TargetFramework);
+        if (!string.Equals(actualTargetFramework, normalizedTargetFramework, StringComparison.Ordinal))
+        {
+            throw new PluginSmokeException("The declared package target framework does not match assembly metadata.");
+        }
+
+        var expectedAssemblyName = Path.GetFileNameWithoutExtension(relativePath);
+        var actualAssemblyName = metadata.AssemblyIdentity.Split(',', 2)[0];
+        if (!actualAssemblyName.Equals(expectedAssemblyName, StringComparison.Ordinal))
+        {
+            throw new PluginSmokeException("A package filename does not match its managed assembly identity.");
+        }
+
+        var allowed = new HashSet<string>(CommonReferences, StringComparer.Ordinal);
+        if (relativePath.Equals("ThroneForge.M1.SyntheticSmoke.dll", StringComparison.Ordinal))
+        {
+            allowed.UnionWith(["BepInEx", "UnityEngine", "UnityEngine.CoreModule", "ThroneForge.API", "ThroneForge.Contracts"]);
+            if (metadata.BepInPluginAttributeCount != 1
+                || !metadata.BepInPluginGuid!.Equals("dev.throneforge.m1.synthetic-smoke", StringComparison.Ordinal)
+                || !metadata.BepInPluginName!.Equals("ThroneForge M1 Synthetic Smoke", StringComparison.Ordinal)
+                || !metadata.BepInPluginVersion!.Equals("0.0.1", StringComparison.Ordinal)
+                || metadata.PublicPluginImplementationCount != 1
+                || metadata.ThroneForgeModImplementationCount != 1
+                || !metadata.HasExpectedBaseUnityPluginReference
+                || !metadata.HasThroneForgeModImplementation)
+            {
+                throw new PluginSmokeException("The synthetic plugin does not contain exactly the expected BepInEx and ThroneForge contract metadata.");
+            }
+        }
+        else if (relativePath.Equals("ThroneForge.API.dll", StringComparison.Ordinal))
+        {
+            allowed.Add("ThroneForge.Contracts");
+        }
+
+        if (metadata.AssemblyReferences.Any(reference => !allowed.Contains(reference)))
+        {
+            throw new PluginSmokeException("The package contains an unexpected managed assembly reference.");
+        }
+    }
+
+    private static string NormalizeTargetFramework(string value)
+        => value.Contains(".NETStandard,Version=v2.0", StringComparison.OrdinalIgnoreCase) ? "netstandard2.0"
+            : value.Contains(".NETStandard,Version=v2.1", StringComparison.OrdinalIgnoreCase) ? "netstandard2.1"
+            : value.Trim().ToLowerInvariant();
+}
+
+public sealed record PluginDeploymentContext(
+    SmokeTestRoots Roots,
+    Task6ExperimentState Ownership,
+    DisposableProfileBaseline Baseline,
+    LoaderTransactionState LoaderTransaction,
+    CopyManifest PreDeploymentManifest,
+    CodeModAdmissionBinding AdmissionBinding);
 
 public sealed record PluginDeploymentReceipt(
     string RelativeRoot,
     IReadOnlyList<string> DeployedRelativePaths,
-    IReadOnlyList<string> DeployedSha256);
+    IReadOnlyList<string> DeployedSha256,
+    string PackageSha256,
+    string AdmissionBindingDigest);
 
 public static class PluginDeploymentService
 {
-    public static PluginDeploymentReceipt Deploy(
-        string packageRoot,
+    public static PluginDeploymentContext DeriveContext(
+        string originalGameRoot,
         string cleanGameRoot,
-        PluginPackageManifest package,
-        PluginDeploymentPreconditions preconditions)
+        string experimentRoot,
+        string repositoryRoot,
+        string expectedFingerprint,
+        CodeModAdmissionBinding admissionBinding)
     {
-        ArgumentNullException.ThrowIfNull(package);
-        ArgumentNullException.ThrowIfNull(preconditions);
-        if (!preconditions.LoaderTransactionApplied || !preconditions.CurrentManifestMatches
-            || !preconditions.NoCustomPlugins || !preconditions.ProcessClosed)
+        ArgumentNullException.ThrowIfNull(admissionBinding);
+        SmokeTestRoots roots;
+        try
         {
-            throw new PluginSmokeException("The disposable profile is not ready for synthetic plugin deployment.");
+            roots = SmokeTestPathValidator.ValidateRoots(repositoryRoot, originalGameRoot, experimentRoot);
+        }
+        catch (SmokeTestException exception)
+        {
+            throw new PluginSmokeException("The Task-6 deployment roots are not valid.", exception);
+        }
+        if (!Path.GetFullPath(cleanGameRoot).Equals(roots.CleanGameRoot, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        {
+            throw new PluginSmokeException("The requested disposable profile is not the owned clean-game path.");
         }
 
-        var directory = PluginDeploymentPath.GetPluginDirectory(cleanGameRoot, package.Identity.Id);
+        var ownership = Task6ExperimentStateService.LoadAndValidate(experimentRoot, expectedFingerprint);
+        if (ownership.Status is not (Task6ExperimentStatus.LoaderApplied or Task6ExperimentStatus.LaunchObserved))
+        {
+            throw new PluginSmokeException("The Task-6 ownership record is not in a loader-ready state for plugin deployment.");
+        }
+
+        var originalManifest = InstallationCopyService.CaptureManifest(roots.OriginalGameRoot);
+        var baseline = DisposableProfileBaselineService.LoadAndValidateSavedBaseline(
+            Path.Combine(roots.ManifestsRoot, "baseline.json"),
+            expectedFingerprint,
+            originalManifest);
+        var current = InstallationCopyService.CaptureManifest(roots.CleanGameRoot);
+        var loaderState = LoaderTransactionStateService.LoadAndValidate(
+            Path.Combine(roots.ManifestsRoot, "transaction-state.json"),
+            roots,
+            expectedFingerprint,
+            originalManifest,
+            [LoaderTransactionStatus.LaunchObserved]);
+        LoaderTransactionStateService.VerifyAppliedProfile(roots, loaderState);
+        var currentFingerprint = InstallationFingerprintService.Capture(roots.CleanGameRoot).Fingerprint;
+        if (!currentFingerprint.Equals(expectedFingerprint, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new PluginSmokeException("The disposable profile fingerprint does not match the expected clean-profile evidence.");
+        }
+
+        var pluginRoot = Path.Combine(roots.CleanGameRoot, "BepInEx", "plugins");
+        if (Directory.Exists(pluginRoot) && Directory.EnumerateFileSystemEntries(pluginRoot).Any())
+        {
+            throw new PluginSmokeException("An existing custom plugin is present in the disposable profile.");
+        }
+
+        if (FindRunningProcessUnder(roots.CleanGameRoot))
+        {
+            throw new PluginSmokeException("The disposable game process is still active; deployment is refused.");
+        }
+
+        if (!loaderState.LaunchEvidence?.MeetsBootstrapCriteria ?? true)
+        {
+            throw new PluginSmokeException("The persisted loader transaction does not prove a clean BepInEx bootstrap.");
+        }
+
+        return new PluginDeploymentContext(roots, ownership, baseline, loaderState, current, admissionBinding);
+    }
+
+    public static PluginDeploymentReceipt DeployCaptured(
+        CapturedPluginPackage package,
+        PluginDeploymentContext context,
+        int? failAfterFiles = null)
+    {
+        ArgumentNullException.ThrowIfNull(package);
+        ArgumentNullException.ThrowIfNull(context);
+        var cleanGameRoot = context.Roots.CleanGameRoot;
+        var directory = PluginDeploymentPath.GetPluginDirectory(cleanGameRoot, package.Manifest.Identity.Id);
         if (Directory.Exists(directory) && Directory.EnumerateFileSystemEntries(directory).Any())
         {
             throw new PluginSmokeException("The synthetic plugin deployment directory is not empty.");
         }
 
-        Directory.CreateDirectory(directory);
         var deployedPaths = new List<string>();
         var deployedHashes = new List<string>();
-        foreach (var file in package.Files)
+        var destinations = package.Manifest.Files
+            .OrderBy(file => file.RelativePath, StringComparer.Ordinal)
+            .Select(file =>
+            {
+                var destinationRelative = $"BepInEx/plugins/{package.Manifest.Identity.Id}/{file.RelativePath}";
+                PluginPackageManifestService.ValidateRelativePath(file.RelativePath);
+                var destination = Path.GetFullPath(Path.Combine(cleanGameRoot, destinationRelative.Replace('/', Path.DirectorySeparatorChar)));
+                SmokeTestPathValidator.EnsureWithin(cleanGameRoot, destination);
+                SmokeTestPathValidator.EnsureNoReparsePointsOnPath(destination);
+                if (File.Exists(destination) || Directory.Exists(destination))
+                {
+                    throw new PluginSmokeException("The synthetic plugin deployment destination is unsafe or already occupied.");
+                }
+
+                if (!package.Bytes.TryGetValue(file.RelativePath, out var capturedBytes))
+                {
+                    throw new PluginSmokeException("The exact captured package bytes are incomplete.");
+                }
+
+                return (file, destinationRelative, destination, capturedBytes);
+            })
+            .ToArray();
+
+        var createdFiles = new List<string>();
+        try
         {
-            var source = Path.GetFullPath(Path.Combine(packageRoot, file.RelativePath.Replace('/', Path.DirectorySeparatorChar)));
-            var destinationRelative = $"BepInEx/plugins/{package.Identity.Id}/{file.RelativePath}";
-            var destination = Path.GetFullPath(Path.Combine(cleanGameRoot, destinationRelative.Replace('/', Path.DirectorySeparatorChar)));
-            var relative = Path.GetRelativePath(cleanGameRoot, destination).Replace(Path.DirectorySeparatorChar, '/');
-            if (!relative.Equals(destinationRelative, StringComparison.Ordinal)
-                || File.Exists(destination)
-                || Directory.Exists(destination))
+            var writtenCount = 0;
+            foreach (var item in destinations)
             {
-                throw new PluginSmokeException("The synthetic plugin deployment destination is unsafe or already occupied.");
+                Directory.CreateDirectory(Path.GetDirectoryName(item.destination)!);
+                File.WriteAllBytes(item.destination, item.capturedBytes);
+                createdFiles.Add(item.destination);
+                writtenCount++;
+                if (failAfterFiles is not null && writtenCount >= failAfterFiles.Value)
+                {
+                    throw new PluginSmokeException("Synthetic deployment failure requested.");
+                }
+                var observed = new Sha256Digest(Convert.ToHexString(SHA256.HashData(item.capturedBytes)).ToLowerInvariant());
+                if (!observed.Equals(item.file.Sha256))
+                {
+                    throw new PluginSmokeException("A deployed synthetic plugin file did not match the captured package hash.");
+                }
+
+                deployedPaths.Add(item.destinationRelative);
+                deployedHashes.Add(observed.Value);
             }
 
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            var after = InstallationCopyService.CaptureManifest(cleanGameRoot);
+            var expected = AddDeploymentToManifest(context.PreDeploymentManifest, destinations);
+            if (!InstallationCopyService.CompareManifests(expected, after).Matches)
             {
-                input.CopyTo(output);
+                throw new PluginSmokeException("The complete disposable manifest did not match the transactional deployment result.");
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or PluginSmokeException)
+        {
+            foreach (var file in createdFiles.AsEnumerable().Reverse())
+            {
+                if (File.Exists(file))
+                {
+                    File.Delete(file);
+                }
             }
 
-            var observed = PluginAssemblyMetadataInspector.Inspect(destination, destinationRelative);
-            if (!observed.Sha256.Equals(file.Sha256))
+            var parent = directory;
+            while (Directory.Exists(parent)
+                && !Directory.EnumerateFileSystemEntries(parent).Any()
+                && !parent.Equals(Path.Combine(cleanGameRoot, "BepInEx", "plugins"), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
             {
-                throw new PluginSmokeException("A deployed synthetic plugin file did not match the approved package hash.");
+                Directory.Delete(parent);
+                parent = Path.GetDirectoryName(parent)!;
             }
 
-            deployedPaths.Add(destinationRelative);
-            deployedHashes.Add(observed.Sha256.Value);
+            if (!InstallationCopyService.CompareManifests(context.PreDeploymentManifest, InstallationCopyService.CaptureManifest(cleanGameRoot)).Matches)
+            {
+                throw new PluginSmokeException("Synthetic plugin deployment failed and could not restore the complete pre-deployment manifest.", exception);
+            }
+
+            throw exception is PluginSmokeException smoke
+                ? smoke
+                : new PluginSmokeException("Synthetic plugin deployment failed and was rolled back.", exception);
         }
 
         return new PluginDeploymentReceipt(
-            $"BepInEx/plugins/{package.Identity.Id}",
+            $"BepInEx/plugins/{package.Manifest.Identity.Id}",
             deployedPaths,
-            deployedHashes);
+            deployedHashes,
+            package.Manifest.PackageSha256.Value,
+            context.AdmissionBinding.BindingDigest);
     }
 
     public static void Remove(string cleanGameRoot, string pluginGuid)
     {
+        SmokeTestPathValidator.EnsureNoReparsePointsOnPath(cleanGameRoot);
         var directory = PluginDeploymentPath.GetPluginDirectory(cleanGameRoot, pluginGuid);
         if (!Directory.Exists(directory))
         {
@@ -436,6 +759,57 @@ public static class PluginDeploymentService
         }
 
         Directory.Delete(directory, recursive: true);
+    }
+
+    private static CopyManifest AddDeploymentToManifest(
+        CopyManifest baseline,
+        IReadOnlyList<(PluginPackageFile file, string destinationRelative, string destination, byte[] capturedBytes)> destinations)
+    {
+        var files = baseline.Files.ToDictionary(item => item.RelativePath, StringComparer.Ordinal);
+        var directories = (baseline.Directories ?? []).ToHashSet(StringComparer.Ordinal);
+        foreach (var item in destinations)
+        {
+            var parts = item.destinationRelative.Split('/');
+            for (var index = 1; index < parts.Length; index++)
+            {
+                directories.Add(string.Join('/', parts[..index]));
+            }
+
+            files[item.destinationRelative] = new FileManifestEntry(item.destinationRelative, item.capturedBytes.LongLength, item.file.Sha256.Value);
+        }
+
+        return new CopyManifest(files.Values.OrderBy(item => item.RelativePath, StringComparer.Ordinal).ToArray(), directories.Order(StringComparer.Ordinal).ToArray());
+    }
+
+    private static bool FindRunningProcessUnder(string cleanGameRoot)
+    {
+        var root = Path.GetFullPath(cleanGameRoot);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        foreach (var process in Process.GetProcesses())
+        {
+            try
+            {
+                var path = process.MainModule?.FileName;
+                if (!string.IsNullOrWhiteSpace(path))
+                {
+                    var full = Path.GetFullPath(path);
+                    if (full.Equals(root, comparison) || full.StartsWith(root + Path.DirectorySeparatorChar, comparison))
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception or NotSupportedException)
+            {
+                // An inaccessible unrelated process is not evidence that the disposable game is running.
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        return false;
     }
 }
 
@@ -452,7 +826,15 @@ public sealed record PluginAssemblyMetadata(
     bool ManagedNativeHeaderPresent,
     int PInvokeEntryCount,
     bool ModuleInitializerPresent,
-    IReadOnlyList<string> AssemblyReferences);
+    IReadOnlyList<string> AssemblyReferences,
+    int BepInPluginAttributeCount = 0,
+    string? BepInPluginGuid = null,
+    string? BepInPluginName = null,
+    string? BepInPluginVersion = null,
+    int PublicPluginImplementationCount = 0,
+    bool HasExpectedBaseUnityPluginReference = false,
+    bool HasThroneForgeModImplementation = false,
+    int ThroneForgeModImplementationCount = 0);
 
 public static class PluginAssemblyMetadataInspector
 {
@@ -491,6 +873,26 @@ public static class PluginAssemblyMetadataInspector
             throw new PluginSmokeException("A plugin inspection input could not be read safely.");
         }
 
+        return InspectBytes(bytes, relativePath, maximumBytes);
+    }
+
+    public static PluginAssemblyMetadata InspectBytes(
+        byte[] bytes,
+        string relativePath,
+        long maximumBytes = DefaultMaximumBytes)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        PluginPackageManifestService.ValidateRelativePath(relativePath);
+        if (maximumBytes < 1)
+        {
+            ArgumentOutOfRangeException.ThrowIfLessThan(maximumBytes, 1, nameof(maximumBytes));
+        }
+
+        if (bytes.LongLength > maximumBytes)
+        {
+            throw new PluginSmokeException("A plugin inspection input exceeds the bounded read limit.");
+        }
+
         var digest = new Sha256Digest(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
         try
         {
@@ -513,6 +915,9 @@ public static class PluginAssemblyMetadataInspector
                 metadata.GetMethodDefinition(handle).Attributes.HasFlag(MethodAttributes.PinvokeImpl));
             var moduleInitializer = HasModuleInitializer(metadata);
             var flags = corHeader?.Flags ?? 0;
+            var pluginAttributes = ReadBepInPluginAttributes(metadata, assembly);
+            var pluginTypes = ReadPluginTypeEvidence(metadata);
+            var modImplementationCount = CountThroneForgeModImplementations(metadata);
 
             return new(
                 relativePath,
@@ -527,7 +932,15 @@ public static class PluginAssemblyMetadataInspector
                 corHeader?.ManagedNativeHeaderDirectory.Size > 0,
                 pinvokeCount,
                 moduleInitializer,
-                references);
+                references,
+                pluginAttributes.Count,
+                pluginAttributes.Count == 1 ? pluginAttributes[0].Guid : null,
+                pluginAttributes.Count == 1 ? pluginAttributes[0].Name : null,
+                pluginAttributes.Count == 1 ? pluginAttributes[0].Version : null,
+                pluginTypes.Count,
+                pluginTypes.Any(item => item.HasBaseUnityPlugin),
+                pluginTypes.Any(item => item.ImplementsThroneForgeMod),
+                modImplementationCount);
         }
         catch (BadImageFormatException)
         {
@@ -538,6 +951,99 @@ public static class PluginAssemblyMetadataInspector
             throw new PluginSmokeException("A plugin inspection input contains unsupported metadata.");
         }
     }
+
+    private static List<(string Guid, string Name, string Version)> ReadBepInPluginAttributes(
+        MetadataReader metadata,
+        AssemblyDefinition assembly)
+    {
+        var attributes = new List<(string Guid, string Name, string Version)>();
+        foreach (var handle in assembly.GetCustomAttributes())
+        {
+            var attribute = metadata.GetCustomAttribute(handle);
+            if (!TryGetAttributeTypeName(metadata, attribute.Constructor, out var name)
+                || !name.Equals("BepInPlugin", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            try
+            {
+                var reader = metadata.GetBlobReader(attribute.Value);
+                if (reader.ReadUInt16() != 1)
+                {
+                    continue;
+                }
+
+                var guid = reader.ReadSerializedString();
+                var displayName = reader.ReadSerializedString();
+                var version = reader.ReadSerializedString();
+                if (guid is not null && displayName is not null && version is not null)
+                {
+                    attributes.Add((guid, displayName, version));
+                }
+            }
+            catch (BadImageFormatException)
+            {
+                // Malformed attribute data is represented as absent evidence and rejected by package rules.
+            }
+        }
+
+        return attributes;
+    }
+
+    private static List<(bool HasBaseUnityPlugin, bool ImplementsThroneForgeMod)> ReadPluginTypeEvidence(MetadataReader metadata)
+    {
+        var evidence = new List<(bool, bool)>();
+        foreach (var handle in metadata.TypeDefinitions)
+        {
+            var type = metadata.GetTypeDefinition(handle);
+            if (!type.Attributes.HasFlag(TypeAttributes.Public)
+                || type.Attributes.HasFlag(TypeAttributes.NestedPublic)
+                || type.Attributes.HasFlag(TypeAttributes.Abstract)
+                || type.Attributes.HasFlag(TypeAttributes.Interface)
+                || type.Attributes.HasFlag(TypeAttributes.Sealed) == false
+                || type.GetGenericParameters().Count != 0)
+            {
+                continue;
+            }
+
+            var baseName = GetTypeName(metadata, type.BaseType);
+            var implementsMod = type.GetInterfaceImplementations()
+                .Select(implementation => GetTypeName(metadata, metadata.GetInterfaceImplementation(implementation).Interface))
+                .Any(name => name.Equals("IThroneForgeMod", StringComparison.Ordinal));
+            if (baseName.Equals("BaseUnityPlugin", StringComparison.Ordinal) || implementsMod)
+            {
+                evidence.Add((baseName.Equals("BaseUnityPlugin", StringComparison.Ordinal), implementsMod));
+            }
+        }
+
+        return evidence;
+    }
+
+    private static int CountThroneForgeModImplementations(MetadataReader metadata)
+    {
+        var count = 0;
+        foreach (var handle in metadata.TypeDefinitions)
+        {
+            var type = metadata.GetTypeDefinition(handle);
+            if (type.GetInterfaceImplementations()
+                .Select(implementation => GetTypeName(metadata, metadata.GetInterfaceImplementation(implementation).Interface))
+                .Any(name => name.Equals("IThroneForgeMod", StringComparison.Ordinal)))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static string GetTypeName(MetadataReader metadata, EntityHandle handle)
+        => handle.Kind switch
+        {
+            HandleKind.TypeReference => metadata.GetString(metadata.GetTypeReference((TypeReferenceHandle)handle).Name),
+            HandleKind.TypeDefinition => metadata.GetString(metadata.GetTypeDefinition((TypeDefinitionHandle)handle).Name),
+            _ => string.Empty
+        };
 
     private static bool HasModuleInitializer(MetadataReader metadata)
     {
@@ -658,11 +1164,15 @@ public static class PluginSmokeMarkerParser
         var valueLines = string.IsNullOrWhiteSpace(markerPayload)
             ? lines
             : markerPayload.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        var values = valueLines
-            .Where(line => line.Contains('=', StringComparison.Ordinal))
-            .Select(line => line.Split('=', 2))
-            .Where(parts => parts.Length == 2)
-            .ToDictionary(parts => parts[0], parts => parts[1], StringComparer.Ordinal);
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var line in valueLines.Where(line => line.Contains('=', StringComparison.Ordinal)))
+        {
+            var parts = line.Split('=', 2);
+            if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]) || !values.TryAdd(parts[0], parts[1]))
+            {
+                return Invalid("duplicate-key", markerCount, lifecycle, values.GetValueOrDefault("pluginGuid"));
+            }
+        }
 
         if (!values.TryGetValue("nonce", out var nonce) || !nonce.Equals(expectedNonce, StringComparison.Ordinal))
         {

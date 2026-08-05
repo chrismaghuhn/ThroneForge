@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using ThroneForge.Contracts;
+using ThroneForge.LoaderSmokeTest;
 using Xunit;
 
 namespace ThroneForge.PluginSmokeTest.Tests;
@@ -87,6 +88,17 @@ public sealed class PluginSmokeDomainTests
 
         Assert.False(result.IsValid);
         Assert.Contains("nonce", result.FailureCategory, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void MarkerParserReturnsStructuredInvalidResultForDuplicateKeys()
+    {
+        var result = PluginSmokeMarkerParser.Parse(
+            "THRONEFORGE_SYNTHETIC_PLUGIN_READY|nonce=n|nonce=second|pluginGuid=dev.throneforge.m1.synthetic-smoke|pluginVersion=0.0.1",
+            "n");
+
+        Assert.False(result.IsValid);
+        Assert.Equal("duplicate-key", result.FailureCategory);
     }
 
     [Fact]
@@ -177,18 +189,143 @@ public sealed class PluginSmokeDomainTests
     public void DeploymentRejectsUnreadyProfileBeforeCreatingDirectory()
     {
         var root = Path.Combine(Path.GetTempPath(), $"throneforge-deploy-{Guid.NewGuid():N}");
-        var package = PluginPackageManifestService.Create(
-            new ModIdentity("dev.throneforge.m1.synthetic-smoke", "0.0.1"),
-            [new PluginPackageFile("Plugin.dll", 3, Digest("abc"), "Plugin, Version=1.0.0.0", "netstandard2.1")]);
+        var original = Path.Combine(root, "original");
+        var experiment = Path.Combine(root, "experiment");
+        Directory.CreateDirectory(original);
 
         try
         {
-            Assert.Throws<PluginSmokeException>(() => PluginDeploymentService.Deploy(
+            var binding = new CodeModAdmissionBinding(
+                new ModIdentity("dev.throneforge.m1.synthetic-smoke", "0.0.1"),
+                Digest("package"),
+                Fingerprint,
+                "throneforge.adapter",
+                "1.0.0");
+            Assert.Throws<PluginSmokeException>(() => PluginDeploymentService.DeriveContext(
+                original,
+                Path.Combine(experiment, "clean-game"),
+                experiment,
                 root,
-                Path.Combine(root, "clean-game"),
-                package,
-                new PluginDeploymentPreconditions(false, true, true, true)));
-            Assert.False(Directory.Exists(Path.Combine(root, "clean-game", "BepInEx")));
+                Fingerprint.Value,
+                binding));
+            Assert.False(Directory.Exists(Path.Combine(experiment, "clean-game", "BepInEx")));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void Task6OwnershipStateRequiresExactFingerprintAndCleanGameRelativePath()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"throneforge-task6-{Guid.NewGuid():N}");
+        try
+        {
+            var state = Task6ExperimentStateService.CreatePrepared(
+                root,
+                Fingerprint.Value,
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+            Task6ExperimentStateService.SaveAtomic(root, state);
+
+            var loaded = Task6ExperimentStateService.LoadAndValidate(root, Fingerprint.Value);
+
+            Assert.Equal(Task6ExperimentStatus.Prepared, loaded.Status);
+            Assert.Equal("clean-game", loaded.CleanGameRelativePath);
+            Assert.Throws<PluginSmokeException>(() => Task6ExperimentStateService.LoadAndValidate(root, new string('a', 64)));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void Task6OwnershipStateRejectsArbitraryExistingDirectoryWithoutMarker()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"throneforge-task6-unowned-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            Assert.Throws<PluginSmokeException>(() => Task6ExperimentStateService.LoadAndValidate(root, Fingerprint.Value));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void PackageManifestLoaderRejectsUnsupportedSchemaVersion()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"throneforge-package-{Guid.NewGuid():N}.json");
+        File.WriteAllText(path, "{\"SchemaVersion\":\"future\",\"ModId\":\"dev.throneforge.m1.synthetic-smoke\",\"ModVersion\":\"0.0.1\",\"PackageSha256\":\"" + new string('0', 64) + "\",\"Files\":[]}");
+        try
+        {
+            Assert.Throws<PluginSmokeException>(() => PluginPackageManifestService.Load(path));
+        }
+        finally
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
+    public void ApiAndContractsPublicSurfaceIsEquivalentAcrossNet10AndNetstandard21()
+    {
+        var repository = FindRepositoryRoot();
+        var apiNet10 = Path.Combine(repository, "artifacts", "bin", "ThroneForge.API", "Release", "net10.0", "ThroneForge.API.dll");
+        var apiNetstandard = Path.Combine(repository, "artifacts", "bin", "ThroneForge.API", "Release", "netstandard2.1", "ThroneForge.API.dll");
+        var contractsNet10 = Path.Combine(repository, "artifacts", "bin", "ThroneForge.Contracts", "Release", "net10.0", "ThroneForge.Contracts.dll");
+        var contractsNetstandard = Path.Combine(repository, "artifacts", "bin", "ThroneForge.Contracts", "Release", "netstandard2.1", "ThroneForge.Contracts.dll");
+
+        Assert.True(File.Exists(apiNet10) && File.Exists(apiNetstandard) && File.Exists(contractsNet10) && File.Exists(contractsNetstandard), "Both public target-framework outputs must be built before parity validation.");
+        PublicSurfaceParityService.RequireEquivalent(apiNet10, apiNetstandard);
+        PublicSurfaceParityService.RequireEquivalent(contractsNet10, contractsNetstandard);
+    }
+
+    [Fact]
+    public void TransactionalDeploymentRemovesPartialFilesAndDirectories()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"throneforge-deploy-transaction-{Guid.NewGuid():N}");
+        var clean = Path.Combine(root, "clean-game");
+        Directory.CreateDirectory(Path.Combine(clean, "BepInEx", "plugins"));
+        var bytes = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        {
+            ["ThroneForge.M1.SyntheticSmoke.dll"] = Encoding.UTF8.GetBytes("one"),
+            ["ThroneForge.API.dll"] = Encoding.UTF8.GetBytes("two"),
+            ["ThroneForge.Contracts.dll"] = Encoding.UTF8.GetBytes("three")
+        };
+        var files = bytes.Select(item => new PluginPackageFile(
+            item.Key,
+            item.Value.LongLength,
+            new Sha256Digest(Convert.ToHexString(SHA256.HashData(item.Value)).ToLowerInvariant()),
+            Path.GetFileNameWithoutExtension(item.Key) + ", Version=1.0.0.0",
+            "netstandard2.1")).ToArray();
+        var manifest = PluginPackageManifestService.Create(new ModIdentity("dev.throneforge.m1.synthetic-smoke", "0.0.1"), files);
+        var roots = new SmokeTestRoots(root, Path.Combine(root, "original"), root, clean, Path.Combine(root, "downloads"), Path.Combine(root, "extract"), Path.Combine(root, "evidence"), Path.Combine(root, "manifests"), Path.Combine(root, "backup"));
+        var binding = new CodeModAdmissionBinding(new ModIdentity("dev.throneforge.m1.synthetic-smoke", "0.0.1"), manifest.PackageSha256, Fingerprint, "throneforge.adapter", "1.0.0");
+        var context = new PluginDeploymentContext(
+            roots,
+            new Task6ExperimentState(Task6ExperimentStateService.SchemaVersion, Task6ExperimentStateService.TaskVersion, Fingerprint.Value, Guid.NewGuid().ToString("N"), new string('a', 40), "clean-game", Task6ExperimentStatus.LaunchObserved),
+            new DisposableProfileBaseline("baseline", "task", Fingerprint.Value, new CopyManifest([], []), new CopyManifest([], ["BepInEx", "BepInEx/plugins"])),
+            new LoaderTransactionState("schema", "task", Fingerprint.Value, "baseline", "archive.zip", new string('a', 64), LoaderTransactionStatus.LaunchObserved, new CopyManifest([], []), [], []),
+            new CopyManifest([], ["BepInEx", "BepInEx/plugins"]),
+            binding);
+
+        try
+        {
+            Assert.Throws<PluginSmokeException>(() => PluginDeploymentService.DeployCaptured(new CapturedPluginPackage(manifest, bytes, new Dictionary<string, PluginAssemblyMetadata>()), context, failAfterFiles: 2));
+            Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(clean, "BepInEx", "plugins")));
         }
         finally
         {
@@ -250,4 +387,21 @@ public sealed class PluginSmokeDomainTests
 
     private static Sha256Digest Digest(string text)
         => new(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant());
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (current is not null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, "src"))
+                && File.Exists(Path.Combine(current.FullName, "ThroneForge.slnx")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        throw new InvalidOperationException("Repository root could not be located for public-surface parity validation.");
+    }
 }

@@ -283,3 +283,16 @@ Task-2 merge evidence: PR #2 merged into `main` at `d3f1bb4fde9f77efbb84349f4403
 - [x] Open selected files once for bounded length validation and hashing; keep deterministic fingerprints.
 - [x] Add regression coverage for output protection, renamed installations, crash-handler ordering, ambiguous executables, CLI redaction, and report non-creation after rejected output.
 - [x] Correct status, plan, README, and changelog wording; run local and hosted validation without starting loader/runtime work.
+
+## M1 Task 6 hardening follow-up (in progress)
+
+- [x] Add an atomically persisted, fingerprint-bound Task-6 ownership record and reject unowned rollback/cleanup targets.
+- [x] Derive plugin-deployment preconditions from the owned disposable profile, loader transaction state, complete current manifest, process state, and empty custom-plugin root.
+- [x] Recapture the exact three package files once, validate their metadata and actual target framework, rerun admission, and retain the same captured bytes for deployment.
+- [x] Make plugin deployment transactional and remove partial files/directories on every write or final-manifest failure.
+- [x] Enforce the exact synthetic package shape, IL-only/no-native/no-PInvoke/no-module-initializer rules, exact identities, BepInEx metadata, and one public plugin implementation.
+- [x] Emit runtime API/Contracts identities from the loaded assemblies instead of build-time constants; add metadata-only net10.0/netstandard2.1 public-surface parity checks.
+- [x] Add structured recovery-marker persistence and malformed-marker handling; do not claim recovery when the marker is unavailable.
+- [ ] Run local canonical validation with the committed SDK selection, push the hardened branch, and obtain green hosted Windows/Linux CI with complete TRX artifact inspection.
+- [ ] After hosted CI passes, perform exactly one corrected private run in a fresh external profile, manually inspect the sanitized report, and update the report with actual package/admission/runtime-identity evidence.
+- [ ] Keep M1 Task 7 unstarted until Task 6 hardening and the fresh private result are reviewed.

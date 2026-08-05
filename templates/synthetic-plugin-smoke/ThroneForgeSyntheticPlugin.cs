@@ -13,9 +13,6 @@ public sealed class ThroneForgeSyntheticPlugin : BaseUnityPlugin, IThroneForgeMo
 {
     private const string PluginGuid = "dev.throneforge.m1.synthetic-smoke";
     private const string PluginVersion = "0.0.1";
-    private const string ApiIdentity = "__THRONEFORGE_API_IDENTITY__";
-    private const string ContractsIdentity = "__THRONEFORGE_CONTRACTS_IDENTITY__";
-
     private void Awake()
     {
         var nonce = Environment.GetEnvironmentVariable("THRONEFORGE_SMOKE_NONCE");
@@ -25,9 +22,14 @@ public sealed class ThroneForgeSyntheticPlugin : BaseUnityPlugin, IThroneForgeMo
             return;
         }
 
+        var apiIdentity = FormatIdentity(typeof(IThroneForgeMod).Assembly.GetName());
+        var contractsIdentity = FormatIdentity(typeof(ModIdentity).Assembly.GetName());
         Logger.LogInfo(
-            $"THRONEFORGE_SYNTHETIC_PLUGIN_READY|nonce={nonce}|pluginGuid={PluginGuid}|pluginVersion={PluginVersion}|api={ApiIdentity}|contracts={ContractsIdentity}");
+            $"THRONEFORGE_SYNTHETIC_PLUGIN_READY|nonce={nonce}|pluginGuid={PluginGuid}|pluginVersion={PluginVersion}|api={apiIdentity}|contracts={contractsIdentity}");
     }
+
+    private static string FormatIdentity(System.Reflection.AssemblyName identity)
+        => $"{identity.Name}, Version={identity.Version}";
 
     public ValueTask InitializeAsync(IModContext context, CancellationToken cancellationToken)
         => throw new InvalidOperationException("THRONEFORGE_SYNTHETIC_PLUGIN_LIFECYCLE_INVOKED");
